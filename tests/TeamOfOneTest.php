@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Validation\ValidationException;
+use Schemastud\Beam\Accounts\Enums\Role;
 use Schemastud\Beam\Accounts\Fortify\CreateNewUser;
-use Schemastud\Beam\Accounts\Support\Roles;
 use Schemastud\Beam\Accounts\Teams\TeamProvisioner;
 use Schemastud\Beam\Accounts\Tests\Fixtures\User;
 use Spatie\Permission\PermissionRegistrar;
@@ -23,7 +23,7 @@ it('provisions a team-of-one when creating a user', function () {
     expect($user->current_team_id)->toBe($team->id);
 
     $membership = $user->memberships()->where('team_id', $team->id)->first();
-    expect($membership->role)->toBe(Roles::OWNER);
+    expect($membership->role)->toBe(Role::Owner->value);
 });
 
 it('assigns the spatie owner role scoped to the personal team', function () {
@@ -37,7 +37,7 @@ it('assigns the spatie owner role scoped to the personal team', function () {
     app(PermissionRegistrar::class)->setPermissionsTeamId($user->personalTeam()->id);
     $user->unsetRelation('roles');
 
-    expect($user->hasRole(Roles::OWNER))->toBeTrue();
+    expect($user->hasRole(Role::Owner->value))->toBeTrue();
 });
 
 it('adds a member with a role through the provisioner', function () {
@@ -51,9 +51,9 @@ it('adds a member with a role through the provisioner', function () {
     $team = $owner->personalTeam();
     $member = User::create(['name' => 'Member', 'email' => 'member@example.test', 'password' => 'password-1234']);
 
-    app(TeamProvisioner::class)->addMember($member, $team, Roles::ADMIN);
+    app(TeamProvisioner::class)->addMember($member, $team, Role::Admin->value);
 
-    expect($member->teamRole($team))->toBe(Roles::ADMIN);
+    expect($member->teamRole($team))->toBe(Role::Admin->value);
 });
 
 it('rejects a duplicate email at registration', function () {

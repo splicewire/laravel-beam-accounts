@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Schemastud\Beam\Accounts\Support\Roles;
+use Schemastud\Beam\Accounts\Enums\Role;
 use Schemastud\Beam\Accounts\Tests\Fixtures\User;
 
 beforeEach(function () {
@@ -22,7 +22,7 @@ it('registers a user through Fortify and provisions their team-of-one', function
     $user = User::firstWhere('email', 'ada@example.test');
     expect($user)->not->toBeNull();
     expect($user->personalTeam())->not->toBeNull();
-    expect($user->memberships()->value('role'))->toBe(Roles::OWNER);
+    expect($user->memberships()->value('role'))->toBe(Role::Owner->value);
 });
 
 it('logs an existing user in through Fortify', function () {

@@ -6,10 +6,10 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Schemastud\Beam\Accounts\Enums\Role;
 use Schemastud\Beam\Accounts\Models\Invitation;
 use Schemastud\Beam\Accounts\Models\Membership;
 use Schemastud\Beam\Accounts\Models\Team;
-use Schemastud\Beam\Accounts\Support\Roles;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -22,13 +22,19 @@ class TeamMembers
 {
     public function __construct(protected TeamProvisioner $provisioner) {}
 
-    public function invite(Team $team, Authenticatable $actor, string $email, string $role = Roles::MEMBER): Invitation
+    public function invite(Team $team, Authenticatable $actor, string $email, Role|string $role = Role::Member): Invitation
     {
         $this->assertOwner($team, $actor);
 
+        $role = $role instanceof Role ? $role : Role::from($role);
+
+        if (! in_array($role, Role::invitable(), true)) {
+            throw new AuthorizationException("The {$role->value} role cannot be assigned by invitation.");
+        }
+
         return Invitation::updateOrCreate(
             ['team_id' => $team->getKey(), 'email' => $email],
-            ['role' => $role, 'token' => (string) Str::uuid()],
+            ['role' => $role->value, 'token' => (string) Str::uuid()],
         );
     }
 
@@ -44,15 +50,17 @@ class TeamMembers
         return $membership;
     }
 
-    public function changeRole(Team $team, Authenticatable $actor, Authenticatable $member, string $role): Membership
+    public function changeRole(Team $team, Authenticatable $actor, Authenticatable $member, Role|string $role): Membership
     {
         $this->assertOwner($team, $actor);
+
+        $role = $role instanceof Role ? $role : Role::from($role);
 
         $membership = Membership::where('team_id', $team->getKey())
             ->where('user_id', $member->getKey())
             ->firstOrFail();
 
-        $membership->update(['role' => $role]);
+        $membership->update(['role' => $role->value]);
         $this->provisioner->syncSpatieRole($member, $team, $role);
 
         return $membership;
@@ -90,7 +98,7 @@ class TeamMembers
         $isOwner = $team->user_id == $actor->getKey()
             || Membership::where('team_id', $team->getKey())
                 ->where('user_id', $actor->getKey())
-                ->where('role', Roles::OWNER)
+                ->where('role', Role::Owner->value)
                 ->exists();
 
         if (! $isOwner) {

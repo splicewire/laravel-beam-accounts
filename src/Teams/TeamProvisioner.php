@@ -6,9 +6,9 @@ use Illuminate\Contracts\Auth\Authenticatable;
 
 use function Schemastud\Beam\Accounts\accountGuard;
 
+use Schemastud\Beam\Accounts\Enums\Role;
 use Schemastud\Beam\Accounts\Models\Membership;
 use Schemastud\Beam\Accounts\Models\Team;
-use Schemastud\Beam\Accounts\Support\Roles;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -26,7 +26,7 @@ class TeamProvisioner
             'personal_team' => true,
         ]);
 
-        $this->addMember($user, $team, Roles::OWNER);
+        $this->addMember($user, $team, Role::Owner);
         $user->forceFill(['current_team_id' => $team->getKey()])->save();
 
         return $team;
@@ -36,11 +36,13 @@ class TeamProvisioner
      * Attach a user to a team with a role, mirroring the assignment into spatie's
      * team-scoped role so the permission cascade resolves against it.
      */
-    public function addMember(Authenticatable $user, Team $team, string $role): Membership
+    public function addMember(Authenticatable $user, Team $team, Role|string $role): Membership
     {
+        $role = $role instanceof Role ? $role : Role::from($role);
+
         $membership = Membership::updateOrCreate(
             ['team_id' => $team->getKey(), 'user_id' => $user->getKey()],
-            ['role' => $role],
+            ['role' => $role->value],
         );
 
         $this->syncSpatieRole($user, $team, $role);
@@ -48,14 +50,16 @@ class TeamProvisioner
         return $membership;
     }
 
-    public function syncSpatieRole(Authenticatable $user, Team $team, string $role): void
+    public function syncSpatieRole(Authenticatable $user, Team $team, Role|string $role): void
     {
+        $role = $role instanceof Role ? $role : Role::from($role);
+
         $registrar = app(PermissionRegistrar::class);
         $previous = $registrar->getPermissionsTeamId();
 
         $registrar->setPermissionsTeamId($team->getKey());
 
-        $roleModel = app(config('permission.models.role'))::findOrCreate($role, accountGuard());
+        $roleModel = app(config('permission.models.role'))::findOrCreate($role->value, accountGuard());
         $user->syncRoles([$roleModel]);
 
         $registrar->setPermissionsTeamId($previous);
