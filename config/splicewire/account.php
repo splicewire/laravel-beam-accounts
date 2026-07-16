@@ -11,7 +11,18 @@ return [
 
     // Register the package's settings routes (profile/security). Turn off if the host
     // wants to wire the macro itself.
-    'register_routes' => true,
+    'register_routes' => env('ACCOUNT_REGISTER_ROUTES', true),
+
+    // Wire Fortify as the default auth substrate (registration/reset actions +
+    // login/two-factor rate limiters). A host that consumes only the code primitive
+    // (models/contracts/enum/traits) over its OWN auth — e.g. the platform app on
+    // Sanctum, not Fortify — turns this off to keep its auth surface untouched.
+    'bootstrap_fortify' => env('ACCOUNT_BOOTSTRAP_FORTIFY', true),
+
+    // Load the package's teams/memberships/invitations migrations. A host composing the
+    // primitive over its own tables (the platform app over `tenant_users`) turns this
+    // off so the engine tables are never created.
+    'register_migrations' => env('ACCOUNT_REGISTER_MIGRATIONS', true),
 
     // Prefix + route middleware for the settings surface.
     'routes' => [

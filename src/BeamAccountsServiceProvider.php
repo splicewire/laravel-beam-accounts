@@ -53,6 +53,10 @@ class BeamAccountsServiceProvider extends ServiceProvider
 
     protected function bootMigrations(): void
     {
+        if (! config('splicewire.account.register_migrations', true)) {
+            return;
+        }
+
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
     }
 
@@ -92,6 +96,10 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootFortify(): void
     {
+        if (! config('splicewire.account.bootstrap_fortify', true)) {
+            return;
+        }
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
