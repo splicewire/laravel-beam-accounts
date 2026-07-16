@@ -1,0 +1,152 @@
+<?php
+
+namespace Schemastud\Beam\Accounts\Tests;
+
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Laravel\Fortify\Features;
+use Laravel\Fortify\FortifyServiceProvider;
+use Orchestra\Testbench\TestCase as Orchestra;
+use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
+use Schemastud\Beam\Accounts\BeamAccountsServiceProvider;
+use Schemastud\Beam\Accounts\Tests\Fixtures\User;
+use Spatie\Permission\PermissionServiceProvider;
+
+abstract class TestCase extends Orchestra
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->createUsersSchema();
+        $this->createTeamsSchema();
+        $this->createSpatieSchema();
+    }
+
+    protected function getPackageProviders($app): array
+    {
+        return [
+            PermissionServiceProvider::class,
+            PermissionCascadeServiceProvider::class,
+            FortifyServiceProvider::class,
+            BeamAccountsServiceProvider::class,
+        ];
+    }
+
+    protected function defineEnvironment($app): void
+    {
+        $config = $app['config'];
+
+        $config->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+
+        $config->set('database.default', 'testing');
+        $config->set('database.connections.testing', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+
+        $config->set('auth.providers.users.model', User::class);
+        $config->set('permission-cascade.user_model', User::class);
+
+        $config->set('session.driver', 'array');
+
+        $config->set('fortify.guard', 'web');
+        $config->set('fortify.home', '/');
+        $config->set('fortify.views', false);
+        $config->set('fortify.features', [
+            Features::registration(),
+            Features::resetPasswords(),
+            Features::emailVerification(),
+            Features::updatePasswords(),
+        ]);
+    }
+
+    protected function createUsersSchema(): void
+    {
+        Schema::create('users', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('current_team_id')->nullable();
+            $table->string('name')->nullable();
+            $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('password')->nullable();
+            $table->rememberToken();
+            $table->timestamps();
+        });
+    }
+
+    protected function createTeamsSchema(): void
+    {
+        Schema::create('teams', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('name');
+            $table->boolean('personal_team')->default(false);
+            $table->timestamps();
+        });
+
+        Schema::create('memberships', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('team_id');
+            $table->unsignedBigInteger('user_id');
+            $table->string('role')->default('member');
+            $table->timestamps();
+            $table->unique(['team_id', 'user_id']);
+        });
+
+        Schema::create('invitations', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('team_id');
+            $table->string('email');
+            $table->string('role')->default('member');
+            $table->string('token')->unique();
+            $table->timestamps();
+            $table->unique(['team_id', 'email']);
+        });
+    }
+
+    protected function createSpatieSchema(): void
+    {
+        Schema::create('permissions', function (Blueprint $table): void {
+            $table->id();
+            $table->string('name');
+            $table->string('guard_name');
+            $table->timestamps();
+            $table->unique(['name', 'guard_name']);
+        });
+
+        Schema::create('roles', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('team_id')->nullable();
+            $table->string('name');
+            $table->string('guard_name');
+            $table->timestamps();
+            $table->unique(['team_id', 'name', 'guard_name']);
+        });
+
+        Schema::create('model_has_permissions', function (Blueprint $table): void {
+            $table->unsignedBigInteger('permission_id');
+            $table->string('model_type');
+            $table->unsignedBigInteger('model_id');
+            $table->unsignedBigInteger('team_id');
+            $table->index(['model_id', 'model_type']);
+            $table->primary(['team_id', 'permission_id', 'model_id', 'model_type']);
+        });
+
+        Schema::create('model_has_roles', function (Blueprint $table): void {
+            $table->unsignedBigInteger('role_id');
+            $table->string('model_type');
+            $table->unsignedBigInteger('model_id');
+            $table->unsignedBigInteger('team_id');
+            $table->index(['model_id', 'model_type']);
+            $table->primary(['team_id', 'role_id', 'model_id', 'model_type']);
+        });
+
+        Schema::create('role_has_permissions', function (Blueprint $table): void {
+            $table->unsignedBigInteger('permission_id');
+            $table->unsignedBigInteger('role_id');
+            $table->primary(['permission_id', 'role_id']);
+        });
+    }
+}

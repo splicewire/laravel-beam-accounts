@@ -1,0 +1,61 @@
+<?php
+
+return [
+    // The session guard the account surface runs on. Satellites are session/cookie
+    // consumer apps — the token 'api' guard is a separate, opt-in door (issue 07).
+    'guard' => 'web',
+
+    // The Authenticatable model registrations create and the profile surface edits.
+    // null falls back to the default auth provider model.
+    'user_model' => null,
+
+    // Register the package's settings routes (profile/security). Turn off if the host
+    // wants to wire the macro itself.
+    'register_routes' => true,
+
+    // Prefix + route middleware for the settings surface.
+    'routes' => [
+        'prefix' => 'settings',
+        'middleware' => ['web', 'auth'],
+    ],
+
+    // Name given to the personal team provisioned on registration. {name} is the user's name.
+    'personal_team_name' => "{name}'s Team",
+
+    // Demo subjects + the `account:login-as` affordance — a standardized way to land in
+    // the app as a known subject at a known access level (owner/admin/member/solo) and
+    // verify the account/billing/admin surfaces gate correctly. A development/preview
+    // convenience, never for real end-users.
+    'demo' => [
+        // Master switch. null (default) = on in every non-production environment, off in
+        // production. Set true to allow in a preview deploy — there the login-as links
+        // must be signed (the artisan command mints them), so it opens no hole.
+        'enabled' => env('ACCOUNT_DEMO_ENABLED'),
+
+        // Deterministic credentials the DemoTeamSeeder provisions and login-as targets.
+        'password' => env('ACCOUNT_DEMO_PASSWORD', 'password'),
+        'email_domain' => env('ACCOUNT_DEMO_EMAIL_DOMAIN', 'example.test'),
+
+        // Where a successful demo login lands. Satellites point this at their home.
+        'redirect' => '/',
+
+        // URL prefix for the signed login-as route.
+        'login_as_prefix' => 'account/login-as',
+    ],
+
+    // The "proprietary API layer" seam — a satellite's second door, for exposing its
+    // own token-authenticated API to its own end-users/mobile clients. Prepared but
+    // NOT provisioned: default-off, wired to no consumer, no endpoints. When a real
+    // consumer appears, install laravel/sanctum and flip `enabled` — no rebuild.
+    //
+    // Sanctum (not Passport): a satellite exposing its own API wants
+    // personal-access-tokens + SPA-cookie auth, not a full OAuth2 authorization server.
+    // Passport stays the platform's concern (the operator console is the OAuth provider).
+    'api' => [
+        'enabled' => false,
+        'guard' => 'api',
+        'driver' => 'sanctum',
+        // null falls back to the same provider as the web guard.
+        'provider' => null,
+    ],
+];
