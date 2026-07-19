@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Concerns;
+namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rules\Password;

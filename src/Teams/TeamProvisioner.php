@@ -1,15 +1,15 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Teams;
+namespace Splicewire\Beam\Accounts\Teams;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-
-use function Schemastud\Beam\Accounts\accountGuard;
-
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Models\Membership;
-use Schemastud\Beam\Accounts\Models\Team;
 use Spatie\Permission\PermissionRegistrar;
+
+use function Splicewire\Beam\Accounts\accountGuard;
+
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Models\Membership;
+use Splicewire\Beam\Accounts\Models\Team;
 
 /**
  * Turns a freshly-registered user into a team-of-one: a personal team, an owner

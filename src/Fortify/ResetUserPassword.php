@@ -1,11 +1,11 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Fortify;
+namespace Splicewire\Beam\Accounts\Fortify;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
-use Schemastud\Beam\Accounts\Concerns\PasswordValidationRules;
+use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 
 class ResetUserPassword implements ResetsUserPasswords
 {

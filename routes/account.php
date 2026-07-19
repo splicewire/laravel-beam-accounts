@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Schemastud\Beam\Accounts\Http\Controllers\ProfileController;
-use Schemastud\Beam\Accounts\Http\Controllers\SecurityController;
+use Splicewire\Beam\Accounts\Http\Controllers\ProfileController;
+use Splicewire\Beam\Accounts\Http\Controllers\SecurityController;
 
 /*
  * The settings surface. Fortify owns the auth routes (login/register/reset/verify);

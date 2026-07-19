@@ -1,13 +1,13 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Concerns;
+namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
-use Schemastud\Beam\Accounts\Contracts\TeamContract;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Accounts\Contracts\TeamContract;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Models\Team;
 
 /**
  * The team side of the account primitive over ANY backing table — not just beam's

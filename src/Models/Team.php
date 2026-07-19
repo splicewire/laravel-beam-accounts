@@ -1,16 +1,16 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Models;
+namespace Splicewire\Beam\Accounts\Models;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-use function Schemastud\Beam\Accounts\accountUserModel;
+use function Splicewire\Beam\Accounts\accountUserModel;
 
-use Schemastud\Beam\Accounts\Contracts\TeamContract;
-use Schemastud\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Contracts\TeamContract;
+use Splicewire\Beam\Accounts\Enums\Role;
 
 /**
  * The reference implementation of {@see TeamContract} — a single-DB team over beam's

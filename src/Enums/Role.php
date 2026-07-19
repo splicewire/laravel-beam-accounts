@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Enums;
+namespace Splicewire\Beam\Accounts\Enums;
 
 /**
  * The single source of truth for the team roles the account runtime understands.

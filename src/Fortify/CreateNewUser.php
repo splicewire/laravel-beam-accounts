@@ -1,16 +1,16 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Fortify;
+namespace Splicewire\Beam\Accounts\Fortify;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
-use function Schemastud\Beam\Accounts\accountUserModel;
+use function Splicewire\Beam\Accounts\accountUserModel;
 
-use Schemastud\Beam\Accounts\Concerns\PasswordValidationRules;
-use Schemastud\Beam\Accounts\Concerns\ProfileValidationRules;
-use Schemastud\Beam\Accounts\Teams\TeamProvisioner;
+use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
+use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
+use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
  * The shared registration action: validate, create the satellite's user, and

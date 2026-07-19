@@ -1,10 +1,10 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Contracts;
+namespace Splicewire\Beam\Accounts\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Models\Membership;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Models\Membership;
 
 /**
  * The minimal membership surface: a single user's seat on a team — who they are, the

@@ -1,11 +1,11 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Tests\Fixtures;
+namespace Splicewire\Beam\Accounts\Tests\Fixtures;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Schemastud\Beam\Accounts\Concerns\BelongsToTeams;
 use Spatie\Permission\Traits\HasRoles;
+use Splicewire\Beam\Accounts\Concerns\BelongsToTeams;
 
 class User extends Authenticatable
 {

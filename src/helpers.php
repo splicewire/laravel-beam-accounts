@@ -1,10 +1,10 @@
 <?php
 
-namespace Schemastud\Beam\Accounts;
+namespace Splicewire\Beam\Accounts;
 
 use Illuminate\Foundation\Auth\User;
 
-if (! function_exists('Schemastud\Beam\Accounts\accountUserModel')) {
+if (! function_exists('Splicewire\Beam\Accounts\accountUserModel')) {
     /**
      * Resolve the satellite's Authenticatable model class.
      */

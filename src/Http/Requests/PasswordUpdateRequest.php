@@ -1,10 +1,10 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Http\Requests;
+namespace Splicewire\Beam\Accounts\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Schemastud\Beam\Accounts\Concerns\PasswordValidationRules;
+use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 
 class PasswordUpdateRequest extends FormRequest
 {

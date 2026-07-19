@@ -1,16 +1,16 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Teams;
+namespace Splicewire\Beam\Accounts\Teams;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Models\Invitation;
-use Schemastud\Beam\Accounts\Models\Membership;
-use Schemastud\Beam\Accounts\Models\Team;
 use Spatie\Permission\PermissionRegistrar;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Models\Invitation;
+use Splicewire\Beam\Accounts\Models\Membership;
+use Splicewire\Beam\Accounts\Models\Team;
 
 /**
  * The multi-member lifecycle over a single-DB team: invite → accept → change role

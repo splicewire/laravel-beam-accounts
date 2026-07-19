@@ -1,7 +1,7 @@
 <?php
 
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Support\Roles;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Support\Roles;
 
 it('is the single source of the role vocabulary', function () {
     expect(Role::values())->toBe(['owner', 'admin', 'member']);

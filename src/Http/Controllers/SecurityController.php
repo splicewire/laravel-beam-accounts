@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Http\Controllers;
+namespace Splicewire\Beam\Accounts\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
@@ -8,8 +8,8 @@ use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Fortify\Features;
-use Schemastud\Beam\Accounts\Http\Requests\PasswordUpdateRequest;
-use Schemastud\Beam\Accounts\Http\Requests\SecurityPageRequest;
+use Splicewire\Beam\Accounts\Http\Requests\PasswordUpdateRequest;
+use Splicewire\Beam\Accounts\Http\Requests\SecurityPageRequest;
 
 class SecurityController extends Controller
 {

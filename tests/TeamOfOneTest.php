@@ -1,11 +1,11 @@
 <?php
 
 use Illuminate\Validation\ValidationException;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Fortify\CreateNewUser;
-use Schemastud\Beam\Accounts\Teams\TeamProvisioner;
-use Schemastud\Beam\Accounts\Tests\Fixtures\User;
 use Spatie\Permission\PermissionRegistrar;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
+use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
+use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 it('provisions a team-of-one when creating a user', function () {
     $user = app(CreateNewUser::class)->create([

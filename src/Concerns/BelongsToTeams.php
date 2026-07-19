@@ -1,12 +1,12 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Concerns;
+namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Schemastud\Beam\Accounts\Models\Membership;
-use Schemastud\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Accounts\Models\Membership;
+use Splicewire\Beam\Accounts\Models\Team;
 
 /**
  * The satellite end-user's side of the teams-first model. Every account owns a

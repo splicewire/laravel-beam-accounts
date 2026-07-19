@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Http\Controllers;
+namespace Splicewire\Beam\Accounts\Http\Controllers;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
@@ -9,8 +9,8 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
-use Schemastud\Beam\Accounts\Http\Requests\ProfileDeleteRequest;
-use Schemastud\Beam\Accounts\Http\Requests\ProfileUpdateRequest;
+use Splicewire\Beam\Accounts\Http\Requests\ProfileDeleteRequest;
+use Splicewire\Beam\Accounts\Http\Requests\ProfileUpdateRequest;
 
 class ProfileController extends Controller
 {

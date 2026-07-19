@@ -1,11 +1,11 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Contracts;
+namespace Splicewire\Beam\Accounts\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Models\Team;
 
 /**
  * The minimal team surface the account runtime understands: an object that has an

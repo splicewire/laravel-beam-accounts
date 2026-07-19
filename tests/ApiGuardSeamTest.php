@@ -1,6 +1,6 @@
 <?php
 
-use Schemastud\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 
 it('does not register the api guard by default', function () {
     expect(config('splicewire.account.api.enabled'))->toBeFalse();

@@ -1,8 +1,8 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Support;
+namespace Splicewire\Beam\Accounts\Support;
 
-use Schemastud\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Enums\Role;
 
 /**
  * @deprecated Use the backed enum {@see Role} — the

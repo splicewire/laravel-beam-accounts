@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Http\Requests;
+namespace Splicewire\Beam\Accounts\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 

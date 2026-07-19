@@ -1,5 +1,5 @@
 {
-    "name": "schemastud/laravel-beam-accounts",
+    "name": "splicewire/laravel-beam-accounts",
     "description": "The account engine of the schemastud stack: Fortify/session as the default auth substrate, the whole self-service account runtime (profile/security surface + Fortify registration/reset actions), and the generic team/membership/invitation primitives on the permission-cascade base leaf. A capability peer of the beam family; concrete tenant-provisioning + demo stay in the consuming satellite. Not Passport.",
     "keywords": [
         "laravel",
@@ -34,11 +34,11 @@
     },
     "suggest": {
         "laravel/sanctum": "Install in a satellite to activate its own opt-in token 'api' guard seam alongside the engine's session/Fortify web guard.",
-        "schemastud/laravel-beam": "The app-substrate rung; require it in a host that also persists schema records."
+        "splicewire/laravel-beam": "The app-substrate rung; require it in a host that also persists schema records."
     },
     "autoload": {
         "psr-4": {
-            "Schemastud\\Beam\\Accounts\\": "src/"
+            "Splicewire\\Beam\\Accounts\\": "src/"
         },
         "files": [
             "src/helpers.php"
@@ -46,7 +46,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Schemastud\\Beam\\Accounts\\Tests\\": "tests/"
+            "Splicewire\\Beam\\Accounts\\Tests\\": "tests/"
         }
     },
     "extra": {
@@ -55,7 +55,7 @@
         },
         "laravel": {
             "providers": [
-                "Schemastud\\Beam\\Accounts\\BeamAccountsServiceProvider"
+                "Splicewire\\Beam\\Accounts\\BeamAccountsServiceProvider"
             ]
         },
         "merge-plugin": {

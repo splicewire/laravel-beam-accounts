@@ -3,8 +3,8 @@
 use Illuminate\Cache\RateLimiter;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
-use Schemastud\Beam\Accounts\Fortify\CreateNewUser;
-use Schemastud\Beam\Accounts\Fortify\ResetUserPassword;
+use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
+use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 
 /**
  * The engine's load-bearing default: Fortify (session auth) is wired as the account

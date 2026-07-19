@@ -1,12 +1,12 @@
 <?php
 
-use Schemastud\Beam\Accounts\Contracts\MembershipContract;
-use Schemastud\Beam\Accounts\Contracts\TeamContract;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Fortify\CreateNewUser;
-use Schemastud\Beam\Accounts\Models\Membership;
-use Schemastud\Beam\Accounts\Models\Team;
-use Schemastud\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Accounts\Contracts\MembershipContract;
+use Splicewire\Beam\Accounts\Contracts\TeamContract;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
+use Splicewire\Beam\Accounts\Models\Membership;
+use Splicewire\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 beforeEach(function () {
     $this->owner = app(CreateNewUser::class)->create([

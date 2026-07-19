@@ -2,7 +2,7 @@
 
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Hash;
-use Schemastud\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 beforeEach(function () {
     $this->withoutMiddleware(ValidateCsrfToken::class);

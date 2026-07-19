@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Tests;
+namespace Splicewire\Beam\Accounts\Tests;
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -8,9 +8,9 @@ use Laravel\Fortify\Features;
 use Laravel\Fortify\FortifyServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
-use Schemastud\Beam\Accounts\BeamAccountsServiceProvider;
-use Schemastud\Beam\Accounts\Tests\Fixtures\User;
 use Spatie\Permission\PermissionServiceProvider;
+use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 abstract class TestCase extends Orchestra
 {

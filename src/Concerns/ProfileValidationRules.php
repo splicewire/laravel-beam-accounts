@@ -1,11 +1,11 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Concerns;
+namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 
-use function Schemastud\Beam\Accounts\accountUserModel;
+use function Splicewire\Beam\Accounts\accountUserModel;
 
 trait ProfileValidationRules
 {

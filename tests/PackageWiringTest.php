@@ -1,8 +1,8 @@
 <?php
 
-use function Schemastud\Beam\Accounts\accountGuard;
+use function Splicewire\Beam\Accounts\accountGuard;
 
-use Schemastud\Beam\Accounts\Concerns\ProfileValidationRules;
+use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
 
 it('runs on the web/session guard only', function () {
     expect(accountGuard())->toBe('web');

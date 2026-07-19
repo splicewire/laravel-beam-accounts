@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Models;
+namespace Splicewire\Beam\Accounts\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

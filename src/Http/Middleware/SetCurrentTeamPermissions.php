@@ -1,13 +1,12 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Http\Middleware;
+namespace Splicewire\Beam\Accounts\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-
-use function Schemastud\Beam\Accounts\accountGuard;
-
 use Spatie\Permission\PermissionRegistrar;
+
+use function Splicewire\Beam\Accounts\accountGuard;
 
 /**
  * Bind spatie's team scope to the authenticated user's current team for the

@@ -1,18 +1,18 @@
 <?php
 
-namespace Schemastud\Beam\Accounts\Tests;
+namespace Splicewire\Beam\Accounts\Tests;
 
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
-use Schemastud\Beam\Accounts\BeamAccountsServiceProvider;
-use Schemastud\Beam\Accounts\Contracts\MembershipContract;
-use Schemastud\Beam\Accounts\Contracts\TeamContract;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Models\Membership;
-use Schemastud\Beam\Accounts\Models\Team;
 use Spatie\Permission\PermissionServiceProvider;
+use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\Contracts\MembershipContract;
+use Splicewire\Beam\Accounts\Contracts\TeamContract;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Models\Membership;
+use Splicewire\Beam\Accounts\Models\Team;
 
 /**
  * Boots the engine with the auth surface + schema gated OFF — the way the platform app

@@ -1,12 +1,12 @@
 <?php
 
 use Illuminate\Auth\Access\AuthorizationException;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Fortify\CreateNewUser;
-use Schemastud\Beam\Accounts\Models\Invitation;
-use Schemastud\Beam\Accounts\Teams\TeamMembers;
-use Schemastud\Beam\Accounts\Tests\Fixtures\User;
 use Spatie\Permission\PermissionRegistrar;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
+use Splicewire\Beam\Accounts\Models\Invitation;
+use Splicewire\Beam\Accounts\Teams\TeamMembers;
+use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 beforeEach(function () {
     $this->owner = app(CreateNewUser::class)->create([

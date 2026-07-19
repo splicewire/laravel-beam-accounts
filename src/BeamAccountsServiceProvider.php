@@ -1,6 +1,6 @@
 <?php
 
-namespace Schemastud\Beam\Accounts;
+namespace Splicewire\Beam\Accounts;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
-use Schemastud\Beam\Accounts\Fortify\CreateNewUser;
-use Schemastud\Beam\Accounts\Fortify\ResetUserPassword;
-use Schemastud\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
-use Schemastud\Beam\Accounts\Teams\TeamProvisioner;
+use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
+use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
+use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
+use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
  * The account engine: Fortify/session as the default auth substrate, the self-service

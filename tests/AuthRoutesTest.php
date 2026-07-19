@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Schemastud\Beam\Accounts\Enums\Role;
-use Schemastud\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 beforeEach(function () {
     $this->withoutMiddleware(ValidateCsrfToken::class);
