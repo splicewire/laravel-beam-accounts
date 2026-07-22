@@ -6,6 +6,9 @@
     <testsuites>
         <testsuite name="Feature">
             <directory>tests</directory>
+            <!-- Base-flow browser suites run only inside a consuming satellite (they need
+                 pest-plugin-browser + a served app); exclude them from the package's own run. -->
+            <exclude>tests/Browser</exclude>
         </testsuite>
     </testsuites>
     <source>

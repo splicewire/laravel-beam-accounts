@@ -10,9 +10,12 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
+use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
+use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
 use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
+use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
@@ -29,6 +32,10 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/splicewire/account.php', 'splicewire.account');
 
         $this->app->singleton(TeamProvisioner::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([LoginAsCommand::class]);
+        }
     }
 
     public function boot(): void
@@ -40,6 +47,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->bootRoutes();
         $this->bootFortify();
         $this->bootApiGuardSeam();
+        $this->bootDemo();
     }
 
     protected function bootConfig(): void
@@ -110,6 +118,27 @@ class BeamAccountsServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
+    }
+
+    /**
+     * The demo verification path — a signed login-as route that lands you in the app as a
+     * known subject. Registered only when demo affordances are live (non-production by
+     * default — the `splicewire.account.demo.enabled` config gate). Outside local/testing
+     * the controller requires a signed link (the `account:login-as` command mints one), so
+     * it opens no back door in a preview deploy. An engine affordance, config-gated — a
+     * satellite no longer hand-wires it.
+     */
+    protected function bootDemo(): void
+    {
+        if (! Demo::enabled()) {
+            return;
+        }
+
+        Route::middleware('web')
+            ->prefix(config('splicewire.account.demo.login_as_prefix', 'account/login-as'))
+            ->group(function () {
+                Route::get('{subject}', LoginAsController::class)->name('splicewire.account.login-as');
+            });
     }
 
     /**
