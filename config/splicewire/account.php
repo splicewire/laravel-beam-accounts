@@ -69,4 +69,20 @@ return [
         // null falls back to the same provider as the web guard.
         'provider' => null,
     ],
+
+    // The per-host KEY-MANAGEMENT seam. beam operates separately from splicewire, so a
+    // beam site manages keys only for ITSELF — each site owns its own keys, there is no
+    // central token store and no cross-host reach. The core primitive
+    // (Keys\DeterministicToken — a reproducible, reset-surviving PAT minter) is always
+    // available to call from PHP (seeders use it directly); this toggle only gates the
+    // HOST-FACING affordance: the `beam-accounts:mint-key` artisan command, so a
+    // non-satellite beam site that never seeds keys gets nothing extra. Default-off,
+    // mirroring the `api` seam — prepared, opt-in, no rebuild to activate.
+    'keys' => [
+        'enabled' => env('ACCOUNT_KEYS_ENABLED', false),
+
+        // The table the deterministic minter upserts into (Sanctum's shape). Override
+        // only if the host renamed its personal-access-tokens table.
+        'table' => 'personal_access_tokens',
+    ],
 ];

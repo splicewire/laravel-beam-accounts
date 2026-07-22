@@ -11,6 +11,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
+use Splicewire\Beam\Accounts\Console\MintKeyCommand;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
@@ -20,10 +21,11 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
  * The account engine: Fortify/session as the default auth substrate, the self-service
- * account runtime (profile/security surface), and the generic team/membership
- * primitives on the permission-cascade base leaf. Concrete tenant-provisioning + demo
- * live in the consuming satellite (splicewire/laravel-satellite-account), which layers
- * on top of this engine — this is the engine, not the satellite.
+ * account runtime (profile/security surface), the generic team/membership primitives on
+ * the permission-cascade base leaf, and the per-host key-management module (opt-in). The
+ * former splicewire/laravel-satellite-account is retired into this engine (ADR-0104);
+ * concrete tenant-provisioning + demo live in the consuming host itself (splicewire-app,
+ * numero, …), which layers on top of this engine — this is the engine, not the satellite.
  */
 class BeamAccountsServiceProvider extends ServiceProvider
 {
@@ -48,6 +50,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->bootFortify();
         $this->bootApiGuardSeam();
         $this->bootDemo();
+        $this->bootKeys();
     }
 
     protected function bootConfig(): void
@@ -139,6 +142,24 @@ class BeamAccountsServiceProvider extends ServiceProvider
             ->group(function () {
                 Route::get('{subject}', LoginAsController::class)->name('splicewire.account.login-as');
             });
+    }
+
+    /**
+     * The per-host key-management module. beam operates separately from splicewire, so a
+     * beam site manages keys only for itself — this registers no cross-host reach and no
+     * central store. The reproducible primitive (Keys\DeterministicToken) is always
+     * available to PHP callers; only the host-facing `beam-accounts:mint-key` command is
+     * gated, opt-in per host (default-off), mirroring the `api` seam.
+     */
+    protected function bootKeys(): void
+    {
+        if (! config('splicewire.account.keys.enabled', false)) {
+            return;
+        }
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([MintKeyCommand::class]);
+        }
     }
 
     /**
