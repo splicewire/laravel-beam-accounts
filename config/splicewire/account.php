@@ -68,6 +68,14 @@ return [
         'driver' => 'sanctum',
         // null falls back to the same provider as the web guard.
         'provider' => null,
+
+        // Scoped-PAT enforcement (ADR-0109). When true, the acting API token's abilities
+        // become the permission-cascade's credential-scope, so a scoped token can do at
+        // most `token abilities ∩ the user's live permissions`. Default-off and a pure
+        // no-op when off. Blast-radius control, not a trust boundary — a scoped token is
+        // still not safe to hand to an untrusted party. A host that mints scoped PATs
+        // (its own Tokens UI) flips this on.
+        'scope_enforcement' => false,
     ],
 
     // The per-host KEY-MANAGEMENT seam. beam operates separately from splicewire, so a

@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
+use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
+use Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
@@ -49,6 +51,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->bootRoutes();
         $this->bootFortify();
         $this->bootApiGuardSeam();
+        $this->bootApiGuardEnforcement();
         $this->bootDemo();
         $this->bootKeys();
     }
@@ -182,5 +185,25 @@ class BeamAccountsServiceProvider extends ServiceProvider
                     ?? config('auth.guards.'.config('splicewire.account.guard', 'web').'.provider', 'users'),
             ],
         ]);
+    }
+
+    /**
+     * The scoped-PAT enforcement seam (ADR-0109). When a host opts in, source the
+     * permission-cascade's credential-scope from the acting API token's abilities, so
+     * `effective authority = token abilities ∩ user's live permissions` is applied at
+     * every policy-gated route through the cascade's one decision point. Default-off and
+     * a pure no-op when off (the cascade's null resolver leaves authorization unchanged).
+     *
+     * This binds the *scope source* only; the cascade owns the narrowing rule and takes no
+     * Sanctum dependency. Bound in boot (after the cascade's register-time default) so this
+     * override wins at request-time resolution.
+     */
+    protected function bootApiGuardEnforcement(): void
+    {
+        if (! config('splicewire.account.api.scope_enforcement', false)) {
+            return;
+        }
+
+        $this->app->singleton(CredentialScopeResolver::class, TokenAbilitiesScopeResolver::class);
     }
 }
