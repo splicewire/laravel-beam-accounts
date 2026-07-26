@@ -67,7 +67,7 @@ class TeamProvisioner
 
     protected function personalTeamName(Authenticatable $user): string
     {
-        $template = config('splicewire.account.personal_team_name', "{name}'s Team");
+        $template = config('beam-accounts.personal_team_name', "{name}'s Team");
 
         return str_replace('{name}', (string) ($user->name ?? 'Personal'), $template);
     }

@@ -4,12 +4,13 @@ namespace Splicewire\Beam\Accounts\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+
+use function Splicewire\Beam\Accounts\accountUserModel;
+
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Models\Team;
 use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
-
-use function Splicewire\Beam\Accounts\accountUserModel;
 
 /**
  * Provisions the demo subjects with deterministic credentials, so every satellite has a
@@ -34,7 +35,7 @@ class DemoTeamSeeder extends Seeder
         }
 
         $model = accountUserModel();
-        $password = Hash::make((string) config('splicewire.account.demo.password', 'password'));
+        $password = Hash::make((string) config('beam-accounts.demo.password', 'password'));
 
         // Every subject in the role-derived roster (+ solo) gets a deterministic account.
         $users = [];

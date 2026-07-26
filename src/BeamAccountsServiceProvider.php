@@ -5,12 +5,14 @@ namespace Splicewire\Beam\Accounts;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
+use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
 use Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
@@ -19,6 +21,7 @@ use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
 use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
 use Splicewire\Beam\Accounts\Support\Demo;
+use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
@@ -33,7 +36,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/splicewire/account.php', 'splicewire.account');
+        $this->mergeConfigFrom(__DIR__.'/../config/beam-accounts.php', 'beam-accounts');
 
         $this->app->singleton(TeamProvisioner::class);
 
@@ -46,6 +49,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
     {
         $this->bootConfig();
         $this->bootMigrations();
+        $this->bootAuthorization();
         $this->bootMiddleware();
         $this->bootRouteMacro();
         $this->bootRoutes();
@@ -60,18 +64,30 @@ class BeamAccountsServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__.'/../config/splicewire/account.php' => $this->app->configPath('splicewire/account.php'),
+                __DIR__.'/../config/beam-accounts.php' => $this->app->configPath('beam-accounts.php'),
             ], 'beam-accounts-config');
         }
     }
 
     protected function bootMigrations(): void
     {
-        if (! config('splicewire.account.register_migrations', true)) {
+        if (! config('beam-accounts.register_migrations', true)) {
             return;
         }
 
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+    }
+
+    /**
+     * The team-membership authorization seam. Registers the `manageMembers` ability
+     * so every consumer — the engine's own {@see TeamMembers}
+     * lifecycle and any host controller — authorizes owner-gated membership changes
+     * through one named check (`$user->can('manageMembers', $team)`) instead of
+     * hand-rolling `role === Owner`. See {@see MembershipPolicy}.
+     */
+    protected function bootAuthorization(): void
+    {
+        Gate::define('manageMembers', [MembershipPolicy::class, 'manageMembers']);
     }
 
     protected function bootMiddleware(): void
@@ -88,7 +104,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
     protected function bootRouteMacro(): void
     {
         Route::macro('splicewireAccountRoutes', function () {
-            $config = config('splicewire.account.routes');
+            $config = config('beam-accounts.routes');
 
             Route::prefix($config['prefix'] ?? 'settings')
                 ->middleware($config['middleware'] ?? ['web', 'auth'])
@@ -98,7 +114,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
 
     protected function bootRoutes(): void
     {
-        if (config('splicewire.account.register_routes', true)) {
+        if (config('beam-accounts.register_routes', true)) {
             Route::splicewireAccountRoutes();
         }
     }
@@ -110,7 +126,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootFortify(): void
     {
-        if (! config('splicewire.account.bootstrap_fortify', true)) {
+        if (! config('beam-accounts.bootstrap_fortify', true)) {
             return;
         }
 
@@ -129,7 +145,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
     /**
      * The demo verification path — a signed login-as route that lands you in the app as a
      * known subject. Registered only when demo affordances are live (non-production by
-     * default — the `splicewire.account.demo.enabled` config gate). Outside local/testing
+     * default — the `beam-accounts.demo.enabled` config gate). Outside local/testing
      * the controller requires a signed link (the `account:login-as` command mints one), so
      * it opens no back door in a preview deploy. An engine affordance, config-gated — a
      * satellite no longer hand-wires it.
@@ -141,7 +157,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
         }
 
         Route::middleware('web')
-            ->prefix(config('splicewire.account.demo.login_as_prefix', 'account/login-as'))
+            ->prefix(config('beam-accounts.demo.login_as_prefix', 'account/login-as'))
             ->group(function () {
                 Route::get('{subject}', LoginAsController::class)->name('splicewire.account.login-as');
             });
@@ -156,7 +172,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootKeys(): void
     {
-        if (! config('splicewire.account.keys.enabled', false)) {
+        if (! config('beam-accounts.keys.enabled', false)) {
             return;
         }
 
@@ -172,17 +188,17 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootApiGuardSeam(): void
     {
-        if (! config('splicewire.account.api.enabled', false)) {
+        if (! config('beam-accounts.api.enabled', false)) {
             return;
         }
 
-        $name = config('splicewire.account.api.guard', 'api');
+        $name = config('beam-accounts.api.guard', 'api');
 
         config([
             "auth.guards.{$name}" => [
-                'driver' => config('splicewire.account.api.driver', 'sanctum'),
-                'provider' => config('splicewire.account.api.provider')
-                    ?? config('auth.guards.'.config('splicewire.account.guard', 'web').'.provider', 'users'),
+                'driver' => config('beam-accounts.api.driver', 'sanctum'),
+                'provider' => config('beam-accounts.api.provider')
+                    ?? config('auth.guards.'.config('beam-accounts.guard', 'web').'.provider', 'users'),
             ],
         ]);
     }
@@ -200,7 +216,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootApiGuardEnforcement(): void
     {
-        if (! config('splicewire.account.api.scope_enforcement', false)) {
+        if (! config('beam-accounts.api.scope_enforcement', false)) {
             return;
         }
 

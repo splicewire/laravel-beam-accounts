@@ -10,7 +10,7 @@ if (! function_exists('Splicewire\Beam\Accounts\accountUserModel')) {
      */
     function accountUserModel(): string
     {
-        return config('splicewire.account.user_model')
+        return config('beam-accounts.user_model')
             ?: config('auth.providers.users.model')
             ?: User::class;
     }
@@ -20,6 +20,6 @@ if (! function_exists('Splicewire\Beam\Accounts\accountUserModel')) {
      */
     function accountGuard(): string
     {
-        return config('splicewire.account.guard', 'web');
+        return config('beam-accounts.guard', 'web');
     }
 }

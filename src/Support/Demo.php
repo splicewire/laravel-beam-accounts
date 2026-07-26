@@ -3,12 +3,13 @@
 namespace Splicewire\Beam\Accounts\Support;
 
 use InvalidArgumentException;
+use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Enums\Role;
 
 /**
  * The demo subjects — a standardized set of known identities at known access levels so
  * any satellite can be entered as owner/admin/member/solo and its account, billing, and
- * team-admin surfaces verified. Provisioned by {@see \Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder},
+ * team-admin surfaces verified. Provisioned by {@see DemoTeamSeeder},
  * targeted by the `account:login-as` affordance. Development/preview only — never real
  * end-users.
  *
@@ -49,7 +50,7 @@ class Demo
      */
     public static function enabled(): bool
     {
-        $flag = config('splicewire.account.demo.enabled');
+        $flag = config('beam-accounts.demo.enabled');
 
         if ($flag !== null) {
             return (bool) $flag;
@@ -86,7 +87,7 @@ class Demo
 
     public static function email(string $key): string
     {
-        $domain = config('splicewire.account.demo.email_domain', 'example.test');
+        $domain = config('beam-accounts.demo.email_domain', 'example.test');
 
         return "demo-{$key}@{$domain}";
     }

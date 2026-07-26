@@ -7,7 +7,7 @@ use Splicewire\Beam\Accounts\Keys\DeterministicToken;
 
 /**
  * Host-facing affordance for the key-management module (gated on
- * `splicewire.account.keys.enabled`): mint a deterministic, reset-surviving key from the
+ * `beam-accounts.keys.enabled`): mint a deterministic, reset-surviving key from the
  * CLI. Given the same (id, plaintext) it prints the SAME bearer every run — so a satellite
  * and the engine can each mint the credential they share without a central authority.
  *
@@ -37,7 +37,7 @@ class MintKeyCommand extends Command
             tokenableId: $this->option('tokenable-id') ?? '',
             name: (string) $this->option('name'),
             abilities: $abilities === [] ? ['*'] : $abilities,
-            table: config('splicewire.account.keys.table', 'personal_access_tokens'),
+            table: config('beam-accounts.keys.table', 'personal_access_tokens'),
         );
 
         $bearer = $token->mint();
