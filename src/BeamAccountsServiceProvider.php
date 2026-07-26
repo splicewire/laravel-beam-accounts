@@ -79,15 +79,17 @@ class BeamAccountsServiceProvider extends ServiceProvider
     }
 
     /**
-     * The team-membership authorization seam. Registers the `manageMembers` ability
-     * so every consumer — the engine's own {@see TeamMembers}
-     * lifecycle and any host controller — authorizes owner-gated membership changes
-     * through one named check (`$user->can('manageMembers', $team)`) instead of
-     * hand-rolling `role === Owner`. See {@see MembershipPolicy}.
+     * The team-membership authorization seam. Registers the membership abilities so
+     * every consumer — the engine's own {@see TeamMembers} lifecycle and any host
+     * controller — authorizes through one named check instead of hand-rolling role
+     * comparisons. Two graduated tiers on the one membership axis: `manageMembers`
+     * (change role / remove / ownership transfer) is owner-only; `manageInvitations`
+     * (send / resend / revoke) admits owners and admins. See {@see MembershipPolicy}.
      */
     protected function bootAuthorization(): void
     {
         Gate::define('manageMembers', [MembershipPolicy::class, 'manageMembers']);
+        Gate::define('manageInvitations', [MembershipPolicy::class, 'manageInvitations']);
     }
 
     protected function bootMiddleware(): void
