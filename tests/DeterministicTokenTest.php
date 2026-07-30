@@ -70,6 +70,15 @@ it('is idempotent — re-minting never duplicates and never changes the credenti
         ->and(DB::table('personal_access_tokens')->count())->toBe(1);
 });
 
+it('accepts a string (uuid) id — folded verbatim into the bearer', function () {
+    // Hosts that key personal_access_tokens by UUID (not Sanctum's default bigint) pass a
+    // string id; it composes the bearer exactly like an int, no coercion.
+    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+
+    expect(makeToken(['id' => $uuid])->bearer())
+        ->toBe($uuid.'|numeroSatelliteServiceToken00000000000v1');
+});
+
 it('two independent instances mint the identical credential — no central authority needed', function () {
     // The satellite mints; the engine, given only the shared (id, plaintext), mints the same.
     $satelliteBearer = makeToken()->mint();

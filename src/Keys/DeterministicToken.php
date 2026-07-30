@@ -22,9 +22,15 @@ use Illuminate\Support\Facades\DB;
  */
 final class DeterministicToken
 {
-    /** @param  list<string>  $abilities */
+    /**
+     * @param  int|string  $id  The token primary key. An int for Sanctum's default bigint
+     *                          column; a string when the host keys personal_access_tokens
+     *                          by UUID (or any other string PK). Folded verbatim into the
+     *                          stored row and the `{id}|{plaintext}` bearer.
+     * @param  list<string>  $abilities
+     */
     public function __construct(
-        public readonly int $id,
+        public readonly int|string $id,
         public readonly string $plaintext,
         public readonly string $tokenableType,
         public readonly int|string $tokenableId,
