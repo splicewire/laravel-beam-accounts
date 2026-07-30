@@ -11,10 +11,11 @@ use function Splicewire\Beam\Accounts\accountUserModel;
 
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Beam;
 
 /**
  * The reference implementation of {@see TeamContract} — a single-DB team over beam's
- * own `memberships` table. Behavior is unchanged from before the contract was
+ * own `beam_memberships` table. Behavior is unchanged from before the contract was
  * introduced; the interface just names the surface the account runtime already used.
  */
 class Team extends Model implements TeamContract
@@ -24,6 +25,16 @@ class Team extends Model implements TeamContract
     protected $casts = [
         'personal_team' => 'boolean',
     ];
+
+    /**
+     * `teams` → `beam_teams`, routed through the single table-prefix seam {@see Beam::table()}
+     * (beam-particle-rename ticket 04). A property default cannot call config(), so the prefix is
+     * applied here.
+     */
+    public function getTable(): string
+    {
+        return Beam::table('teams');
+    }
 
     public function owner(): BelongsTo
     {
@@ -37,7 +48,7 @@ class Team extends Model implements TeamContract
 
     public function members()
     {
-        return $this->belongsToMany(accountUserModel(), 'memberships')
+        return $this->belongsToMany(accountUserModel(), Beam::table('memberships'))
             ->withPivot('role')
             ->withTimestamps();
     }

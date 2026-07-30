@@ -11,6 +11,7 @@ use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Beam;
 
 abstract class TestCase extends Orchestra
 {
@@ -78,7 +79,7 @@ abstract class TestCase extends Orchestra
 
     protected function createTeamsSchema(): void
     {
-        Schema::create('teams', function (Blueprint $table): void {
+        Schema::create(Beam::table('teams'), function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->string('name');
@@ -86,7 +87,7 @@ abstract class TestCase extends Orchestra
             $table->timestamps();
         });
 
-        Schema::create('memberships', function (Blueprint $table): void {
+        Schema::create(Beam::table('memberships'), function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('team_id');
             $table->unsignedBigInteger('user_id');
@@ -95,7 +96,7 @@ abstract class TestCase extends Orchestra
             $table->unique(['team_id', 'user_id']);
         });
 
-        Schema::create('invitations', function (Blueprint $table): void {
+        Schema::create(Beam::table('invitations'), function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('team_id');
             $table->string('email');

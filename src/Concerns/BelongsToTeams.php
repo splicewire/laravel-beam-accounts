@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Beam;
 
 /**
  * The satellite end-user's side of the teams-first model. Every account owns a
@@ -27,7 +28,7 @@ trait BelongsToTeams
 
     public function teams(): BelongsToMany
     {
-        return $this->belongsToMany(Team::class, 'memberships')
+        return $this->belongsToMany(Team::class, Beam::table('memberships'))
             ->withPivot('role')
             ->withTimestamps();
     }
