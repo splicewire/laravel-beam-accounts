@@ -9,6 +9,13 @@ return [
     // null falls back to the default auth provider model.
     'user_model' => null,
 
+    // The tenant-side (per-tenant replica) user model the central User syncs into, as a
+    // SyncMaster. The base User names it via config rather than importing a host class, so
+    // beam-accounts stays host-agnostic (ADR-0138). A host that resource-syncs users into
+    // tenant schemas binds this to its own model (e.g. \App\Models\TenantUser::class);
+    // null is a safe null-object (the framework Authenticatable).
+    'tenant_user_model' => null,
+
     // Register the package's settings routes (profile/security). Turn off if the host
     // wants to wire the macro itself.
     'register_routes' => env('ACCOUNT_REGISTER_ROUTES', true),

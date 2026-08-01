@@ -23,8 +23,11 @@
         "illuminate/support": "^11.0|^12.0|^13.0",
         "inertiajs/inertia-laravel": "^2.0|^3.0",
         "laravel/fortify": "^1.20",
+        "laravel/passkeys": "^0.2",
+        "laravel/sanctum": "^4.0",
         "rushing/laravel-permission-cascade": "*",
-        "spatie/laravel-permission": "^6.0"
+        "spatie/laravel-permission": "^6.0",
+        "stancl/tenancy": "^3.0"
     },
     "require-dev": {
         "orchestra/testbench": "^9.0|^10.0|^11.0",
