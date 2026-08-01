@@ -91,5 +91,5 @@ it('keeps the host-facing mint-key command off by default (module default-off)',
     // The primitive is always usable in PHP; only the console door is gated, and it is
     // off unless a host opts in via splicewire.account.keys.enabled.
     expect(array_keys($this->app[Kernel::class]->all()))
-        ->not->toContain('beam-accounts:mint-key');
+        ->not->toContain('splicewire:beam:accounts-mint-key');
 });

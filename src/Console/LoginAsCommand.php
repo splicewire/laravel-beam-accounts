@@ -13,7 +13,7 @@ use Splicewire\Beam\Accounts\Support\Demo;
  */
 class LoginAsCommand extends Command
 {
-    protected $signature = 'account:login-as {subject : owner|admin|member|solo} {--minutes=30 : How long the signed link stays valid}';
+    protected $signature = 'splicewire:beam:account-login-as {subject : owner|admin|member|solo} {--minutes=30 : How long the signed link stays valid}';
 
     protected $description = 'Print a signed browser login link for a demo subject (dev/preview only).';
 

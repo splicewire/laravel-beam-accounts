@@ -40,7 +40,7 @@ return [
     // Name given to the personal team provisioned on registration. {name} is the user's name.
     'personal_team_name' => "{name}'s Team",
 
-    // Demo subjects + the `account:login-as` affordance — a standardized way to land in
+    // Demo subjects + the `splicewire:beam:account-login-as` affordance — a standardized way to land in
     // the app as a known subject at a known access level (owner/admin/member/solo) and
     // verify the account/billing/admin surfaces gate correctly. A development/preview
     // convenience, never for real end-users.
@@ -90,7 +90,7 @@ return [
     // central token store and no cross-host reach. The core primitive
     // (Keys\DeterministicToken — a reproducible, reset-surviving PAT minter) is always
     // available to call from PHP (seeders use it directly); this toggle only gates the
-    // HOST-FACING affordance: the `beam-accounts:mint-key` artisan command, so a
+    // HOST-FACING affordance: the `splicewire:beam:accounts-mint-key` artisan command, so a
     // non-satellite beam site that never seeds keys gets nothing extra. Default-off,
     // mirroring the `api` seam — prepared, opt-in, no rebuild to activate.
     'keys' => [

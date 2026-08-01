@@ -8,7 +8,7 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 /*
  * The engine-homed demo verification path: the role-derived demo roster, the
- * DemoTeamSeeder that provisions it, and the signed `account:login-as` route. Demo +
+ * DemoTeamSeeder that provisions it, and the signed `splicewire:beam:account-login-as` route. Demo +
  * login-as moved down from the satellite (they reference only engine types + engine
  * config) so every consumer — platform or satellite — gets the same affordance behind
  * the one `splicewire.account.demo.enabled` gate.

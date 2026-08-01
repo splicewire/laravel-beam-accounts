@@ -148,7 +148,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      * The demo verification path — a signed login-as route that lands you in the app as a
      * known subject. Registered only when demo affordances are live (non-production by
      * default — the `beam-accounts.demo.enabled` config gate). Outside local/testing
-     * the controller requires a signed link (the `account:login-as` command mints one), so
+     * the controller requires a signed link (the `splicewire:beam:account-login-as` command mints one), so
      * it opens no back door in a preview deploy. An engine affordance, config-gated — a
      * satellite no longer hand-wires it.
      */
@@ -169,7 +169,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      * The per-host key-management module. beam operates separately from splicewire, so a
      * beam site manages keys only for itself — this registers no cross-host reach and no
      * central store. The reproducible primitive (Keys\DeterministicToken) is always
-     * available to PHP callers; only the host-facing `beam-accounts:mint-key` command is
+     * available to PHP callers; only the host-facing `splicewire:beam:accounts-mint-key` command is
      * gated, opt-in per host (default-off), mirroring the `api` seam.
      */
     protected function bootKeys(): void
