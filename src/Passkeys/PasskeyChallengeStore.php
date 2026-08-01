@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Splicewire\Beam\Accounts\Passkeys;
 
 use Illuminate\Support\Facades\Cache;

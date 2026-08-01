@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  * Writes the row through the query builder (never a Sanctum class) so beam-accounts keeps
  * Sanctum a SUGGESTED, opt-in dependency: the table shape is Sanctum's, the coupling isn't.
  */
-final class DeterministicToken
+class DeterministicToken
 {
     /**
      * @param  int|string  $id  The token primary key. An int for Sanctum's default bigint
@@ -30,13 +30,13 @@ final class DeterministicToken
      * @param  list<string>  $abilities
      */
     public function __construct(
-        public readonly int|string $id,
-        public readonly string $plaintext,
-        public readonly string $tokenableType,
-        public readonly int|string $tokenableId,
-        public readonly string $name,
-        public readonly array $abilities = ['*'],
-        public readonly string $table = 'personal_access_tokens',
+        public int|string $id,
+        public string $plaintext,
+        public string $tokenableType,
+        public int|string $tokenableId,
+        public string $name,
+        public array $abilities = ['*'],
+        public string $table = 'personal_access_tokens',
     ) {}
 
     /**
