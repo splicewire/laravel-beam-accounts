@@ -23,6 +23,6 @@ class LoginAsController
         $login($subject);
         $request->session()->regenerate();
 
-        return redirect()->to(config('beam-accounts.demo.redirect', '/'));
+        return redirect()->to(config('beam.accounts.demo.redirect', '/'));
     }
 }

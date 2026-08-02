@@ -35,7 +35,7 @@ class DemoTeamSeeder extends Seeder
         }
 
         $model = accountUserModel();
-        $password = Hash::make((string) config('beam-accounts.demo.password', 'password'));
+        $password = Hash::make((string) config('beam.accounts.demo.password', 'password'));
 
         // Every subject in the role-derived roster (+ solo) gets a deterministic account.
         $users = [];

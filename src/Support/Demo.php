@@ -50,7 +50,7 @@ class Demo
      */
     public static function enabled(): bool
     {
-        $flag = config('beam-accounts.demo.enabled');
+        $flag = config('beam.accounts.demo.enabled');
 
         if ($flag !== null) {
             return (bool) $flag;
@@ -87,7 +87,7 @@ class Demo
 
     public static function email(string $key): string
     {
-        $domain = config('beam-accounts.demo.email_domain', 'example.test');
+        $domain = config('beam.accounts.demo.email_domain', 'example.test');
 
         return "demo-{$key}@{$domain}";
     }

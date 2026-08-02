@@ -36,7 +36,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/beam-accounts.php', 'beam-accounts');
+        $this->mergeConfigFrom(__DIR__.'/../config/beam/accounts.php', 'beam.accounts');
 
         $this->app->singleton(TeamProvisioner::class);
 
@@ -64,14 +64,14 @@ class BeamAccountsServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__.'/../config/beam-accounts.php' => $this->app->configPath('beam-accounts.php'),
+                __DIR__.'/../config/beam/accounts.php' => $this->app->configPath('beam/accounts.php'),
             ], 'beam-accounts-config');
         }
     }
 
     protected function bootMigrations(): void
     {
-        if (! config('beam-accounts.register_migrations', true)) {
+        if (! config('beam.accounts.register_migrations', true)) {
             return;
         }
 
@@ -106,7 +106,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
     protected function bootRouteMacro(): void
     {
         Route::macro('splicewireAccountRoutes', function () {
-            $config = config('beam-accounts.routes');
+            $config = config('beam.accounts.routes');
 
             Route::prefix($config['prefix'] ?? 'settings')
                 ->middleware($config['middleware'] ?? ['web', 'auth'])
@@ -116,7 +116,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
 
     protected function bootRoutes(): void
     {
-        if (config('beam-accounts.register_routes', true)) {
+        if (config('beam.accounts.register_routes', true)) {
             Route::splicewireAccountRoutes();
         }
     }
@@ -128,7 +128,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootFortify(): void
     {
-        if (! config('beam-accounts.bootstrap_fortify', true)) {
+        if (! config('beam.accounts.bootstrap_fortify', true)) {
             return;
         }
 
@@ -147,7 +147,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
     /**
      * The demo verification path — a signed login-as route that lands you in the app as a
      * known subject. Registered only when demo affordances are live (non-production by
-     * default — the `beam-accounts.demo.enabled` config gate). Outside local/testing
+     * default — the `beam.accounts.demo.enabled` config gate). Outside local/testing
      * the controller requires a signed link (the `splicewire:beam:account-login-as` command mints one), so
      * it opens no back door in a preview deploy. An engine affordance, config-gated — a
      * satellite no longer hand-wires it.
@@ -159,7 +159,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
         }
 
         Route::middleware('web')
-            ->prefix(config('beam-accounts.demo.login_as_prefix', 'account/login-as'))
+            ->prefix(config('beam.accounts.demo.login_as_prefix', 'account/login-as'))
             ->group(function () {
                 Route::get('{subject}', LoginAsController::class)->name('splicewire.account.login-as');
             });
@@ -174,7 +174,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootKeys(): void
     {
-        if (! config('beam-accounts.keys.enabled', false)) {
+        if (! config('beam.accounts.keys.enabled', false)) {
             return;
         }
 
@@ -190,17 +190,17 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootApiGuardSeam(): void
     {
-        if (! config('beam-accounts.api.enabled', false)) {
+        if (! config('beam.accounts.api.enabled', false)) {
             return;
         }
 
-        $name = config('beam-accounts.api.guard', 'api');
+        $name = config('beam.accounts.api.guard', 'api');
 
         config([
             "auth.guards.{$name}" => [
-                'driver' => config('beam-accounts.api.driver', 'sanctum'),
-                'provider' => config('beam-accounts.api.provider')
-                    ?? config('auth.guards.'.config('beam-accounts.guard', 'web').'.provider', 'users'),
+                'driver' => config('beam.accounts.api.driver', 'sanctum'),
+                'provider' => config('beam.accounts.api.provider')
+                    ?? config('auth.guards.'.config('beam.accounts.guard', 'web').'.provider', 'users'),
             ],
         ]);
     }
@@ -218,7 +218,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
      */
     protected function bootApiGuardEnforcement(): void
     {
-        if (! config('beam-accounts.api.scope_enforcement', false)) {
+        if (! config('beam.accounts.api.scope_enforcement', false)) {
             return;
         }
 
