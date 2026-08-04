@@ -27,6 +27,7 @@
         "laravel/sanctum": "^4.0",
         "rushing/laravel-permission-cascade": "*",
         "spatie/laravel-permission": "^6.0",
+        "splicewire/laravel-beam": "*",
         "stancl/tenancy": "^3.0"
     },
     "require-dev": {
@@ -36,8 +37,7 @@
         "wikimedia/composer-merge-plugin": "^2.1"
     },
     "suggest": {
-        "laravel/sanctum": "Install in a satellite to activate its own opt-in token 'api' guard seam alongside the engine's session/Fortify web guard.",
-        "splicewire/laravel-beam": "The app-substrate rung; require it in a host that also persists schema records."
+        "laravel/sanctum": "Install in a satellite to activate its own opt-in token 'api' guard seam alongside the engine's session/Fortify web guard."
     },
     "autoload": {
         "psr-4": {
