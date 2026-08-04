@@ -29,7 +29,7 @@ it('renders the profile page for each demo subject', function (string $role) {
     ->skip(fn () => manifest_deviates('account.profile'), 'profile declared off');
 
 it('renders the security page for each demo subject', function (string $role) {
-    $password = config('splicewire.account.demo.password', 'password');
+    $password = config('beam.accounts.demo.password', 'password');
 
     // Fortify guards the security surface behind password confirmation, so the surface
     // entry redirects through /user/confirm-password before the page renders.

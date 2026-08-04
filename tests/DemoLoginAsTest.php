@@ -11,7 +11,7 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
  * DemoTeamSeeder that provisions it, and the signed `splicewire:beam:account-login-as` route. Demo +
  * login-as moved down from the satellite (they reference only engine types + engine
  * config) so every consumer — platform or satellite — gets the same affordance behind
- * the one `splicewire.account.demo.enabled` gate.
+ * the one `beam.accounts.demo.enabled` gate.
  */
 
 function seedDemo(): void
@@ -82,13 +82,13 @@ it('404s an unknown demo subject', function () {
 });
 
 it('403s the login-as route when demo affordances are disabled', function () {
-    config()->set('splicewire.account.demo.enabled', false);
+    config()->set('beam.accounts.demo.enabled', false);
 
     $this->get('/account/login-as/'.Role::Owner->value)->assertForbidden();
 });
 
 it('skips seeding when demo affordances are disabled', function () {
-    config()->set('splicewire.account.demo.enabled', false);
+    config()->set('beam.accounts.demo.enabled', false);
 
     seedDemo();
 

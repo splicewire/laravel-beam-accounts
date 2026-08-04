@@ -3,7 +3,7 @@
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 
 it('does not register the api guard by default', function () {
-    expect(config('splicewire.account.api.enabled'))->toBeFalse();
+    expect(config('beam.accounts.api.enabled'))->toBeFalse();
     expect(config('auth.guards.api'))->toBeNull();
 });
 
@@ -14,7 +14,7 @@ it('leaves the web/session guard intact', function () {
 
 it('wires a sanctum api guard only when the seam is enabled', function () {
     // Re-run the seam with the flag on, simulating a host that opted in.
-    config(['splicewire.account.api.enabled' => true]);
+    config(['beam.accounts.api.enabled' => true]);
 
     $provider = new BeamAccountsServiceProvider($this->app);
     $reflect = new ReflectionMethod($provider, 'bootApiGuardSeam');

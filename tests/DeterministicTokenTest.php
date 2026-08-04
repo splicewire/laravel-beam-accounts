@@ -89,7 +89,7 @@ it('two independent instances mint the identical credential — no central autho
 
 it('keeps the host-facing mint-key command off by default (module default-off)', function () {
     // The primitive is always usable in PHP; only the console door is gated, and it is
-    // off unless a host opts in via splicewire.account.keys.enabled.
+    // off unless a host opts in via beam.accounts.keys.enabled.
     expect(array_keys($this->app[Kernel::class]->all()))
         ->not->toContain('splicewire:beam:accounts-mint-key');
 });

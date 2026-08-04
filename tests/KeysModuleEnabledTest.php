@@ -39,7 +39,7 @@ class KeysModuleEnabledTest extends Orchestra
         ]);
 
         // The host opts into managing its own keys.
-        $config->set('splicewire.account.keys.enabled', true);
+        $config->set('beam.accounts.keys.enabled', true);
     }
 
     protected function setUp(): void

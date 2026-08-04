@@ -45,9 +45,9 @@ class ConfigGateTest extends Orchestra
         ]);
 
         // The host gates the auth surface + schema off.
-        $config->set('splicewire.account.bootstrap_fortify', false);
-        $config->set('splicewire.account.register_migrations', false);
-        $config->set('splicewire.account.register_routes', false);
+        $config->set('beam.accounts.bootstrap_fortify', false);
+        $config->set('beam.accounts.register_migrations', false);
+        $config->set('beam.accounts.register_routes', false);
     }
 
     public function test_provider_boots_without_fortify_or_migrations(): void
