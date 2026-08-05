@@ -20,6 +20,7 @@ use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
 use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
+use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
@@ -37,6 +38,13 @@ class BeamAccountsServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/beam/accounts.php', 'beam.accounts');
+
+        // OOTB directory-ACL grant model: permission-cascade is model-free, so supply the
+        // default grant model unless the host has bound its own. Lazily consumed by the
+        // cascade at grant-query time, so setting it here (before boot) is early enough.
+        if (config('permission-cascade.grant_model') === null) {
+            config(['permission-cascade.grant_model' => AccessGrant::class]);
+        }
 
         $this->app->singleton(TeamProvisioner::class);
 
