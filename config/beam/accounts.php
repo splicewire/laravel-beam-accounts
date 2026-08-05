@@ -26,6 +26,11 @@ return [
     // Sanctum, not Fortify — turns this off to keep its auth surface untouched.
     'bootstrap_fortify' => env('ACCOUNT_BOOTSTRAP_FORTIFY', true),
 
+    // The SPA reset route the reset-link email points at, carrying the broker token +
+    // email in the query string. Default targets the beam SPA under /ui; a host with a
+    // different SPA host/path overrides via env without touching the notification class.
+    'password_reset_url' => env('PASSWORD_RESET_URL', rtrim(env('APP_URL', 'http://localhost'), '/').'/ui/reset-password'),
+
     // Load the package's teams/memberships/invitations migrations. A host composing the
     // primitive over its own tables (the platform app over `tenant_users`) turns this
     // off so the engine tables are never created.

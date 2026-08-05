@@ -10,9 +10,11 @@ use Laravel\Passkeys\Contracts\PasskeyUser;
 use Laravel\Passkeys\PasskeyAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-use Stancl\Tenancy\Database\Concerns\ResourceSyncing;
 
 use function Splicewire\Beam\Accounts\accountTenantUserModel;
+
+use Splicewire\Beam\Accounts\Notifications\ResetPasswordNotification;
+use Stancl\Tenancy\Database\Concerns\ResourceSyncing;
 
 /**
  * The beam auth principal — the base User model of the beam-accounts engine.
@@ -20,8 +22,9 @@ use function Splicewire\Beam\Accounts\accountTenantUserModel;
  * Composes the vendor auth substrate (Sanctum tokens, Spatie roles, Laravel Passkeys,
  * Notifiable, UUID keys) and the Stancl `ResourceSyncing` machinery. A host subclasses this
  * as its concrete `App\Models\User` and layers on app-specific state (tenant relations,
- * custom notifications, boot orchestration). The base carries only the generic auth/sync
- * state every beam host shares; the one host-bound name — the tenant-side user model — is
+ * boot orchestration). The base carries only the generic auth/sync state every beam host
+ * shares — including the SPA-routed password-reset notification, config-seamed so it needs
+ * no host override; the one host-bound name — the tenant-side user model — is
  * resolved through config (`accountTenantUserModel()`), never imported, so the base takes no
  * edge onto any host `App\Models\*` class (ADR-0138).
  *
@@ -80,6 +83,15 @@ class User extends Authenticatable implements PasskeyUser
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    /**
+     * Send the password-reset link email pointing at the SPA reset route
+     * (config-seamed), not Laravel's default server-rendered `password.reset` route.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
+    }
 
     public function getGlobalIdentifierKey()
     {
