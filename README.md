@@ -22,6 +22,10 @@ beam-accounts   (account engine — Fortify default + self-service account UI + 
   `BelongsToTeams` account concern, `TeamProvisioner` (team-of-one) + `TeamMembers`
   (invite → accept → change-role → remove), the `Roles` vocabulary, and the
   `SetCurrentTeamPermissions` middleware, all on the `permission-cascade` base leaf.
+- **The auth support types** — `Enums\TokenProvenance` (where a Sanctum PAT came from),
+  `Auth\AuthTokenFactory` (the single session/login-token mint), and `Support\CentralRoot`
+  (the flip-safe central-Root check). Relocated here from `Splicewire\Tower\*` (HTTP-04) so
+  the token/root logic lives in the account engine and its consumers call *down* instead of up.
 
 ## The account-shell contract (data-shape only)
 
