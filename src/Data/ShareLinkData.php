@@ -21,11 +21,11 @@ class ShareLinkData extends Data
         public string $token,
         public string $scope,
         public string $url,
-        public ?string $expires_at,
-        public ?string $revoked_at,
-        public int $use_count,
-        public ?int $max_uses,
-        public bool $is_valid,
+        public ?string $expiresAt,
+        public ?string $revokedAt,
+        public int $useCount,
+        public ?int $maxUses,
+        public bool $isValid,
     ) {}
 
     public static function scope(Builder $query): Builder
@@ -40,11 +40,11 @@ class ShareLinkData extends Data
             token: $link->token,
             scope: $link->scope,
             url: route('beam.share-link.resolve', $link->token),
-            expires_at: $link->expires_at?->toIso8601String(),
-            revoked_at: $link->revoked_at?->toIso8601String(),
-            use_count: $link->use_count,
-            max_uses: $link->max_uses,
-            is_valid: $link->isValid(),
+            expiresAt: $link->expires_at?->toIso8601String(),
+            revokedAt: $link->revoked_at?->toIso8601String(),
+            useCount: $link->use_count,
+            maxUses: $link->max_uses,
+            isValid: $link->isValid(),
         );
     }
 }

@@ -19,8 +19,8 @@ class AccessGrantData extends Data
 {
     public function __construct(
         public int|string $id,
-        public string $grantable_type,
-        public string $grantable_id,
+        public string $grantableType,
+        public string $grantableId,
         public string $ability,
         public string $effect,
     ) {}
@@ -38,8 +38,8 @@ class AccessGrantData extends Data
     {
         return new self(
             id: $grant->getKey(),
-            grantable_type: $grant->grantable_type,
-            grantable_id: $grant->grantable_id,
+            grantableType: $grant->grantable_type,
+            grantableId: $grant->grantable_id,
             ability: $grant->ability,
             effect: $grant->effect,
         );

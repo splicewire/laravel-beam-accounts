@@ -17,10 +17,10 @@ class ViewRequestData extends Data
 {
     public function __construct(
         public string $id,
-        public string $requestable_type,
-        public string $requestable_id,
+        public string $requestableType,
+        public string $requestableId,
         public string $status,
-        public ?string $decided_at,
+        public ?string $decidedAt,
     ) {}
 
     public static function scope(Builder $query): Builder
@@ -36,10 +36,10 @@ class ViewRequestData extends Data
     {
         return new self(
             id: $request->id,
-            requestable_type: $request->requestable_type,
-            requestable_id: $request->requestable_id,
+            requestableType: $request->requestable_type,
+            requestableId: $request->requestable_id,
             status: $request->status,
-            decided_at: $request->decided_at?->toIso8601String(),
+            decidedAt: $request->decided_at?->toIso8601String(),
         );
     }
 }
