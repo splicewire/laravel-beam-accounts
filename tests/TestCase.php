@@ -52,6 +52,12 @@ abstract class TestCase extends Orchestra
 
         $config->set('session.driver', 'array');
 
+        // laravel-data's package config isn't merged under Testbench, so its transformation-depth
+        // defaults come through null and trip a TypeError when a Data class is transformed to array.
+        // Restore the package defaults so ->toArray() works in the isolated test app.
+        $config->set('data.max_transformation_depth', null);
+        $config->set('data.throw_when_max_transformation_depth_reached', true);
+
         $config->set('fortify.guard', 'web');
         $config->set('fortify.home', '/');
         $config->set('fortify.views', false);

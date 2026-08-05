@@ -16,6 +16,7 @@ use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
 use Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
+use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
@@ -25,6 +26,7 @@ use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Sharing\ShareLinkScopes;
 use Splicewire\Beam\Accounts\Support\Demo;
+use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
@@ -54,6 +56,13 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->app->singleton(ShareLinkScopes::class);
 
         $this->app->singleton(TeamProvisioner::class);
+
+        // The account-shell provider seam (ticket 08): the package projects the SHAPE
+        // (AccountShellData); the host binds a provider that fills it from its own product data.
+        // Default to the null provider so consuming the shell prop is safe OOTB — an unbound host
+        // gets `null` and the shell degrades gracefully rather than erroring. Bound with `bind`
+        // (not `singleton`) so a host override takes precedence with the same lazy semantics.
+        $this->app->bind(AccountShellProvider::class, NullAccountShellProvider::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([LoginAsCommand::class]);

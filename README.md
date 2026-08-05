@@ -23,6 +23,37 @@ beam-accounts   (account engine — Fortify default + self-service account UI + 
   (invite → accept → change-role → remove), the `Roles` vocabulary, and the
   `SetCurrentTeamPermissions` middleware, all on the `permission-cascade` base leaf.
 
+## The account-shell contract (data-shape only)
+
+The engine also projects a **SHAPE** for the account area — the plan chip, public profile,
+account rows, and upsell CTAs a host renders in its dashboard sidebar/account view. This is a
+**data-shape contract, NOT a billing engine**: the package owns no Cashier/charge logic, holds
+no card data, makes no gateway call, and ships no monetization copy. It defines the shape and a
+bindable provider seam; the **host populates every value** from its own product data.
+
+```
+AccountShellData {
+  plan:    PlanData    { tier, label, credits?, max? }
+  profile: ProfileData { handle, avatar?, metrics: MetricData[] { label, value } }
+  account: AccountData { email, paymentMethodLabel? }   // label is a DISPLAY STRING, e.g. "Visa •••• 4242"
+  upsells: UpsellData[] { key, label, href? }
+}
+```
+
+A host binds `Splicewire\Beam\Accounts\Contracts\AccountShellProvider` to fill the shape and
+projects the result as an Inertia prop (mirroring how it already projects its `accountNav`):
+
+```php
+app()->bind(AccountShellProvider::class, App\Account\AudiostudAccountShell::class);
+// then in HandleInertiaRequests::share():
+'accountShell' => app(AccountShellProvider::class)->shellFor($request->user()),
+```
+
+The default binding is `Support\NullAccountShellProvider` (returns `null`), so a host that binds
+nothing degrades gracefully — the shell renders empty rather than erroring. The metric semantics
+(SONGS / PLAYS / FOLLOWERS), the plan/credit meaning, and all monetization copy are **host product
+content**; the package carries only the slots.
+
 ## What stays in the satellite
 
 `splicewire/laravel-satellite-account` composes this engine and keeps only the pieces the
