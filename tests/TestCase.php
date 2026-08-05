@@ -117,6 +117,36 @@ abstract class TestCase extends Orchestra
             $table->unsignedInteger('max_uses')->nullable();
             $table->timestamps();
         });
+
+        Schema::create(Beam::table('access_grants'), function (Blueprint $table): void {
+            $table->id();
+            $table->string('grantable_type');
+            $table->string('grantable_id');
+            $table->string('grantee_type');
+            $table->string('grantee_id');
+            $table->string('ability');
+            $table->string('effect');
+            $table->timestamps();
+        });
+
+        Schema::create(Beam::table('view_requests'), function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('requestable_type');
+            $table->string('requestable_id');
+            $table->string('requester_type');
+            $table->string('requester_id');
+            $table->string('status')->default('pending');
+            $table->timestamp('decided_at')->nullable();
+            $table->timestamps();
+        });
+
+        // A HasVisibility fixture to share (steward via HasUserId).
+        Schema::create('shareables', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('visibility')->nullable();
+            $table->timestamps();
+        });
     }
 
     protected function createSpatieSchema(): void
