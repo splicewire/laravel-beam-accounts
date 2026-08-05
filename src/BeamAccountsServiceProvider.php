@@ -21,6 +21,7 @@ use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
 use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
+use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
@@ -98,6 +99,14 @@ class BeamAccountsServiceProvider extends ServiceProvider
     {
         Gate::define('manageMembers', [MembershipPolicy::class, 'manageMembers']);
         Gate::define('manageInvitations', [MembershipPolicy::class, 'manageInvitations']);
+
+        // A share link is managed (revoked) by its minter (ADR-0009, tracer 05). Not
+        // team-scoped like invitations — the check is minter-ownership, compared as strings
+        // since created_by is a cross-host string key.
+        Gate::define('manageShareLinks', function ($user, ShareLink $link) {
+            return $link->created_by !== null
+                && (string) $link->created_by === (string) $user->getAuthIdentifier();
+        });
     }
 
     protected function bootMiddleware(): void

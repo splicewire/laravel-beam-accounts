@@ -105,4 +105,12 @@ return [
         // only if the host renamed its personal-access-tokens table.
         'table' => 'personal_access_tokens',
     ],
+
+    // Reusable capability links (ADR-0009, tracer 05): the ShareLink primitive + ShareLinks
+    // action are always callable from PHP; this flag gates the HOST-FACING affordance (the
+    // satellite's /s/{token} resolver + copy-link UI, tracer 06). Mirrors the `keys`/`api`
+    // seams — prepared, opt-in.
+    'share_links' => [
+        'enabled' => env('ACCOUNT_SHARE_LINKS_ENABLED', true),
+    ],
 ];
