@@ -52,9 +52,10 @@ abstract class TestCase extends Orchestra
 
         $config->set('session.driver', 'array');
 
-        // laravel-data's package config isn't merged under Testbench, so its transformation-depth
-        // defaults come through null and trip a TypeError when a Data class is transformed to array.
-        // Restore the package defaults so ->toArray() works in the isolated test app.
+        // laravel-data's package config isn't merged under Testbench, so its defaults come through
+        // null/absent and trip a TypeError when a Data class is transformed (->toArray) or hydrated
+        // (::from). Load the package's full default config so both work in the isolated test app.
+        $config->set('data', require dirname(__DIR__).'/vendor/spatie/laravel-data/config/data.php');
         $config->set('data.max_transformation_depth', null);
         $config->set('data.throw_when_max_transformation_depth_reached', true);
 
@@ -178,7 +179,7 @@ abstract class TestCase extends Orchestra
             $table->unsignedBigInteger('permission_id');
             $table->string('model_type');
             $table->unsignedBigInteger('model_id');
-            $table->unsignedBigInteger('team_id');
+            $table->unsignedBigInteger('team_id')->nullable();
             $table->index(['model_id', 'model_type']);
             $table->primary(['team_id', 'permission_id', 'model_id', 'model_type']);
         });
@@ -187,7 +188,7 @@ abstract class TestCase extends Orchestra
             $table->unsignedBigInteger('role_id');
             $table->string('model_type');
             $table->unsignedBigInteger('model_id');
-            $table->unsignedBigInteger('team_id');
+            $table->unsignedBigInteger('team_id')->nullable();
             $table->index(['model_id', 'model_type']);
             $table->primary(['team_id', 'role_id', 'model_id', 'model_type']);
         });

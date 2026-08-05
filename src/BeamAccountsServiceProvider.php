@@ -17,6 +17,7 @@ use Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
+use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
@@ -27,6 +28,7 @@ use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Sharing\ShareLinkScopes;
 use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
+use Splicewire\Beam\Accounts\Support\NullAuthUserExtras;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
@@ -63,6 +65,14 @@ class BeamAccountsServiceProvider extends ServiceProvider
         // gets `null` and the shell degrades gracefully rather than erroring. Bound with `bind`
         // (not `singleton`) so a host override takes precedence with the same lazy semantics.
         $this->app->bind(AccountShellProvider::class, NullAccountShellProvider::class);
+
+        // The auth-projection extension seam (HTTP-06 / extension-seam asset 07). The base
+        // AuthUserData carries only the identity core; a host adds fields via two idioms — the
+        // config-swappable SHAPE class (`beam.accounts.data.auth_user`, defaulted below) and this
+        // bound VALUE contributor. Default to the Null contributor so a standalone beam-accounts site
+        // projects a coherent identity core with the host fields simply ABSENT (not empty). Bound with
+        // `bind` so a host override wins with the same lazy semantics.
+        $this->app->bind(AuthUserExtrasContributor::class, NullAuthUserExtras::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([LoginAsCommand::class]);

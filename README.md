@@ -58,6 +58,41 @@ nothing degrades gracefully — the shell renders empty rather than erroring. Th
 (SONGS / PLAYS / FOLLOWERS), the plan/credit meaning, and all monetization copy are **host product
 content**; the package carries only the slots.
 
+## The auth projection (`AuthUserData`) + its host-extension seam
+
+The engine ships the **identity-core** auth projection `Data\AuthUserData` — the DTO that `/me`,
+login, passkey-login, and profile-update all converge on. It carries **only** identity fields —
+`id, name, email, accessToken, roles, permissions, tenants, isRoot, isDemo, tenant` — and **names no
+host type** (no commerce/embed), so beam-accounts never depends *up* on a host package. Build it with
+the single seam:
+
+```php
+AuthUserData::fromUser($user, $accessToken);   // central-vs-tenant branch; isRoot via Support\CentralRoot
+```
+
+A host that needs extra fields on the projection adds them through a **two-idiom extension seam** —
+without beam-accounts ever learning those fields exist:
+
+- **SHAPE** (config-swappable class): `config('beam.accounts.data.auth_user')` — default
+  `AuthUserData::class`. A host publishes this config and swaps a **subclass** that declares its own
+  flat, top-level props. `fromUser` resolves the configured class and hydrates it via `::from()`
+  (spatie maps by property **name**, not positional `new`), so the subclass's extra props fill
+  themselves — **no constructor forwarding**.
+- **VALUE** (bound port + Null default): `Contracts\AuthUserExtrasContributor` — the host binds a
+  contributor whose `contribute($user)` returns the extra fields keyed by property name; `fromUser`
+  spreads them blind into `::from()`. The default binding is `Support\NullAuthUserExtras` (returns
+  `[]`).
+
+```php
+// host service provider:
+app()->bind(AuthUserExtrasContributor::class, App\Auth\MyAuthUserExtras::class);
+config(['beam.accounts.data.auth_user' => App\Data\MyAuthUserData::class]);
+```
+
+**Standalone degrades cleanly:** with the base class + the Null contributor, a beam-accounts site
+projects the pure identity core — the host fields are **absent** (not empty). (Feeds the
+auth-relocation ADR; auth-cluster spec §2 + extension-seam asset 07.)
+
 ## What stays in the satellite
 
 `splicewire/laravel-satellite-account` composes this engine and keeps only the pieces the
