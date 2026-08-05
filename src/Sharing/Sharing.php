@@ -7,7 +7,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Rushing\PermissionCascade\Contracts\AccessGrant;
+use Splicewire\Beam\Accounts\Data\AccessGrantData;
+use Splicewire\Beam\Accounts\Data\ShareLinkData;
+use Splicewire\Beam\Accounts\Data\ViewRequestData;
+use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Models\ViewRequest;
+use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
 use Splicewire\Beam\Particle\ParticleOperationRegistry;
@@ -108,6 +113,46 @@ class Sharing
             foreach (['share', 'unshare', 'share-link', 'request-access', 'approve-request', 'decline-request'] as $op) {
                 Route::particleOp($urlKey, $resourceKey, $op);
             }
+        });
+    }
+
+    /**
+     * Register + mount the three sharing-ledger READ resources — the current user's own view of
+     * each ledger (ADR-0009): `share-links` (created_by = me, + a `revoke` op), `access-grants`
+     * (grantee = me — "shared with me"), `view-requests` (requester = me — "my requests + status").
+     * Owner-side management (grants ON my resources / requests FOR my resources) stays per-resource
+     * (the attachTo approve/decline ops + a UI embed), since scoping "resources I own" across morph
+     * types is not a generic SQL scope.
+     */
+    public static function ledgerResources(array $opts = []): void
+    {
+        $groupPrefix = $opts['groupPrefix'] ?? 'resources';
+        $middleware = $opts['middleware'] ?? ['web', 'auth'];
+
+        // The read shape / scope / projection are declared on the attributed Data classes; discovery
+        // reflects the #[ParticleResource] + convention scope()/project() into the registry.
+        app(AttributedParticleDiscovery::class)->discover([
+            ShareLinkData::class,
+            AccessGrantData::class,
+            ViewRequestData::class,
+        ]);
+
+        // Revoke stays a write op (minter-gated) — reads are declarative, writes imperative (as attachTo).
+        app(ParticleOperationRegistry::class)->register(new ParticleOperation(
+            resource: 'share-links', name: 'revoke', kind: OperationKind::Write, model: ShareLink::class,
+            ability: 'manageShareLinks',
+            handle: function (ShareLink $link) {
+                app(ShareLinks::class)->revoke($link);
+
+                return ['data' => ['id' => $link->getKey(), 'revoked_at' => $link->fresh()->revoked_at?->toIso8601String()]];
+            },
+        ));
+
+        Route::middleware($middleware)->prefix($groupPrefix)->group(function () {
+            Route::particleResource('share-links', 'share-links', ['only' => ['index']]);
+            Route::particleResource('access-grants', 'access-grants', ['only' => ['index']]);
+            Route::particleResource('view-requests', 'view-requests', ['only' => ['index']]);
+            Route::particleOp('share-links', 'share-links', 'revoke');
         });
     }
 
