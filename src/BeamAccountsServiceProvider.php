@@ -19,9 +19,11 @@ use Splicewire\Beam\Accounts\Console\MintKeyCommand;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
+use Splicewire\Beam\Accounts\Http\Controllers\ShareLinkController;
 use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Models\ShareLink;
+use Splicewire\Beam\Accounts\Sharing\ShareLinkScopes;
 use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
@@ -47,6 +49,10 @@ class BeamAccountsServiceProvider extends ServiceProvider
             config(['permission-cascade.grant_model' => AccessGrant::class]);
         }
 
+        // The share-link scope-handler registry (tracer 06) — a singleton so a host registers
+        // its handlers (in boot) on the same instance the /s/{token} resolver reads.
+        $this->app->singleton(ShareLinkScopes::class);
+
         $this->app->singleton(TeamProvisioner::class);
 
         if ($this->app->runningInConsole()) {
@@ -67,6 +73,24 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->bootApiGuardEnforcement();
         $this->bootDemo();
         $this->bootKeys();
+        $this->bootShareLinks();
+    }
+
+    /**
+     * The reusable link-only front door (tracer 06): a PUBLIC `GET /s/{token}` that resolves a
+     * ShareLink through the host-registered {@see ShareLinkScopes}. Gated by
+     * `beam.accounts.share_links.enabled` — the ShareLink primitive stays callable from PHP
+     * either way; this only mounts the guest route.
+     */
+    protected function bootShareLinks(): void
+    {
+        if (! config('beam.accounts.share_links.enabled', true)) {
+            return;
+        }
+
+        Route::middleware('web')->group(function () {
+            Route::get('/s/{token}', [ShareLinkController::class, 'resolve'])->name('beam.share-link.resolve');
+        });
     }
 
     protected function bootConfig(): void
