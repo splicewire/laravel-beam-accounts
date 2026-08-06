@@ -18,6 +18,8 @@ use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
+use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
+use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
@@ -58,6 +60,14 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->app->singleton(ShareLinkScopes::class);
 
         $this->app->singleton(TeamProvisioner::class);
+
+        // The declarative entitlement-bundle layer (Frame OS ticket 09): the BundleRegistry reads the
+        // host-declared `name => keys` bundles from config; the EntitlementComposer folds a bundle
+        // baseline with per-principal grants/denies (`plan-baseline ∪ grants − denies`). Both are pure
+        // — no plan model — so a host's bound EntitlementResolver composes them over its own plan/grant
+        // discovery. Singletons so the resolved config is read once per request.
+        $this->app->singleton(BundleRegistry::class, fn () => new BundleRegistry);
+        $this->app->singleton(EntitlementComposer::class);
 
         // The account-shell provider seam (ticket 08): the package projects the SHAPE
         // (AccountShellData); the host binds a provider that fills it from its own product data.

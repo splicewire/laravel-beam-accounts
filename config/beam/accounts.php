@@ -134,4 +134,23 @@ return [
     'share_links' => [
         'enabled' => env('ACCOUNT_SHARE_LINKS_ENABLED', true),
     ],
+
+    // Declarative named ENTITLEMENT BUNDLES (Frame OS ticket 09, ADR-0013 §3/§5). A bundle is a
+    // named Set<entitlementKey> — the reusable product-facing unit a plan maps to. A host declares
+    // its bundles here (`name => [keys]`), maps a plan to a bundle name, and resolves a principal's
+    // effective set as `plan-baseline ∪ grants − denies` via the EntitlementComposer. Empty by
+    // default (an unconfigured host holds nothing — the null-default discipline, ADR-0009). This is
+    // the CONSUMER/host-principal path; the multi-tenant commerce cascade
+    // (Splicewire\Beam\Commerce\Entitlements\EntitlementResolver) keeps the tenant principal.
+    //
+    //   'entitlements' => [
+    //       'bundles' => [
+    //           'own-a-song'    => ['own-a-song', 'publish'],
+    //           'go-songwriter' => ['own-a-song', 'go-songwriter', 'publish', 'generate'],
+    //           'staff'         => ['author-ux', 'workbench.enter'],
+    //       ],
+    //   ],
+    'entitlements' => [
+        'bundles' => [],
+    ],
 ];
