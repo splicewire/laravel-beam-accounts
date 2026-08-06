@@ -1,0 +1,38 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Laravel\Passkeys\Passkeys;
+
+/**
+ * WebAuthn passkey credentials (login-branding-passkey ticket 07).
+ *
+ * A CENTRAL migration (not tenant): credentials live beside users + personal access tokens
+ * in the public schema, because the RP is the central sign-in host and a single credential
+ * yields a token that already works across every tenant subdomain. Mirrors the schema shipped
+ * by laravel/passkeys (published here rather than vendor-loaded, so it runs with the central
+ * set); `foreignIdFor` resolves the UUID `users.id` key type automatically.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('passkeys', function (Blueprint $table) {
+            $table->id();
+            $table->foreignIdFor(Passkeys::userModel(), 'user_id')->constrained()->cascadeOnDelete();
+            $table->string('name');
+            $table->string('credential_id')->unique();
+            $table->json('credential');
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamps();
+
+            $table->index('user_id');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('passkeys');
+    }
+};

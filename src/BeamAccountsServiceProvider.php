@@ -121,13 +121,58 @@ class BeamAccountsServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Home the account engine's own migrations across TWO independently-gated estates —
+     * separated (recohere RCH-12) so a host can take the auth schema without the
+     * teams schema, or vice versa:
+     *
+     *  - AUTH (cluster C2) — the app's real auth schema, homed here to align with the
+     *    auth CODE that already lives in this package (users, permission tables, PAT
+     *    provenance/archived alters, google_id, passkeys; and the tenant estate: tenant
+     *    permission tables, userables, per-tenant users, role doctrine, guest_tokens,
+     *    sign_offs, system_account rename). Gated by `register_auth_migrations`. The
+     *    platform app (Sanctum, composing over its own `tenant_users`) turns the
+     *    teams estate OFF but keeps this ON — this IS its auth schema.
+     *  - TEAMS — the engine's teams/memberships/invitations/access-grants/share-links
+     *    tables under `migrations/teams`. Gated by `register_migrations` (unchanged
+     *    semantics). A host composing the team PRIMITIVE over its own tables turns this
+     *    off so the engine tables are never created.
+     *
+     * Each estate registers both a CENTRAL dir (auto-discovered by `migrate` via
+     * {@see loadMigrationsFrom()}) and, where present, a `tenant/` subdir pushed onto
+     * Stancl's `config('tenancy.migration_parameters.--path')` array (tenancy has no
+     * auto-discovery for tenant migrations; the `tenants:migrate` command reads that
+     * array at runtime, and boot runs well before it). Mirrors the same idiom in
+     * splicewire/tower's TowerServiceProvider::bootMigrations() (no code dependency —
+     * beam is DOWN from tower).
+     */
     protected function bootMigrations(): void
     {
-        if (! config('beam.accounts.register_migrations', true)) {
-            return;
+        // AUTH estate (cluster C2) — the host's real auth schema.
+        if (config('beam.accounts.register_auth_migrations', true)) {
+            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+            $this->pushTenantMigrationPath(__DIR__.'/../database/migrations/tenant');
         }
 
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        // TEAMS estate — the engine's teams/memberships/invitations tables.
+        if (config('beam.accounts.register_migrations', true)) {
+            $this->loadMigrationsFrom(__DIR__.'/../database/migrations/teams');
+        }
+    }
+
+    /**
+     * Push a package tenant-migration dir onto Stancl's runtime `--path` array,
+     * install-location-agnostic and idempotent.
+     */
+    protected function pushTenantMigrationPath(string $dir): void
+    {
+        $tenantPath = realpath($dir) ?: $dir;
+
+        $paths = config('tenancy.migration_parameters.--path', []);
+
+        if (! in_array($tenantPath, $paths, true)) {
+            config()->push('tenancy.migration_parameters.--path', $tenantPath);
+        }
     }
 
     /**

@@ -1,0 +1,38 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Finality (dealer-network B3), subscriber side. A `SignOff` freezes a local
+ * `ResolutionResult` at sign-time — the subscriber's attestation of its compliance
+ * state as of that moment. The frozen `result` is the sole source the central rollup
+ * sweep reads; the publisher never sees the underlying evidence, only the derived
+ * per-requirement status (grant-not-visibility).
+ *
+ * Per-tenant operational data (who signed, when, what was true), NOT synced corpus.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('sign_offs', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+
+            $table->json('result');                       // the frozen ResolutionResult
+            $table->uuid('signed_by')->nullable();        // → tenant_users.id
+            $table->string('holder_scope_ref')->nullable(); // edge subject signed for (e.g. location)
+            $table->timestamp('signed_at');
+
+            $table->timestamps();
+
+            $table->index('signed_at');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('sign_offs');
+    }
+};

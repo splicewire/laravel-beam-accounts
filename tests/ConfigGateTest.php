@@ -44,9 +44,12 @@ class ConfigGateTest extends Orchestra
             'prefix' => '',
         ]);
 
-        // The host gates the auth surface + schema off.
+        // The host gates the auth surface + schema off. Both migration estates
+        // (teams via register_migrations, auth via register_auth_migrations —
+        // recohere RCH-12) are gated so NO beam-accounts migrations register.
         $config->set('beam.accounts.bootstrap_fortify', false);
         $config->set('beam.accounts.register_migrations', false);
+        $config->set('beam.accounts.register_auth_migrations', false);
         $config->set('beam.accounts.register_routes', false);
     }
 
