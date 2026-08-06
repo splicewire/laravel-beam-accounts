@@ -13,7 +13,7 @@ class LoginAsController
         abort_unless(Demo::enabled(), 403);
         abort_unless(Demo::has($subject), 404);
 
-        // Outside local/testing the link must be signed — the `splicewire:beam:account-login-as` command
+        // Outside local/testing the link must be signed — the `splicewire:beam:accounts:login-as` command
         // mints one — so the affordance can ride along in a preview deploy without
         // becoming an open back door.
         if (! app()->environment('local', 'testing') && ! $request->hasValidSignature()) {

@@ -66,7 +66,7 @@ return [
         'auth_user' => AuthUserData::class,
     ],
 
-    // Demo subjects + the `splicewire:beam:account-login-as` affordance — a standardized way to land in
+    // Demo subjects + the `splicewire:beam:accounts:login-as` affordance — a standardized way to land in
     // the app as a known subject at a known access level (owner/admin/member/solo) and
     // verify the account/billing/admin surfaces gate correctly. A development/preview
     // convenience, never for real end-users.
@@ -116,7 +116,7 @@ return [
     // central token store and no cross-host reach. The core primitive
     // (Keys\DeterministicToken — a reproducible, reset-surviving PAT minter) is always
     // available to call from PHP (seeders use it directly); this toggle only gates the
-    // HOST-FACING affordance: the `splicewire:beam:accounts-mint-key` artisan command, so a
+    // HOST-FACING affordance: the `splicewire:beam:accounts:mint-key` artisan command, so a
     // non-satellite beam site that never seeds keys gets nothing extra. Default-off,
     // mirroring the `api` seam — prepared, opt-in, no rebuild to activate.
     'keys' => [

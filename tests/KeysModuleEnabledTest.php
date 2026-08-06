@@ -13,7 +13,7 @@ use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 
 /**
  * Boots the engine with the key-management module opted IN (the way a satellite host runs
- * it), and asserts the host-facing `splicewire:beam:accounts-mint-key` command is wired and mints a
+ * it), and asserts the host-facing `splicewire:beam:accounts:mint-key` command is wired and mints a
  * deterministic, reset-surviving row end-to-end.
  */
 class KeysModuleEnabledTest extends Orchestra
@@ -61,12 +61,12 @@ class KeysModuleEnabledTest extends Orchestra
 
     public function test_command_is_registered_when_the_module_is_enabled(): void
     {
-        $this->assertArrayHasKey('splicewire:beam:accounts-mint-key', $this->app[Kernel::class]->all());
+        $this->assertArrayHasKey('splicewire:beam:accounts:mint-key', $this->app[Kernel::class]->all());
     }
 
     public function test_command_mints_a_deterministic_row(): void
     {
-        $this->artisan('splicewire:beam:accounts-mint-key', [
+        $this->artisan('splicewire:beam:accounts:mint-key', [
             'id' => 990003,
             'plaintext' => 'numeroSatelliteServiceToken00000000000v1',
             '--tokenable-id' => 'owner-uuid',
@@ -74,7 +74,7 @@ class KeysModuleEnabledTest extends Orchestra
         ])->assertSuccessful();
 
         // Re-run: idempotent, still one row, same credential.
-        $this->artisan('splicewire:beam:accounts-mint-key', [
+        $this->artisan('splicewire:beam:accounts:mint-key', [
             'id' => 990003,
             'plaintext' => 'numeroSatelliteServiceToken00000000000v1',
             '--tokenable-id' => 'owner-uuid',

@@ -13,7 +13,7 @@ use Splicewire\Beam\Accounts\Support\Demo;
 
 /**
  * Assume a demo subject's identity on the session guard. The single wrapped operation
- * behind both the `splicewire:beam:account-login-as` command and the signed login-as route. An engine
+ * behind both the `splicewire:beam:accounts:login-as` command and the signed login-as route. An engine
  * affordance (gated by demo.enabled), not a per-satellite fork.
  */
 class LogInAs

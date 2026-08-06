@@ -10,7 +10,7 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * The demo subjects — a standardized set of known identities at known access levels so
  * any satellite can be entered as owner/admin/member/solo and its account, billing, and
  * team-admin surfaces verified. Provisioned by {@see DemoTeamSeeder},
- * targeted by the `splicewire:beam:account-login-as` affordance. Development/preview only — never real
+ * targeted by the `splicewire:beam:accounts:login-as` affordance. Development/preview only — never real
  * end-users.
  *
  * The roster is **derived from the {@see Role} enum**, not a hand-authored list: one

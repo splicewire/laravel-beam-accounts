@@ -16,7 +16,7 @@ use Splicewire\Beam\Accounts\Keys\DeterministicToken;
  */
 class MintKeyCommand extends Command
 {
-    protected $signature = 'splicewire:beam:accounts-mint-key
+    protected $signature = 'splicewire:beam:accounts:mint-key
         {id : The fixed token id (pin a high, unique id clear of createToken() auto-increment)}
         {plaintext : The fixed plaintext (the part after "id|")}
         {--tokenable-id= : The owning model id}

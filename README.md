@@ -105,7 +105,7 @@ auth-relocation ADR; auth-cluster spec §2 + extension-seam asset 07.)
 
 `splicewire/laravel-satellite-account` composes this engine and keeps only the pieces the
 **seam** legitimately differs on: concrete tenant/demo provisioning — the `Demo` subjects,
-the `DemoTeamSeeder`, and the `splicewire:beam:account-login-as` affordance (command + signed route +
+the `DemoTeamSeeder`, and the `splicewire:beam:accounts:login-as` affordance (command + signed route +
 `LogInAs` action). A multi-tenant satellite (Standwell / Entreport) that mints child-tenants
 plugs its provisioning in at the same seam. Provisioning is the boundary; the account engine
 is uniform.
