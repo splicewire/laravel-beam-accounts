@@ -15,6 +15,7 @@ use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Data\Frame\CreateInvitationData;
 use Splicewire\Beam\Accounts\Data\Frame\InvitationResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\MembershipResourceData;
+use Splicewire\Beam\Accounts\Data\Frame\TeamResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\TokenResourceData;
 use Splicewire\Beam\Accounts\Data\ProfileData;
 use Splicewire\Beam\Accounts\Data\ProfileUpdateInputData;
@@ -205,6 +206,21 @@ it('the member source is empty when there is no active team', function () {
     expect($page->items())->toHaveCount(0);
 });
 
+// ── Teams (the domain-neutral tenant-admin list) ──────────────────────────────────────────────
+
+it('projects a team into the admin list row', function () {
+    [$owner, $team] = ownerWithTeam();
+    $member = User::create(['name' => 'M', 'email' => 'm@example.test', 'password' => 'x']);
+    Membership::create(['team_id' => $team->id, 'user_id' => $member->id, 'role' => Role::Member->value]);
+
+    $row = TeamResourceData::project($team->fresh());
+
+    expect($row->name)->toBe('T')
+        ->and($row->ownerEmail)->toBe('owner@example.test')
+        ->and($row->memberCount)->toBe(2)
+        ->and($row->personal)->toBeTrue();
+});
+
 // ── OOTB registration (the "fresh host gets the area" claim) ──────────────────────────────────
 
 it('registers tokens/invitations/members onto the Frame registries when beam is present', function () {
@@ -218,8 +234,8 @@ it('registers tokens/invitations/members onto the Frame registries when beam is 
     $admin = app(AdminResourceRegistry::class);
     $particles = app(ParticleResourceRegistry::class);
 
-    // Admin/manifest side: all three list surfaces present.
-    foreach (['tokens', 'invitations', 'members'] as $key) {
+    // Admin/manifest side: all four list surfaces present.
+    foreach (['tokens', 'invitations', 'members', 'teams'] as $key) {
         $admin->get($key); // throws if absent
     }
     expect($admin->get('members')->sourceKind)->toBe('service')
@@ -227,9 +243,10 @@ it('registers tokens/invitations/members onto the Frame registries when beam is 
         ->and($admin->get('invitations')->editable)->toBeFalse()
         ->and($admin->get('tokens')->deletable)->toBeTrue();
 
-    // REST/op side: the two model-backed attribute resources are on the particle registry.
+    // REST/op side: the model-backed attribute resources are on the particle registry.
     expect($particles->has('tokens'))->toBeTrue()
-        ->and($particles->has('invitations'))->toBeTrue();
+        ->and($particles->has('invitations'))->toBeTrue()
+        ->and($particles->has('teams'))->toBeTrue();
 });
 
 // ── Account profile (already package-owned — the 4th ticket-20 resource) ──────────────────────

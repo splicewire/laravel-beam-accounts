@@ -22,6 +22,7 @@ use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
 use Splicewire\Beam\Accounts\Data\Frame\InvitationResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\MembershipResourceData;
+use Splicewire\Beam\Accounts\Data\Frame\TeamResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\TokenResourceData;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
@@ -144,6 +145,7 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $attributeResources = [
             TokenResourceData::class,
             InvitationResourceData::class,
+            TeamResourceData::class,
         ];
 
         // Admin/manifest side — reflect each attribute DTO into the admin registry (list/detail surface).
