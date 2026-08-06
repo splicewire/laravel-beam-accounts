@@ -10,9 +10,13 @@ use function Splicewire\Beam\Accounts\accountUserModel;
 trait ProfileValidationRules
 {
     /**
+     * @param  int|string|null  $userId  The current user's key for unique-ignore-self. Widened from
+     *                                   `?int` (HTTP-07): the account user model is UUID-keyed
+     *                                   (`HasUuids`), so `getKey()` is a string — the former `?int`
+     *                                   hint could never receive the real key without a TypeError.
      * @return array<string, array<int, ValidationRule|array<mixed>|string>>
      */
-    protected function profileRules(?int $userId = null): array
+    protected function profileRules(int|string|null $userId = null): array
     {
         return [
             'name' => $this->nameRules(),
@@ -31,7 +35,7 @@ trait ProfileValidationRules
     /**
      * @return array<int, ValidationRule|array<mixed>|string>
      */
-    protected function emailRules(?int $userId = null): array
+    protected function emailRules(int|string|null $userId = null): array
     {
         return [
             'required',

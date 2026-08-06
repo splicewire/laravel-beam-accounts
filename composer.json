@@ -25,6 +25,7 @@
         "laravel/fortify": "^1.20",
         "laravel/passkeys": "^0.2",
         "laravel/sanctum": "^4.0",
+        "rushing/laravel-data-schemas-scribe": "*",
         "rushing/laravel-permission-cascade": "*",
         "spatie/laravel-permission": "^6.0",
         "splicewire/laravel-beam": "*",

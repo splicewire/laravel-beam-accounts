@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\LaravelData\Data;
 use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
 use Splicewire\Beam\Accounts\Support\CentralRoot;
@@ -31,6 +32,10 @@ class AuthUserData extends Data
         public string $id,
         public string $name,
         public string $email,
+        // Wire parity with the retired AuthUserResource (HTTP-07): the token serializes as the
+        // snake `access_token` the SPA has always read, though the property is camel. Global output
+        // mapping is off (config/data.php), so the map is declared per-property here.
+        #[MapOutputName('access_token')]
         public ?string $accessToken,
         /** @var string[] */
         public array $roles,

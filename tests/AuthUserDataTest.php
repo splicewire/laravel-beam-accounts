@@ -63,8 +63,11 @@ it('degrades cleanly standalone — host fields are ABSENT, not empty', function
     // literally absent — because the base class doesn't declare them and NullAuthUserExtras adds nothing.
     expect($array)->not->toHaveKey('entitlements');
     expect($array)->not->toHaveKey('platformEmbedPk');
+    // `access_token` (snake) is the WIRE key — mapped via #[MapOutputName] to preserve byte-for-byte
+    // parity with the retired AuthUserResource the SPA reads (HTTP-07, first consumer to pin the wire);
+    // the PHP property stays camel `accessToken`.
     expect(array_keys($array))->toBe([
-        'id', 'name', 'email', 'accessToken', 'roles', 'permissions', 'tenants', 'isRoot', 'isDemo', 'tenant',
+        'id', 'name', 'email', 'access_token', 'roles', 'permissions', 'tenants', 'isRoot', 'isDemo', 'tenant',
     ]);
 });
 

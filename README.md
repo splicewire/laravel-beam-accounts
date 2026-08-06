@@ -26,6 +26,14 @@ beam-accounts   (account engine — Fortify default + self-service account UI + 
   `Auth\AuthTokenFactory` (the single session/login-token mint), and `Support\CentralRoot`
   (the flip-safe central-Root check). Relocated here from `Splicewire\Tower\*` (HTTP-04) so
   the token/root logic lives in the account engine and its consumers call *down* instead of up.
+- **The auth API HTTP surface** — five `Http/Controllers/Api/V1/*` on the canonical InputData
+  shape (`Login`, `PasskeyLogin`, `PasswordReset`, `Passkey` CRUD, and the API/JSON `Profile`
+  variant beside the Inertia one), plus their `Data/*InputData` bodies. Relocated here from
+  `Splicewire\Tower\Api\V1\*` (HTTP-07). Each drops its FormRequest for a typed
+  `{Concept}InputData` (static `rules(ValidationContext)`, validated under `OnlyRequests`),
+  annotates `#[ResponseFromData(AuthUserData::class)]`, and mints its token IN the controller
+  (via `AuthTokenFactory`) ahead of projecting — so `AuthUserData` stays a pure projection.
+  The recipe is captured once in the host's ADR-0179.
 
 ## The account-shell contract (data-shape only)
 
