@@ -153,4 +153,30 @@ return [
     'entitlements' => [
         'bundles' => [],
     ],
+
+    // The account + team-admin FRAME RESOURCES (Frame OS ticket 20): the OOTB list/detail surfaces a
+    // host gets by installing beam-accounts — Tokens (list + revoke), Invitations (list + create +
+    // revoke), Members (list-only). On by default, and inert unless beam's Frame registry is present.
+    // A host that curates its own resource roster (e.g. a satellite that registers tenant-scoped
+    // variants) turns this off and re-consumes the package DTOs itself.
+    'frame_resources' => [
+        'enabled' => env('ACCOUNT_FRAME_RESOURCES', true),
+    ],
+
+    // The team-admin resources (Members / Invitations) scope to the acting request's team. The
+    // domain-neutral default is the current user's current-or-personal team; a host whose "active
+    // team" is a different notion (e.g. a per-request TENANT) binds a resolver here — a `(): ?object`
+    // callable returning the scope object whose `getKey()` is the invitations/memberships `team_id`.
+    'teams' => [
+        'resolver' => null,
+    ],
+
+    // The API-tokens resource. `model` is the PAT model the list/revoke reads (a host with a bespoke
+    // PAT — its own connection, a uuid key — binds its class; null = the package's own model). `scope`
+    // is the load-bearing row-level isolation: an `(Builder, ?Authenticatable): Builder` callable; the
+    // default scopes to the authenticated principal's OWN tokens.
+    'tokens' => [
+        'model' => null,
+        'scope' => null,
+    ],
 ];

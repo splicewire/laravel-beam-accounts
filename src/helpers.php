@@ -3,6 +3,8 @@
 namespace Splicewire\Beam\Accounts;
 
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\Auth;
+use Splicewire\Beam\Accounts\Models\PersonalAccessToken;
 
 if (! function_exists('Splicewire\Beam\Accounts\accountUserModel')) {
     /**
@@ -36,5 +38,43 @@ if (! function_exists('Splicewire\Beam\Accounts\accountUserModel')) {
     function accountGuard(): string
     {
         return config('beam.accounts.guard', 'web');
+    }
+
+    /**
+     * Resolve the personal-access-token model the account Tokens resource reads (Frame OS ticket 20).
+     *
+     * A host with a bespoke PAT model — its own connection (`central`), a uuid key, extra
+     * columns — binds `beam.accounts.tokens.model`. Unset falls back to the package's own
+     * {@see PersonalAccessToken}.
+     */
+    function accountTokenModel(): string
+    {
+        return config('beam.accounts.tokens.model')
+            ?: PersonalAccessToken::class;
+    }
+
+    /**
+     * Resolve the team the account team-admin resources (Members / Invitations) scope to for the
+     * acting request (Frame OS ticket 20).
+     *
+     * DOMAIN-NEUTRAL default: the authenticated user's current-or-personal team. A host whose
+     * "active team" is a different notion — tower's per-request TENANT — binds a resolver
+     * `beam.accounts.teams.resolver` (a `(): ?object` callable returning the scope object whose
+     * `getKey()` is the `team_id`/`tenant_id` the invitations/memberships belong to). Unset falls
+     * back to the current user's team.
+     */
+    function accountCurrentTeam(): ?object
+    {
+        $resolver = config('beam.accounts.teams.resolver');
+
+        if (is_callable($resolver)) {
+            return $resolver();
+        }
+
+        $user = Auth::user();
+
+        return method_exists($user, 'currentTeamOrPersonal')
+            ? $user->currentTeamOrPersonal()
+            : null;
     }
 }
