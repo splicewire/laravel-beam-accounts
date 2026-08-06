@@ -54,6 +54,23 @@
         }
     },
     "extra": {
+        "package-topology": {
+            "because": "beam-accounts is the account engine and now OWNS the auth public surface relocated DOWN out of tower (HTTP-04/07/08): the TokenProvenance enum, AuthTokenFactory, the CentralRoot support helper, base AuthUserData + its AuthUserExtrasContributor port/config seam, and the 5 Api/V1/* auth controllers. That surface is consumed DOWN by the tower host (which requires beam-accounts) and by the host App tier; the engine itself depends DOWN on beam + the permission-cascade/fortify foundations and must NEVER reach UP into tower / satellite / the host App tier.",
+            "policy": {
+                "noRequire": [
+                    {
+                        "fromPrefix": "splicewire/laravel-beam-accounts",
+                        "toPrefix": "splicewire/laravel-tower",
+                        "because": "the account engine is reusable by any beam site; the auth surface lives DOWN here and is consumed UP by the tower host (host-specific TowerAuthUserData/Extras subclass stays in tower) — beam-accounts never requires tower"
+                    },
+                    {
+                        "fromPrefix": "splicewire/laravel-beam-accounts",
+                        "toPrefix": "splicewire/laravel-satellite",
+                        "because": "the foundation never reaches up into the consumer-app tier"
+                    }
+                ]
+            }
+        },
         "branch-alias": {
             "dev-main": "1.0.x-dev"
         },
