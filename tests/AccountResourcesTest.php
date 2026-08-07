@@ -29,7 +29,6 @@ use Splicewire\Beam\Accounts\Models\Team;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Beam;
-use Splicewire\Beam\Frame\AdminResourceRegistry;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -224,29 +223,27 @@ it('projects a team into the admin list row', function () {
 // ── OOTB registration (the "fresh host gets the area" claim) ──────────────────────────────────
 
 it('registers tokens/invitations/members onto the Frame registries when beam is present', function () {
-    // Bind the real beam registries; the provider's afterResolving hooks fire on first resolve.
-    app()->singleton(AdminResourceRegistry::class, fn () => new AdminResourceRegistry);
+    // Bind the real beam registry; the provider's afterResolving hook fires on first resolve.
     app()->singleton(ParticleResourceRegistry::class, fn () => new ParticleResourceRegistry);
 
-    // Re-run the boot hook now that the registries are bindable in this test app.
+    // Re-run the boot hook now that the registry is bindable in this test app.
     (new BeamAccountsServiceProvider(app()))->boot();
 
-    $admin = app(AdminResourceRegistry::class);
-    $particles = app(ParticleResourceRegistry::class);
+    $registry = app(ParticleResourceRegistry::class);
 
-    // Admin/manifest side: all four list surfaces present.
+    // Frame-manifest side: all four list surfaces present.
     foreach (['tokens', 'invitations', 'members', 'teams'] as $key) {
-        $admin->get($key); // throws if absent
+        $registry->definition($key); // throws if absent
     }
-    expect($admin->get('members')->sourceKind)->toBe('service')
-        ->and($admin->get('members')->deletable)->toBeFalse()
-        ->and($admin->get('invitations')->editable)->toBeFalse()
-        ->and($admin->get('tokens')->deletable)->toBeTrue();
+    expect($registry->definition('members')->sourceKind)->toBe('service')
+        ->and($registry->definition('members')->deletable)->toBeFalse()
+        ->and($registry->definition('invitations')->editable)->toBeFalse()
+        ->and($registry->definition('tokens')->deletable)->toBeTrue();
 
-    // REST/op side: the model-backed attribute resources are on the particle registry.
-    expect($particles->has('tokens'))->toBeTrue()
-        ->and($particles->has('invitations'))->toBeTrue()
-        ->and($particles->has('teams'))->toBeTrue();
+    // REST/op side: the model-backed attribute resources are on the same registry.
+    expect($registry->has('tokens'))->toBeTrue()
+        ->and($registry->has('invitations'))->toBeTrue()
+        ->and($registry->has('teams'))->toBeTrue();
 });
 
 // ── Account profile (already package-owned — the 4th ticket-20 resource) ──────────────────────

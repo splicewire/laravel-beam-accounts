@@ -40,7 +40,6 @@ use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
 use Splicewire\Beam\Accounts\Support\NullAuthUserExtras;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
-use Splicewire\Beam\Frame\AdminResourceRegistry;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 
@@ -119,12 +118,15 @@ class BeamAccountsServiceProvider extends ServiceProvider
     /**
      * The account + team-admin FRAME RESOURCES (Frame OS ticket 20) — the OOTB list/detail surfaces a
      * host gets by installing beam-accounts: Tokens (list + revoke), Invitations (list + create + revoke),
-     * Members (list-only). Two are attribute-declared `#[ParticleResource]` DTOs registered into beam-core's
-     * particle discovery; Members is SOURCE-backed (model-less pivot), registered imperatively as a raw
-     * ResourceDefinition on beam's AdminResourceRegistry (the model-required attribute can't express it).
+     * Members (list-only). Two are attribute-declared `#[ParticleResource]` DTOs; Members is SOURCE-backed
+     * (model-less pivot), registered imperatively as a raw ResourceDefinition (the model-required attribute
+     * can't express it). One `register()`/`registerDefinition()` call per resource is enough for BOTH the
+     * REST transport and Frame's manifest — beam's merged {@see ParticleResourceRegistry} serves both off
+     * the one stored declaration (the retired `AdminResourceRegistry` used to need each resource registered
+     * TWICE, once per registry; that split is gone).
      *
-     * Gated by `beam.accounts.frame_resources.enabled` (default true) AND inert unless beam's Frame registry
-     * is present — a beam-less/Frame-less host silently gets nothing. A host that curates its own resource
+     * Gated by `beam.accounts.frame_resources.enabled` (default true) AND inert unless beam's particle
+     * registry is present — a beam-less host silently gets nothing. A host that curates its own resource
      * roster (e.g. splicewire-app, which lists tower's tenant-scoped variants in config/frame.php) turns this
      * off and re-consumes the package DTOs directly.
      */
@@ -134,9 +136,9 @@ class BeamAccountsServiceProvider extends ServiceProvider
             return;
         }
 
-        // Inert unless beam's Frame/particle registries are present (a beam-less host gets nothing).
+        // Inert unless beam's particle registry is present (a beam-less host gets nothing).
         if (
-            ! class_exists(AdminResourceRegistry::class)
+            ! class_exists(ParticleResourceRegistry::class)
             || ! class_exists(AttributedParticleDiscovery::class)
         ) {
             return;
@@ -148,18 +150,19 @@ class BeamAccountsServiceProvider extends ServiceProvider
             TeamResourceData::class,
         ];
 
-        // Admin/manifest side — reflect each attribute DTO into the admin registry (list/detail surface).
         // Registered via afterResolving so it lands regardless of the beam↔beam-accounts boot order.
         $this->app->afterResolving(
-            AdminResourceRegistry::class,
-            function (AdminResourceRegistry $registry) use ($attributeResources): void {
+            ParticleResourceRegistry::class,
+            function (ParticleResourceRegistry $registry) use ($attributeResources): void {
                 foreach ($attributeResources as $dataClass) {
-                    $registry->registerClass($dataClass);
+                    $registry->register(
+                        AttributedParticleDiscovery::resourceFromAttribute($dataClass)
+                    );
                 }
 
                 // Members — the source-backed (model-less) list, imperatively (the model-required
                 // attribute can't express it), mirroring tower's TowerFrameResourceProvider.
-                $registry->register(new ResourceDefinition(
+                $registry->registerDefinition(new ResourceDefinition(
                     key: 'members',
                     sourceKind: 'service',
                     model: null,
@@ -182,19 +185,6 @@ class BeamAccountsServiceProvider extends ServiceProvider
                     deletable: false,
                     editable: false,
                 ));
-            }
-        );
-
-        // REST/op side — register each attribute DTO's runtime declaration onto the particle resource
-        // registry (the list index + revoke destroy transport the generic ParticleController serves).
-        $this->app->afterResolving(
-            ParticleResourceRegistry::class,
-            function (ParticleResourceRegistry $registry) use ($attributeResources): void {
-                foreach ($attributeResources as $dataClass) {
-                    $registry->register(
-                        AttributedParticleDiscovery::resourceFromAttribute($dataClass)
-                    );
-                }
             }
         );
     }
