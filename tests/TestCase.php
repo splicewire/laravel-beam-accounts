@@ -8,10 +8,18 @@ use Laravel\Fortify\Features;
 use Laravel\Fortify\FortifyServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
+use Rushing\Versioning\VersioningServiceProvider;
+use Schemastud\DataSchemas\LaravelDataSchemasServiceProvider;
+use Spatie\Activitylog\ActivitylogServiceProvider;
+use Spatie\LaravelData\LaravelDataServiceProvider;
+use Spatie\MediaLibrary\MediaLibraryServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\Submissions\RecordsSubmissions;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Beam;
+use Splicewire\Beam\BeamServiceProvider;
+use Splicewire\Beam\Models\BeamSubmission;
 
 abstract class TestCase extends Orchestra
 {
@@ -22,11 +30,22 @@ abstract class TestCase extends Orchestra
         $this->createUsersSchema();
         $this->createTeamsSchema();
         $this->createSpatieSchema();
+        $this->createSubmissionsSchema();
     }
 
     protected function getPackageProviders($app): array
     {
         return [
+            // beam-core: a declared dependency (composer require), not auto-registered by
+            // BeamAccountsServiceProvider (a plain ServiceProvider, not Spatie's PackageServiceProvider) —
+            // booted explicitly here so container-resolved beam-core ports (SchemaTargetResolver,
+            // RecordReconciler, SchemaRegistry) are available, exactly as a real host composes it.
+            BeamServiceProvider::class,
+            MediaLibraryServiceProvider::class,
+            ActivitylogServiceProvider::class,
+            LaravelDataServiceProvider::class,
+            VersioningServiceProvider::class,
+            LaravelDataSchemasServiceProvider::class,
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             FortifyServiceProvider::class,
@@ -197,6 +216,27 @@ abstract class TestCase extends Orchestra
             $table->unsignedBigInteger('permission_id');
             $table->unsignedBigInteger('role_id');
             $table->primary(['permission_id', 'role_id']);
+        });
+    }
+
+    /**
+     * beam-core's `beam_submissions` table (a publish-only stub, as a real host would have after
+     * vendor:publish) — {@see RecordsSubmissions} writes
+     * through {@see BeamSubmission}, which resolves it via `Beam::table()`.
+     */
+    protected function createSubmissionsSchema(): void
+    {
+        Schema::create(Beam::table('submissions'), function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('form_key')->index();
+            $table->string('schema_ref')->nullable();
+            $table->string('schema_id')->nullable()->index();
+            $table->string('migration_status')->nullable()->index();
+            $table->json('payload');
+            $table->json('context')->nullable();
+            $table->json('meta')->nullable();
+            $table->uuid('user_id')->nullable()->index();
+            $table->timestamps();
         });
     }
 }

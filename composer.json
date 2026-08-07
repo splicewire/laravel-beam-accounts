@@ -27,6 +27,7 @@
         "laravel/sanctum": "^4.0",
         "rushing/laravel-data-schemas-scribe": "*",
         "rushing/laravel-permission-cascade": "*",
+        "schemastud/laravel-data-schemas": "*",
         "spatie/laravel-permission": "^6.0",
         "splicewire/laravel-beam": "*",
         "stancl/tenancy": "^3.0"
@@ -35,6 +36,7 @@
         "orchestra/testbench": "^9.0|^10.0|^11.0",
         "pestphp/pest": "^2.0|^3.0",
         "laravel/pint": "^1.0",
+        "spatie/laravel-medialibrary": "^11.0",
         "wikimedia/composer-merge-plugin": "^2.1"
     },
     "suggest": {
