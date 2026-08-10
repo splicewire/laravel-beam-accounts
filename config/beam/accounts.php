@@ -147,11 +147,28 @@ return [
     //       'bundles' => [
     //           'own-a-song'    => ['own-a-song', 'publish'],
     //           'go-songwriter' => ['own-a-song', 'go-songwriter', 'publish', 'generate'],
-    //           'staff'         => ['author-ux', 'workbench.enter'],
+    //           'staff'         => ['author-ux', 'os.enter', 'app-operator'],
     //       ],
     //   ],
+    //
+    // The DEFAULT resolver (Entitlements\DefaultEntitlementResolver) — bound OOTB unless the host set
+    // `config('permission-cascade.entitlement_resolver')` — grants a STAFF principal the bundle named by
+    // `default_staff_bundle` (the `staff` bundle below, shipped by default so a fresh host's `/operator` +
+    // `/os` gates resolve for a staff user instead of 403-ing everyone). Staff is detected via a truthy
+    // `is_staff` attribute OR one of `staff_roles` (spatie). A host that wants plan/grant logic binds its own
+    // resolver (which wins) and this default steps aside.
     'entitlements' => [
-        'bundles' => [],
+        'bundles' => [
+            // The default staff bundle — the operator/OS/authoring capabilities. `app-operator` hard-gates
+            // the operator realm; `os.enter` gates the OS-shell; `author-ux` drives the authoring chrome.
+            'staff' => ['author-ux', 'os.enter', 'app-operator'],
+        ],
+
+        // The bundle a staff principal resolves under the DefaultEntitlementResolver.
+        'default_staff_bundle' => 'staff',
+
+        // The spatie roles that mark a principal staff (the fallback when there is no `is_staff` attribute).
+        'staff_roles' => ['staff', 'operator'],
     ],
 
     // The account + team-admin FRAME RESOURCES (Frame OS ticket 20): the OOTB list/detail surfaces a

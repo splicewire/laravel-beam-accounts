@@ -25,6 +25,7 @@ use Splicewire\Beam\Accounts\Data\Frame\MembershipResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\TeamResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\TokenResourceData;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
+use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
@@ -62,6 +63,16 @@ class BeamAccountsServiceProvider extends ServiceProvider
         // cascade at grant-query time, so setting it here (before boot) is early enough.
         if (config('permission-cascade.grant_model') === null) {
             config(['permission-cascade.grant_model' => AccessGrant::class]);
+        }
+
+        // OOTB entitlement resolver: bind the DefaultEntitlementResolver (staff → the staff bundle) UNLESS
+        // the host declared its own via `config('permission-cascade.entitlement_resolver')`. Setting the
+        // config key (not rebinding the contract) is enough — permission-cascade's provider reads this key
+        // to build its EntitlementResolver singleton, and beam's registerEntitlementAbilities() then defines
+        // the `entitlement:{key}` gates. A host resolver (audiostud's) wins because it sets this key first.
+        // This is what turns a fresh host's operator/OS gates on without a laravel-beam edit.
+        if (config('permission-cascade.entitlement_resolver') === null) {
+            config(['permission-cascade.entitlement_resolver' => DefaultEntitlementResolver::class]);
         }
 
         // The share-link scope-handler registry (tracer 06) — a singleton so a host registers
