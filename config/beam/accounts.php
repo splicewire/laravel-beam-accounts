@@ -76,6 +76,14 @@ return [
         // must be signed (the artisan command mints them), so it opens no hole.
         'enabled' => env('ACCOUNT_DEMO_ENABLED'),
 
+        // The config GATE for the DemoTeamSeeder's registration in the beam-seed manifest
+        // (splicewire:beam:seed). The seeder registers unconditionally from the provider, but
+        // this key decides whether it actually runs — so a production `beam:seed` never fabricates
+        // demo subjects. null (default) mirrors `Demo::enabled()` (on everywhere but production);
+        // set false to suppress demo seeding even in a preview, or true to force it. Explicit
+        // config wins; the provider resolves the null→non-production fallback at registration.
+        'seed_users' => env('ACCOUNT_SEED_DEMO_USERS'),
+
         // Deterministic credentials the DemoTeamSeeder provisions and login-as targets.
         'password' => env('ACCOUNT_DEMO_PASSWORD', 'password'),
         'email_domain' => env('ACCOUNT_DEMO_EMAIL_DOMAIN', 'example.test'),

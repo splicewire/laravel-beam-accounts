@@ -12,6 +12,7 @@ use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Beam;
+use Splicewire\Beam\BeamServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -30,6 +31,9 @@ abstract class TestCase extends Orchestra
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             FortifyServiceProvider::class,
+            // beam-core, so its BeamSeedManifest singleton binds — beam-accounts registers its
+            // DemoTeamSeeder into it (bootSeed). beam-accounts hard-deps beam-core in composition.
+            BeamServiceProvider::class,
             BeamAccountsServiceProvider::class,
         ];
     }
