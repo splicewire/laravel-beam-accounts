@@ -33,19 +33,6 @@ return [
     // different SPA host/path overrides via env without touching the notification class.
     'password_reset_url' => env('PASSWORD_RESET_URL', rtrim(env('APP_URL', 'http://localhost'), '/').'/ui/reset-password'),
 
-    // Load the package's teams/memberships/invitations migrations. A host composing the
-    // primitive over its own tables (the platform app over `tenant_users`) turns this
-    // off so the engine tables are never created.
-    'register_migrations' => env('ACCOUNT_REGISTER_MIGRATIONS', true),
-
-    // Load the package's AUTH migrations (cluster C2): the users/permission/PAT/passkeys
-    // central estate and the tenant estate (userables, per-tenant users, role doctrine,
-    // guest_tokens, sign_offs, system_account). These ARE the host's real auth schema,
-    // homed here to align with the auth code the package owns — separate from the teams
-    // estate above so a host can take auth without teams. On by default; the platform app
-    // keeps this ON (Sanctum auth) while turning the teams estate OFF.
-    'register_auth_migrations' => env('ACCOUNT_REGISTER_AUTH_MIGRATIONS', true),
-
     // Prefix + route middleware for the settings surface.
     'routes' => [
         'prefix' => 'settings',

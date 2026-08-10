@@ -27,6 +27,7 @@
         "laravel/sanctum": "^4.0",
         "rushing/laravel-data-schemas-scribe": "*",
         "rushing/laravel-permission-cascade": "*",
+        "spatie/laravel-package-tools": "^1.16",
         "spatie/laravel-permission": "^6.0",
         "splicewire/laravel-beam": "*",
         "stancl/tenancy": "^3.0"

@@ -16,6 +16,12 @@ use Splicewire\Beam\Beam;
  * table present) creates the target directly. Guarded on the CURRENT schema explicitly (not
  * Schema::hasTable, which follows the tenant search_path — the CLAUDE.md footgun) so the guarded logic
  * is order-independent and idempotent across re-runs.
+ *
+ * NOT squashed with `add_current_team_id_to_users_table` or `add_lifecycle_to_invitations_table` —
+ * this whole `teams/` directory converts 1:1 (extension/location/registration only, logic untouched):
+ * the data-preserving rename above already ran against real deployed data, so folding a later ALTER
+ * into a "clean create" would silently skip landing that column on a host that already ran the
+ * original migrations.
  */
 return new class extends Migration
 {

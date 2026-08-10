@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
  * every owned record pointing at the same principal. Guarded so it no-ops where
  * the legacy row is absent, and skips (rather than colliding on the unique email)
  * if a `system@` row already exists.
+ *
+ * A DATA migration, not a schema migration — TENANT-ONLY. Converted 1:1 (extension/location/
+ * registration only): never squashed/merged into anything else, per the estate's squash
+ * convention for data migrations.
  */
 return new class extends Migration
 {

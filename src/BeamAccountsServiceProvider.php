@@ -8,12 +8,13 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
 use Schemastud\Frame\Registry\NavMetadata;
 use Schemastud\Frame\Registry\ResourceDefinition;
+use Spatie\LaravelPackageTools\Package;
+use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
 use Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
@@ -25,6 +26,7 @@ use Splicewire\Beam\Accounts\Data\Frame\MembershipResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\TeamResourceData;
 use Splicewire\Beam\Accounts\Data\Frame\TokenResourceData;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
+use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
@@ -45,6 +47,7 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Seed\BeamSeedManifest;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
+use Splicewire\Beam\Doctor\BeamDoctorManifest;
 
 /**
  * The account engine: Fortify/session as the default auth substrate, the self-service
@@ -53,13 +56,62 @@ use Splicewire\Beam\Particle\ParticleResourceRegistry;
  * former splicewire/laravel-satellite-account is retired into this engine (ADR-0104);
  * concrete tenant-provisioning + demo live in the consuming host itself (splicewire-app,
  * numero, …), which layers on top of this engine — this is the engine, not the satellite.
+ *
+ * Migrations ship as PUBLISH-ONLY spatie/laravel-package-tools stubs (the estate-wide
+ * convention) — see {@see self::configurePackage()}. `register()` here still performs the
+ * package's own container bindings/config-merge (unrelated to package-tools' own config/
+ * migration plumbing, which runs via `parent::register()`); the former `boot()` sequence
+ * (bootConfig/bootMigrations/bootAuthorization/etc) now runs from {@see self::packageBooted()},
+ * since `PackageServiceProvider::boot()` calls `configurePackage()`-driven plumbing and THEN
+ * `packageBooted()` — the hook point for everything this engine used to do in its own `boot()`.
  */
-class BeamAccountsServiceProvider extends ServiceProvider
+class BeamAccountsServiceProvider extends PackageServiceProvider
 {
-    public function register(): void
+    public function configurePackage(Package $package): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/beam/accounts.php', 'beam.accounts');
+        $package
+            ->name('laravel-beam-accounts')
+            ->hasConfigFile(['beam/accounts'])
+            // Publish-only .stub migrations (NOT ->discoversMigrations(), which loads at runtime).
+            // Declared order matters: creates before their alters, parents before children (FKs),
+            // package-tools timestamps each entry a second apart in listed order at publish time.
+            //
+            // shared/  — identical central+tenant schema (picked up on both connections by
+            //            beam-tenancy's registerSharedMigrationsPath() host-side wiring).
+            // (bare)   — central-only.
+            // tenant/  — tenant-only.
+            // teams/   — the teams/memberships/invitations/access-grants/share-links/view-requests
+            //            estate; NOT squashed (data-preserving renames already ran against real
+            //            deployed data — see the individual stub docblocks).
+            ->hasMigrations([
+                'shared/create_users_table',
+                'shared/create_permission_tables',
+                'create_passkeys_table',
+                'add_provenance_and_archived_to_personal_access_tokens_table',
+                'tenant/create_userables_table',
+                'tenant/create_guest_tokens_table',
+                'tenant/create_sign_offs_table',
+                'tenant/rename_userish_to_system_account',
+                'teams/create_teams_table',
+                'teams/create_memberships_table',
+                'teams/add_current_team_id_to_users_table',
+                'teams/create_invitations_table',
+                'teams/create_access_grants_table',
+                'teams/create_share_links_table',
+                'teams/create_view_requests_table',
+                'teams/add_lifecycle_to_invitations_table',
+            ]);
+    }
 
+    /**
+     * The package's own container bindings/config-defaults — everything the old plain-provider
+     * `register()` did, minus the config merge (now `hasConfigFile(['beam/accounts'])` in
+     * {@see self::configurePackage()}). Runs after `PackageServiceProvider::register()` has
+     * configured the package and registered its config, mirroring how
+     * `BeamMultiTenancyServiceProvider` structured its own conversion.
+     */
+    public function packageRegistered(): void
+    {
         // OOTB directory-ACL grant model: permission-cascade is model-free, so supply the
         // default grant model unless the host has bound its own. Lazily consumed by the
         // cascade at grant-query time, so setting it here (before boot) is early enough.
@@ -111,10 +163,16 @@ class BeamAccountsServiceProvider extends ServiceProvider
         }
     }
 
-    public function boot(): void
+    /**
+     * `PackageServiceProvider::boot()` runs the package-tools plumbing (config publish/merge,
+     * migrations publish) THEN calls this hook — so everything the engine's own former `boot()`
+     * did (auth/middleware/routes/Fortify/etc) now runs from here, mirroring exactly how
+     * `BeamMultiTenancyServiceProvider::packageBooted()` was structured post-conversion.
+     * `bootConfig()`/`bootMigrations()` are gone — package-tools' `hasConfigFile()`/
+     * `hasMigrations()` (declared in {@see self::configurePackage()}) now own that plumbing.
+     */
+    public function packageBooted(): void
     {
-        $this->bootConfig();
-        $this->bootMigrations();
         $this->bootAuthorization();
         $this->bootMiddleware();
         $this->bootRouteMacro();
@@ -127,6 +185,16 @@ class BeamAccountsServiceProvider extends ServiceProvider
         $this->bootShareLinks();
         $this->bootFrameResources();
         $this->bootSeed();
+
+        // beam-accounts is itself an "operator" of the estate-wide publish-only stub migrations
+        // convention — self-registers the doctor/operator check on ITS OWN migrations, same as
+        // every other beam-* package registers it on theirs.
+        if ($this->app->bound(BeamDoctorManifest::class)) {
+            $this->app->make(BeamDoctorManifest::class)->register(
+                'splicewire/laravel-beam-accounts',
+                BeamAccountsMigrationsAudit::class,
+            );
+        }
     }
 
     /**
@@ -252,69 +320,6 @@ class BeamAccountsServiceProvider extends ServiceProvider
         Route::middleware('web')->group(function () {
             Route::get('/s/{token}', [ShareLinkController::class, 'resolve'])->name('beam.share-link.resolve');
         });
-    }
-
-    protected function bootConfig(): void
-    {
-        if ($this->app->runningInConsole()) {
-            $this->publishes([
-                __DIR__.'/../config/beam/accounts.php' => $this->app->configPath('beam/accounts.php'),
-            ], 'beam-accounts-config');
-        }
-    }
-
-    /**
-     * Home the account engine's own migrations across TWO independently-gated estates —
-     * separated (recohere RCH-12) so a host can take the auth schema without the
-     * teams schema, or vice versa:
-     *
-     *  - AUTH (cluster C2) — the app's real auth schema, homed here to align with the
-     *    auth CODE that already lives in this package (users, permission tables, PAT
-     *    provenance/archived alters, google_id, passkeys; and the tenant estate: tenant
-     *    permission tables, userables, per-tenant users, role doctrine, guest_tokens,
-     *    sign_offs, system_account rename). Gated by `register_auth_migrations`. The
-     *    platform app (Sanctum, composing over its own `tenant_users`) turns the
-     *    teams estate OFF but keeps this ON — this IS its auth schema.
-     *  - TEAMS — the engine's teams/memberships/invitations/access-grants/share-links
-     *    tables under `migrations/teams`. Gated by `register_migrations` (unchanged
-     *    semantics). A host composing the team PRIMITIVE over its own tables turns this
-     *    off so the engine tables are never created.
-     *
-     * Each estate registers both a CENTRAL dir (auto-discovered by `migrate` via
-     * {@see loadMigrationsFrom()}) and, where present, a `tenant/` subdir pushed onto
-     * Stancl's `config('tenancy.migration_parameters.--path')` array (tenancy has no
-     * auto-discovery for tenant migrations; the `tenants:migrate` command reads that
-     * array at runtime, and boot runs well before it). Mirrors the same idiom in
-     * splicewire/tower's TowerServiceProvider::bootMigrations() (no code dependency —
-     * beam is DOWN from tower).
-     */
-    protected function bootMigrations(): void
-    {
-        // AUTH estate (cluster C2) — the host's real auth schema.
-        if (config('beam.accounts.register_auth_migrations', true)) {
-            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-            $this->pushTenantMigrationPath(__DIR__.'/../database/migrations/tenant');
-        }
-
-        // TEAMS estate — the engine's teams/memberships/invitations tables.
-        if (config('beam.accounts.register_migrations', true)) {
-            $this->loadMigrationsFrom(__DIR__.'/../database/migrations/teams');
-        }
-    }
-
-    /**
-     * Push a package tenant-migration dir onto Stancl's runtime `--path` array,
-     * install-location-agnostic and idempotent.
-     */
-    protected function pushTenantMigrationPath(string $dir): void
-    {
-        $tenantPath = realpath($dir) ?: $dir;
-
-        $paths = config('tenancy.migration_parameters.--path', []);
-
-        if (! in_array($tenantPath, $paths, true)) {
-            config()->push('tenancy.migration_parameters.--path', $tenantPath);
-        }
     }
 
     /**

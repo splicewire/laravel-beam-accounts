@@ -4,14 +4,16 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Splicewire\Beam\Accounts\Models\ViewRequest;
+use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Beam;
 
 /**
- * `beam_view_requests` — the polymorphic view-access request ledger behind
- * {@see ViewRequest} (ADR-0009, tracer 04, generalized).
- * Net-new, create-only, current-schema guarded (tenant-safe). Morph keys are strings to hold
- * both uuid- and bigint-keyed hosts.
+ * `beam_share_links` — the reusable capability-link ledger behind
+ * {@see ShareLink} (ADR-0009, tracer 05). Net-new, so
+ * create-only; guarded on the CURRENT schema (the tenant-schema footgun) so it is idempotent
+ * and tenant-safe. `created_by` is a string to hold both uuid- and bigint-keyed hosts.
+ *
+ * TEAMS-estate, converts 1:1 alongside the rest of `teams/` (no squashing across this directory).
  */
 return new class extends Migration
 {
@@ -24,17 +26,15 @@ return new class extends Migration
         }
 
         Schema::create($this->target(), function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('requestable_type');
-            $table->string('requestable_id');
-            $table->string('requester_type');
-            $table->string('requester_id');
-            $table->string('status')->default('pending');
-            $table->timestamp('decided_at')->nullable();
+            $table->id();
+            $table->string('token')->unique();
+            $table->string('scope')->index();          // opaque host scope, e.g. composition:{uuid}
+            $table->string('created_by')->nullable();  // minter user key (string — cross-host)
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamp('revoked_at')->nullable();
+            $table->unsignedInteger('use_count')->default(0);
+            $table->unsignedInteger('max_uses')->nullable();
             $table->timestamps();
-
-            $table->index(['requestable_type', 'requestable_id', 'status']);
-            $table->index(['requester_type', 'requester_id']);
         });
     }
 
@@ -45,7 +45,7 @@ return new class extends Migration
 
     private function target(): string
     {
-        return Beam::table('view_requests');
+        return Beam::table('share_links');
     }
 
     private function existsInCurrentSchema(string $schema, string $table): bool

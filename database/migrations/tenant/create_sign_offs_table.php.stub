@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Schema;
  * per-requirement status (grant-not-visibility).
  *
  * Per-tenant operational data (who signed, when, what was true), NOT synced corpus.
+ *
+ * TENANT-ONLY, single create, no ALTERs to squash.
  */
 return new class extends Migration
 {

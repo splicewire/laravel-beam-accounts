@@ -11,6 +11,12 @@ use Splicewire\Beam\Beam;
  * pending-only). The team-of-one accept flow (`TeamMembers::accept`) deletes the row rather than
  * stamping `accepted_at`, so these were absent; the Frame list/revoke surface needs a pending marker.
  * Additive + nullable — every existing invitation stays valid (pending), no backfill needed.
+ *
+ * NOT squashed into `create_invitations_table` — this whole `teams/` directory converts 1:1
+ * (extension/location/registration only, logic untouched): `create_invitations_table`'s
+ * data-preserving rename already ran against real deployed data, so folding this ALTER into a
+ * "clean create" would silently skip landing these columns on a host that already ran the original
+ * migrations.
  */
 return new class extends Migration
 {

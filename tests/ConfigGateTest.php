@@ -15,10 +15,17 @@ use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
 
 /**
- * Boots the engine with the auth surface + schema gated OFF — the way the platform app
- * consumes it (Sanctum auth over its own `tenant_users`, engine tables never created).
- * Deliberately does NOT register Fortify so the provider is exercised on the false path,
- * and asserts the code primitive (contracts/enum/models) is still available.
+ * Boots the engine with the auth surface config-gated OFF — the way the platform app consumes it
+ * (Sanctum auth over its own `tenant_users`). Deliberately does NOT register Fortify so the
+ * provider is exercised on the false path, and asserts the code primitive (contracts/enum/models)
+ * is still available.
+ *
+ * The former `register_migrations`/`register_auth_migrations` config toggles (and the assertion
+ * that gating them off left no beam-accounts migration path registered) are GONE: migrations are
+ * now publish-only stubs (estate-wide convention) — never auto-loaded via `loadMigrationsFrom()`
+ * regardless of config, so that assertion's whole premise (a config-gated migration estate) no
+ * longer exists. {@see \Splicewire\Beam\Accounts\Tests\Doctor\BeamAccountsMigrationsAuditTest}
+ * is the doctor-audit test that now covers "no migrations get auto-loaded" mechanically.
  */
 class ConfigGateTest extends Orchestra
 {
@@ -44,25 +51,12 @@ class ConfigGateTest extends Orchestra
             'prefix' => '',
         ]);
 
-        // The host gates the auth surface + schema off. Both migration estates
-        // (teams via register_migrations, auth via register_auth_migrations —
-        // recohere RCH-12) are gated so NO beam-accounts migrations register.
         $config->set('beam.accounts.bootstrap_fortify', false);
-        $config->set('beam.accounts.register_migrations', false);
-        $config->set('beam.accounts.register_auth_migrations', false);
         $config->set('beam.accounts.register_routes', false);
     }
 
-    public function test_provider_boots_without_fortify_or_migrations(): void
+    public function test_provider_boots_without_fortify(): void
     {
-        // Boot reached here without wiring Fortify or loading migrations, so the engine
-        // tables were never registered as pending migrations.
-        $pending = collect($this->app['migrator']->paths());
-        $this->assertTrue(
-            $pending->every(fn ($path) => ! str_contains($path, 'beam-accounts')),
-            'beam-accounts migrations must not be registered when register_migrations=false',
-        );
-
         // No settings routes were mounted.
         $this->assertFalse(Route::has('profile.edit'));
 

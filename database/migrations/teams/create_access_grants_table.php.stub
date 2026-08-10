@@ -16,6 +16,8 @@ use Splicewire\Beam\Beam;
  * `grantable_id` AND `grantee_id` are strings — morph keys that must hold both uuid-keyed
  * hosts (beam users/threads) and bigint-keyed hosts (audiostud users/roles) without a
  * per-host column type. `ability` ∈ {view, manage}; `effect` ∈ {allow, deny}.
+ *
+ * TEAMS-estate, converts 1:1 alongside the rest of `teams/` (no squashing across this directory).
  */
 return new class extends Migration
 {

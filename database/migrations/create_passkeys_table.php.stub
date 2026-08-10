@@ -13,6 +13,8 @@ use Laravel\Passkeys\Passkeys;
  * yields a token that already works across every tenant subdomain. Mirrors the schema shipped
  * by laravel/passkeys (published here rather than vendor-loaded, so it runs with the central
  * set); `foreignIdFor` resolves the UUID `users.id` key type automatically.
+ *
+ * CENTRAL-ONLY — no tenant twin, single create, no ALTERs to squash.
  */
 return new class extends Migration
 {

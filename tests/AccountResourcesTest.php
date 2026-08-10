@@ -226,8 +226,14 @@ it('registers tokens/invitations/members onto the Frame registries when beam is 
     // Bind the real beam registry; the provider's afterResolving hook fires on first resolve.
     app()->singleton(ParticleResourceRegistry::class, fn () => new ParticleResourceRegistry);
 
-    // Re-run the boot hook now that the registry is bindable in this test app.
-    (new BeamAccountsServiceProvider(app()))->boot();
+    // Re-run register()+boot() now that the registry is bindable in this test app. A fresh
+    // PackageServiceProvider instance must be register()ed before boot() — register() is where
+    // configurePackage() initializes the provider's $package property boot() reads. Re-running
+    // register() here is harmless/idempotent (same tolerance the estate already documents for a
+    // provider that boots twice, e.g. BeamDoctorManifest::register()'s idempotent replace).
+    $provider = new BeamAccountsServiceProvider(app());
+    $provider->register();
+    $provider->boot();
 
     $registry = app(ParticleResourceRegistry::class);
 

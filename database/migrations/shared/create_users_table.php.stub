@@ -1,0 +1,66 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Squashed pre-prod (no deployed data to preserve migration history for) from the original central
+ * create plus its tenant twin plus 1 additive ALTER: the tenant `create_users_table` shape (which
+ * already inlined `google_id`) is the canonical create; the central-only
+ * `add_google_id_column` ALTER folds into the create's Blueprint for a fresh install, but ALSO
+ * stays as a standalone unconditional retrofit below for a host whose `users` table predates this
+ * package (any `laravel new` derivative, typically bigint-keyed) — the create's `hasTable` guard
+ * would otherwise skip `google_id` on that pre-existing table forever.
+ *
+ * SHARED (central + every tenant): identical `users` shape on both connections.
+ */
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * GUARDED (beam-install-turnkey trap 3): skip the CREATE when a `users` table already exists —
+     * a host that already owns a `users` table (any `laravel new` derivative, typically bigint-keyed)
+     * keeps its own table. A fresh host with no `users` table gets this uuid-keyed one, `google_id`
+     * included inline. Idempotent: safe on re-run and on `migrate:fresh`.
+     */
+    public function up(): void
+    {
+        if (! Schema::hasTable('users')) {
+            Schema::create('users', function (Blueprint $table) {
+                $table->uuid('id')->primary();
+                $table->string('name');
+                $table->string('email')->unique();
+                $table->timestamp('email_verified_at')->nullable();
+                $table->string('password');
+                $table->string('google_id')->nullable();
+                $table->rememberToken();
+                $table->timestamps();
+            });
+
+            return;
+        }
+
+        // Unconditional retrofit: a pre-existing host `users` table (skipped by the guard above)
+        // still needs `google_id` — reproduces the original two-migration behavior (guarded create +
+        // unconditional retrofit alter) as one file.
+        if (! Schema::hasColumn('users', 'google_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('google_id', 128)->nullable();
+            });
+        }
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        if (Schema::hasColumn('users', 'google_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropColumn('google_id');
+            });
+        }
+    }
+};
