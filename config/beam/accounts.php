@@ -142,28 +142,25 @@ return [
     //       'bundles' => [
     //           'own-a-song'    => ['own-a-song', 'publish'],
     //           'go-songwriter' => ['own-a-song', 'go-songwriter', 'publish', 'generate'],
-    //           'staff'         => ['author-ux', 'os.enter', 'app-operator'],
     //       ],
     //   ],
     //
     // The DEFAULT resolver (Entitlements\DefaultEntitlementResolver) — bound OOTB unless the host set
-    // `config('permission-cascade.entitlement_resolver')` — grants a STAFF principal the bundle named by
-    // `default_staff_bundle` (the `staff` bundle below, shipped by default so a fresh host's `/operator` +
-    // `/os` gates resolve for a staff user instead of 403-ing everyone). Staff is detected via a truthy
-    // `is_staff` attribute OR one of `staff_roles` (spatie). A host that wants plan/grant logic binds its own
-    // resolver (which wins) and this default steps aside.
+    // `config('permission-cascade.entitlement_resolver')` — carries NO staff flag (ACC-01 retired `is_staff`
+    // entirely). It grants `author-ux-{realm}` (+ the coarse `author-ux` alias, + `os.enter`/`app-operator`
+    // for the `operator` realm specifically) off `manage` grants an Owner/Admin-held Team holds on a realm's
+    // root entry — data, not a boolean column. A host that wants plan/grant logic binds its own resolver
+    // (which wins) and this default steps aside.
     'entitlements' => [
         'bundles' => [
-            // The default staff bundle — the operator/OS/authoring capabilities. `app-operator` hard-gates
-            // the operator realm; `os.enter` gates the OS-shell; `author-ux` drives the authoring chrome.
-            'staff' => ['author-ux', 'os.enter', 'app-operator'],
+            //
         ],
 
-        // The bundle a staff principal resolves under the DefaultEntitlementResolver.
-        'default_staff_bundle' => 'staff',
-
-        // The spatie roles that mark a principal staff (the fallback when there is no `is_staff` attribute).
-        'staff_roles' => ['staff', 'operator'],
+        // The realm-root lookup port (Entitlements\Contracts\RealmGrantable) DefaultEntitlementResolver's
+        // grant cascade rides — unbound by default (null-default discipline, ADR-0009): with no realm roots
+        // to resolve, the cascade grants nothing. `splicewire/laravel-beam-ux` binds its own OOTB
+        // implementation (BeamUxEntry IS the realm root) when installed.
+        'realm_grantable' => null,
     ],
 
     // The account + team-admin FRAME RESOURCES (Frame OS ticket 20): the OOTB list/detail surfaces a

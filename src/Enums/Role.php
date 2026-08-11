@@ -68,6 +68,17 @@ enum Role: string
     }
 
     /**
+     * Whether this role is eligible to receive/exercise an access-cascade grant at all (ACC-01's
+     * eligibility floor, `rushing/laravel-permission-cascade`'s directory ACL): Member is excluded;
+     * Owner/Admin are eligible. The grant cascade itself then governs WHICH realms/entries once
+     * eligible — this only gates who is in the door.
+     */
+    public function grantEligible(): bool
+    {
+        return $this !== self::Member;
+    }
+
+    /**
      * Human label for a case (title-cased value). The frame editor / any UI reads
      * this rather than hand-authoring labels.
      */

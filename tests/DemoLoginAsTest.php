@@ -1,9 +1,11 @@
 <?php
 
+use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
+use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Support\Demo;
-use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
+use Splicewire\Beam\Accounts\Tests\Fixtures\RealmRoot;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 /*
@@ -16,7 +18,7 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 function seedDemo(): void
 {
-    (new DemoTeamSeeder(app(TeamProvisioner::class)))->run();
+    app(DemoTeamSeeder::class)->run();
 }
 
 it('derives the demo roster from the Role enum plus a solo subject', function () {
@@ -93,4 +95,44 @@ it('skips seeding when demo affordances are disabled', function () {
     seedDemo();
 
     expect(User::where('email', 'like', 'demo-%')->count())->toBe(0);
+});
+
+// ── ACC-01: the Demo Team's grant-derived reach — no separate "Staff" subject needed ──────────
+
+it('grants the demo team manage on every provisioned realm root, making Owner/Admin author-ux-verifiable and Member denied', function () {
+    RealmRoot::create(['realm' => 'site']);
+    RealmRoot::create(['realm' => 'operator']);
+
+    seedDemo();
+
+    $resolver = app(DefaultEntitlementResolver::class);
+
+    $owner = User::where('email', Demo::email(Role::Owner->value))->first();
+    $admin = User::where('email', Demo::email(Role::Admin->value))->first();
+    $member = User::where('email', Demo::email(Role::Member->value))->first();
+
+    expect($resolver->entitlementsFor($owner))->toEqualCanonicalizing([
+        'author-ux-site', 'author-ux-operator', 'author-ux', 'os.enter', 'app-operator',
+    ]);
+    expect($resolver->entitlementsFor($admin))->toEqualCanonicalizing([
+        'author-ux-site', 'author-ux-operator', 'author-ux', 'os.enter', 'app-operator',
+    ]);
+    expect($resolver->entitlementsFor($member))->toBe([]);
+});
+
+it('is idempotent about the realm-root grants it mints (re-running does not duplicate)', function () {
+    RealmRoot::create(['realm' => 'site']);
+
+    seedDemo();
+    seedDemo();
+
+    $model = config('permission-cascade.grant_model');
+    expect($model::query()->where('ability', AccessGrant::ABILITY_MANAGE)->count())->toBe(1);
+});
+
+it('grants nothing when no realm root has been provisioned yet', function () {
+    seedDemo();
+
+    $model = config('permission-cascade.grant_model');
+    expect($model::query()->count())->toBe(0);
 });

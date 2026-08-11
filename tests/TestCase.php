@@ -10,6 +10,7 @@ use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\Tests\Fixtures\FixtureRealmGrantable;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Beam;
 use Splicewire\Beam\BeamServiceProvider;
@@ -53,6 +54,10 @@ abstract class TestCase extends Orchestra
 
         $config->set('auth.providers.users.model', User::class);
         $config->set('permission-cascade.user_model', User::class);
+
+        // ACC-01: the OOTB realm-root port binding under test — beam-ux's own binding is the same
+        // shape (BeamUxEntry instead of the RealmRoot fixture), exercised in beam-ux's own suite.
+        $config->set('beam.accounts.entitlements.realm_grantable', FixtureRealmGrantable::class);
 
         $config->set('session.driver', 'array');
 
@@ -155,6 +160,15 @@ abstract class TestCase extends Orchestra
         Schema::create('shareables', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('visibility')->nullable();
+            $table->timestamps();
+        });
+
+        // A HasVisibility "realm root" fixture (ACC-01) — stands in for beam-ux's BeamUxEntry so
+        // DefaultEntitlementResolver's grant cascade is exercised without a beam-ux dependency.
+        Schema::create('realm_roots', function (Blueprint $table): void {
+            $table->id();
+            $table->string('realm')->unique();
             $table->string('visibility')->nullable();
             $table->timestamps();
         });
