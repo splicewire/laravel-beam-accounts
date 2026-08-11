@@ -48,6 +48,7 @@ use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Seed\BeamSeedManifest;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
+use Splicewire\Beam\Install\BeamInstallManifest;
 
 /**
  * The account engine: Fortify/session as the default auth substrate, the self-service
@@ -97,6 +98,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
                 'teams/add_current_team_id_to_users_table',
                 'teams/create_invitations_table',
                 'teams/create_access_grants_table',
+                'teams/create_visibilities_table',
                 'teams/create_share_links_table',
                 'teams/create_view_requests_table',
                 'teams/add_lifecycle_to_invitations_table',
@@ -118,6 +120,18 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         if (config('permission-cascade.grant_model') === null) {
             config(['permission-cascade.grant_model' => AccessGrant::class]);
         }
+
+        // UNLIKE grant_model/entitlement_resolver above, this is NOT defaulted-on here. Those two
+        // are pure-additive when unconfigured (nothing previously read a grant/entitlement, so
+        // turning them on can't disagree with an existing value) — but visibility_model is a
+        // STORAGE BACKEND SWITCH for a feature multiple HasVisibility models across the family
+        // already use column-based (Shelf/Silo, tower's RunnerTransform, beam-threads'
+        // ConversationParticle, audiostud's Composition/AudioSample/LyricPiece). Defaulting this
+        // on fleet-wide would silently redirect every one of them from their real, possibly
+        // populated `visibility` column to an empty morph table. Each host opts in per its OWN
+        // `config/permission-cascade.php` instead (see rushing/audiostud's, which already sets
+        // `reach_resolver`/`entitlement_resolver` the same way) — {@see \Splicewire\Beam\Accounts\Models\Visibility}
+        // just supplies the model+migration so a host doesn't have to build its own.
 
         // OOTB entitlement resolver: bind the DefaultEntitlementResolver (staff → the staff bundle) UNLESS
         // the host declared its own via `config('permission-cascade.entitlement_resolver')`. Setting the
@@ -185,6 +199,21 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         $this->bootShareLinks();
         $this->bootFrameResources();
         $this->bootSeed();
+
+        // Self-register into beam-core's install manifest (order 5: users/permission_tables are
+        // foundational — publish early, ahead of the default-order-100 packages that FK into them)
+        // so `splicewire:beam:install` publishes this package's shared/central/tenant/teams
+        // migrations with the rest of the stack. Recohere gap: this package predates the manifest
+        // and was never wired in — no host has ever gotten a real users/permission_tables/teams
+        // estate from a plain install command run.
+        if ($this->app->bound(BeamInstallManifest::class)) {
+            $this->app->make(BeamInstallManifest::class)->register(
+                package: 'splicewire/laravel-beam-accounts',
+                publishTags: ['beam-accounts-config', 'beam-accounts-migrations'],
+                migrates: true,
+                order: 5,
+            );
+        }
 
         // beam-accounts is itself an "operator" of the estate-wide publish-only stub migrations
         // convention — self-registers the doctor/operator check on ITS OWN migrations, same as
