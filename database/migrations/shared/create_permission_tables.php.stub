@@ -17,8 +17,11 @@ use Illuminate\Support\Facades\Schema;
  * `roles`/`permissions` own PKs are uuid (the cross-host morph-key convention — see
  * `App\Models\Role`/`Permission` in a consuming host). `model_morph_key` (`model_id` on
  * `model_has_roles`/`model_has_permissions`) is unrelated to that — it stores the PK of whatever
- * model HOLDS the role (typically `App\Models\User`, a plain auto-increment integer in every host
- * this package ships to today), so it stays `unsignedBigInteger`, matching spatie's own stock stub.
+ * model HOLDS the role, which this package cannot assume the type of (a host may keep its own
+ * bigint-keyed `users` table rather than adopt this package's uuid-user identity wholesale — see
+ * `config/beam/accounts.php`'s `register_auth_migrations`). `string` mirrors the same "morph key
+ * (uuid or bigint) — string for cross-host" idiom `AccessGrant.grantable_id`/`grantee_id` already
+ * use for this exact problem, rather than assuming either type.
  */
 return new class extends Migration
 {
@@ -76,7 +79,7 @@ return new class extends Migration
             $table->uuid($pivotPermission);
 
             $table->string('model_type');
-            $table->unsignedBigInteger($columnNames['model_morph_key']);
+            $table->string($columnNames['model_morph_key']);
             $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_permissions_model_id_model_type_index');
 
             $table->foreign($pivotPermission)
@@ -102,7 +105,7 @@ return new class extends Migration
             $table->uuid($pivotRole);
 
             $table->string('model_type');
-            $table->unsignedBigInteger($columnNames['model_morph_key']);
+            $table->string($columnNames['model_morph_key']);
             $table->index([$columnNames['model_morph_key'], 'model_type'], 'model_has_roles_model_id_model_type_index');
 
             $table->foreign($pivotRole)
