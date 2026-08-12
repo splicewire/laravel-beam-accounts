@@ -4,14 +4,13 @@ namespace Splicewire\Beam\Accounts\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Rushing\PermissionCascade\Contracts\AccessGrant;
 
 use function Splicewire\Beam\Accounts\accountUserModel;
 
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Models\Team;
-use Splicewire\Beam\Accounts\Sharing\AccessGrants;
 use Splicewire\Beam\Accounts\Support\Demo;
+use Splicewire\Beam\Accounts\Teams\RealmReachGrant;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
@@ -33,7 +32,7 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
  */
 class DemoTeamSeeder extends Seeder
 {
-    public function __construct(protected TeamProvisioner $provisioner, protected AccessGrants $grants) {}
+    public function __construct(protected TeamProvisioner $provisioner, protected RealmReachGrant $reach) {}
 
     public function run(): void
     {
@@ -74,35 +73,13 @@ class DemoTeamSeeder extends Seeder
         // The solo subject models the default satellite shape: its own team-of-one.
         $this->provisioner->personalTeamFor($users['solo']);
 
-        $this->grantRealmReach($team);
+        // ACC-01: grant the Demo Team `manage` on every currently-provisioned realm's root grantable —
+        // the DATA that makes Owner/Admin `login-as`-verifiable into `/os`/`/operator` and every
+        // authored realm (Member stays denied via {@see Role::grantEligible()}). Extracted into
+        // {@see RealmReachGrant} so any host can grant an arbitrary team full realm reach, not just
+        // this shared "Demo Team".
+        $this->reach->toTeam($team);
 
         $this->command?->info('beam-accounts: demo subjects ready — '.implode('/', Role::values()).' on "Demo Team", plus solo.');
-    }
-
-    /**
-     * ACC-01: grant the Demo Team `manage` on every currently-provisioned realm's root
-     * grantable — the DATA that makes Owner/Admin `login-as`-verifiable into `/os`/`/operator`
-     * and every authored realm (Member stays denied via {@see Role::grantEligible()}).
-     *
-     * Requires a host-bound `Splicewire\Beam\Accounts\Entitlements\Contracts\RealmGrantable`
-     * (`splicewire/laravel-beam-ux`'s is the OOTB implementation) — inert (no-op) when unbound, so a
-     * beam-accounts host without beam-ux pays nothing. Also requires that host's realm roots already
-     * be provisioned (e.g. `splicewire:beam:ux:seed-nav` run first) — a realm provisioned afterward
-     * needs a re-run of this seeder to pick up its grant (`AccessGrants::share()` is idempotent —
-     * `firstOrCreate`).
-     */
-    protected function grantRealmReach(Team $team): void
-    {
-        $class = config('beam.accounts.entitlements.realm_grantable');
-
-        if ($class === null) {
-            return;
-        }
-
-        $grantable = app($class);
-
-        foreach ($grantable->provisionedRealms() as $realm) {
-            $this->grants->share($grantable->rootFor($realm), $team, AccessGrant::ABILITY_MANAGE);
-        }
     }
 }

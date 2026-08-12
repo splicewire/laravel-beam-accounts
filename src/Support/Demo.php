@@ -24,6 +24,16 @@ use Splicewire\Beam\Accounts\Enums\Role;
 class Demo
 {
     /**
+     * The demo subject key {@see DemoTeamSeeder} grants root/operator reach onto (every
+     * provisioned realm's root, via {@see DemoTeamSeeder::grantRealmReach()}, PLUS `is_staff`
+     * where that host column exists) — the one demo account meant to be discoverable and
+     * testable AS "the operator/root account", not just an ordinary Owner/Admin/Member row.
+     * `admin` (not `owner`): mirrors the role that's `Role::grantEligible()` without being the
+     * team's literal creator, so an "operator" reads as a granted capability, not an identity.
+     */
+    public const OPERATOR_KEY = 'admin';
+
+    /**
      * key => {role, shared}. `shared` subjects sit together on one "Demo Team" (so the
      * role gates can be checked side by side); `solo` gets its own team-of-one (the
      * default satellite shape on registration). Role-derived; `solo` is the one hand-named
@@ -42,6 +52,12 @@ class Demo
         $subjects['solo'] = ['role' => Role::Owner, 'shared' => false];
 
         return $subjects;
+    }
+
+    /** Whether `$key` is the designated operator/root demo subject ({@see self::OPERATOR_KEY}). */
+    public static function isOperator(string $key): bool
+    {
+        return $key === self::OPERATOR_KEY;
     }
 
     /**
@@ -92,8 +108,13 @@ class Demo
         return "demo-{$key}@{$domain}";
     }
 
+    /**
+     * The display label a login-as/demo-account button shows. `self::OPERATOR_KEY` reads as
+     * "Demo Operator" — not "Demo Admin" — since its capability (root/operator reach), not its
+     * team role, is the notable, testable thing about it.
+     */
     public static function name(string $key): string
     {
-        return 'Demo '.ucfirst($key);
+        return self::isOperator($key) ? 'Demo Operator' : 'Demo '.ucfirst($key);
     }
 }

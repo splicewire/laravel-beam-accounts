@@ -18,6 +18,8 @@ use Splicewire\Beam\Accounts\Models\Team;
  */
 class TeamProvisioner
 {
+    public function __construct(private RealmReachGrant $reach) {}
+
     public function personalTeamFor(Authenticatable $user, ?string $name = null): Team
     {
         $team = Team::create([
@@ -28,6 +30,27 @@ class TeamProvisioner
 
         $this->addMember($user, $team, Role::Owner);
         $user->forceFill(['current_team_id' => $team->getKey()])->save();
+
+        return $team;
+    }
+
+    /**
+     * `$user` becomes Owner of their own personal Team holding `manage` on every provisioned realm's
+     * root ({@see RealmReachGrant}) — the grant-cascade equivalent of a blanket `is_staff` grant
+     * (theme-entries-and-authoring). `updateOrCreate` on the user's own personal team (not
+     * {@see personalTeamFor()}'s plain `create`) so this is idempotent — safe to call from a factory
+     * state or a reseed without minting a second orphaned team.
+     */
+    public function personalTeamWithFullReachFor(Authenticatable $user, ?string $name = null): Team
+    {
+        $team = Team::updateOrCreate(
+            ['user_id' => $user->getKey(), 'personal_team' => true],
+            ['name' => $name ?? $this->personalTeamName($user)],
+        );
+
+        $this->addMember($user, $team, Role::Owner);
+        $user->forceFill(['current_team_id' => $user->getAttribute('current_team_id') ?? $team->getKey()])->save();
+        $this->reach->toTeam($team);
 
         return $team;
     }

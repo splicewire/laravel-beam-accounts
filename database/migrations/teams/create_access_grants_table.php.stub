@@ -23,7 +23,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $currentSchema = DB::selectOne('select current_schema() as schema')->schema;
+        $currentSchema = DB::getDriverName() === 'pgsql'
+            ? DB::selectOne('select current_schema() as schema')->schema
+            : null;
 
         if ($this->existsInCurrentSchema($currentSchema, $this->target())) {
             return; // Idempotent re-run.
@@ -54,8 +56,17 @@ return new class extends Migration
         return Beam::table('access_grants');
     }
 
-    private function existsInCurrentSchema(string $schema, string $table): bool
+    /**
+     * Outside Postgres there is no per-connection "current schema"/search_path concern (the
+     * CLAUDE.md footgun this guard exists for in the first place) — sqlite/mysql only ever see one
+     * namespace per connection, so a plain {@see Schema::hasTable()} is exact and driver-safe there.
+     */
+    private function existsInCurrentSchema(?string $schema, string $table): bool
     {
+        if ($schema === null) {
+            return Schema::hasTable($table);
+        }
+
         return DB::selectOne(
             'select 1 from information_schema.tables where table_schema = ? and table_name = ?',
             [$schema, $table],
