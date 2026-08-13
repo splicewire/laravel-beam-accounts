@@ -9,7 +9,12 @@ use Illuminate\Support\Facades\Schema;
  * directory converts 1:1 (extension/location/registration only, logic untouched). The teams chain's
  * renames already ran against real deployed data; folding this ALTER into a "clean create" would
  * silently skip landing `current_team_id` on a host that already ran the original migrations.
- * TEAMS-estate, central-only.
+ *
+ * TEAMS-estate, CENTRAL-ONLY — the one `teams/` file whose side is fixed rather than host-placed:
+ * it alters `users`, and the current-team pointer rides the auth principal
+ * ({@see \Splicewire\Beam\Accounts\Models\User} is `'central'`-pinned, auth floor). Which team a
+ * login is currently switched into is a property of the identity that spans tenants, not of any
+ * one team's own rows — so the column lands beside the credentials, never in a tenant schema.
  */
 return new class extends Migration
 {

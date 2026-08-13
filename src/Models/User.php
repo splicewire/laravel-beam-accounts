@@ -49,6 +49,11 @@ class User extends Authenticatable implements PasskeyUser
     use PasskeyAuthenticatable;
     use ResourceSyncing;
 
+    /**
+     * @central-floor auth — the auth principal: credentials must resolve before any tenant
+     * schema is selected (the key cannot live behind the door it opens), and a single central
+     * identity is what lets one login span every tenant subdomain.
+     */
     protected $connection = 'central';
 
     /**

@@ -5,7 +5,12 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * TENANT-ONLY, single create, no ALTERs to squash.
+ * TENANT-ONLY, single create, no ALTERs to squash — the ownership pivot binding a user to
+ * tenant-resident records (the `userable` uuid morph pair): the pivot rows are the tenant's own
+ * data and participate in its churn, so they live inside the schema with the records they bind.
+ * `user_id` is deliberately unconstrained (`foreignUuid` with no `->constrained()`) — the
+ * principal it points at lives outside this schema, and a tenant-schema table cannot enforce an
+ * FK across the isolation wall.
  */
 return new class extends Migration
 {

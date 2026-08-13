@@ -5,7 +5,12 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * TENANT-ONLY, single create, no ALTERs to squash.
+ * TENANT-ONLY, single create, no ALTERs to squash — a guest token is scoped entry into ONE
+ * tenant's data (`scope`/`role`/`params`/`landing_url` all name tenant-local surfaces) and is
+ * checked only AFTER the tenant is already resolved, so nothing here must exist before the
+ * schema boots (no bootstrap paradox, no central claim). Keeping the rows in the customer's
+ * schema means revoking, exporting, or deleting the tenant carries its guest access with it
+ * (multitenancy.md: isolation is the schema boundary).
  */
 return new class extends Migration
 {

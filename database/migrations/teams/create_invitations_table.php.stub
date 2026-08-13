@@ -21,6 +21,13 @@ use Splicewire\Beam\Beam;
  * (extension/location/registration only, logic untouched): the data-preserving rename above already
  * ran against real deployed data, so folding the later lifecycle-columns ALTER into a "clean create"
  * would silently skip landing those columns on a host that already ran the original migrations.
+ *
+ * Placement (multitenancy.md): host-placed, ONE side per host — the TEAMS estate sits deliberately
+ * outside `shared/` (both passes would stand up two divergent team stores) and its models pin no
+ * connection; the connection, not the model, knows the side. A single-tenant host runs it on its one
+ * central connection (audiostud does, top-level); a broker routes the whole estate into the
+ * per-tenant set so each customer gets their own team invitations (teams.md#broker-flavor). The
+ * current-schema guard keeps it idempotent wherever the host lands it.
  */
 return new class extends Migration
 {
