@@ -9,7 +9,9 @@ use Splicewire\Beam\Accounts\Http\Controllers\Api\V1\PasskeyController;
 /**
  * A passkey credential row as {@see PasskeyController}
  * presents it — the `present()` map ({id, name, last_used_at, created_at}), inside the ResponseBody
- * `data` slot: a list on `passkeys.index`, a single row on `passkeys.store`/`passkeys.update`. Type-only
+ * `data` slot: a list on `passkeys.index`, a single row on `passkeys.store`/`passkeys.update`, and the
+ * removed credential's final-state snapshot on `passkeys.destroy` (the destroy-returns-the-resource
+ * envelope rule). Type-only
  * projection contract (the wire stays the controller's hand-built array); snake_case props mirror the
  * wire verbatim. Timestamps are ISO-8601 strings, nullable (a credential that has never been used, or a
  * row without timestamps).

@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 use Splicewire\Beam\Accounts\Data\ForgotPasswordInputData;
+use Splicewire\Beam\Accounts\Data\PasswordResetResultData;
 use Splicewire\Beam\Accounts\Data\ResetPasswordInputData;
 use Splicewire\Beam\Data\ResponseBody;
 use Splicewire\Beam\Http\Controller;
@@ -35,8 +36,11 @@ class PasswordResetController extends Controller
         // all look identical from the outside.
         Password::broker()->sendResetLink(['email' => $input->email]);
 
+        // The data slot carries a machine-readable outcome (never the submitted email — the
+        // response must stay byte-identical across existing/missing accounts).
         return ResponseBody::from([
             'message' => 'If an account exists for that email, a reset link is on its way.',
+            'data' => new PasswordResetResultData(status: 'link-sent'),
         ]);
     }
 
@@ -72,6 +76,7 @@ class PasswordResetController extends Controller
 
         return ResponseBody::from([
             'message' => 'Your password has been reset.',
+            'data' => new PasswordResetResultData(status: 'reset'),
         ]);
     }
 }

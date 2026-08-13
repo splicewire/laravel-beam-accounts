@@ -102,9 +102,13 @@ class PasskeyController extends Controller
         // the bound model was passed to an int parameter (latent: no test hit an authed delete).
         abort_unless((string) $passkey->user_id === (string) $request->user()->getAuthIdentifier(), 404);
 
+        // Snapshot the row before deletion so the data slot carries the removed credential's
+        // final state (the destroy-returns-the-resource envelope rule), matching PasskeyData.
+        $snapshot = $this->present($passkey);
+
         $passkey->delete();
 
-        return ResponseBody::from(['message' => 'Passkey removed.'])->deleted();
+        return ResponseBody::from(['message' => 'Passkey removed.', 'data' => $snapshot])->deleted();
     }
 
     /**
