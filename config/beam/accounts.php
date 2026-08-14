@@ -188,4 +188,16 @@ return [
         'model' => null,
         'scope' => null,
     ],
+
+    // The users resource — the identity roster. `scope` is the load-bearing row-level isolation on
+    // the widest shared table in the package: an `(Builder, ?Authenticatable): Builder` callable
+    // applied to BOTH the list and the per-record read, so the two can never disagree. The default
+    // shows the acting principal themselves plus everyone they share a team with; a CENTRAL Root
+    // principal sees all; an unauthenticated caller sees nothing. Bind this when your seats don't
+    // live on beam's memberships table. There is no `model` key — the user model already has one
+    // seam, the top-level `user_model` above; the resource's ATTRIBUTE literal is overridden by
+    // subclassing the DTO (attributes cannot read config).
+    'users' => [
+        'scope' => null,
+    ],
 ];

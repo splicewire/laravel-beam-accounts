@@ -25,6 +25,7 @@ use Splicewire\Beam\Accounts\Data\InvitationData;
 use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Data\TeamData;
 use Splicewire\Beam\Accounts\Data\TokenData;
+use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
@@ -297,6 +298,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             TokenData::class,
             InvitationData::class,
             TeamData::class,
+            UserData::class,
         ];
 
         // Registered via afterResolving so it lands regardless of the beam↔beam-accounts boot order.

@@ -6,6 +6,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Schemastud\Frame\Contracts\UnionQuery;
+use Spatie\Permission\Models\Role as SpatieRole;
+use Spatie\Permission\PermissionRegistrar;
 
 use function Splicewire\Beam\Accounts\accountCurrentTeam;
 use function Splicewire\Beam\Accounts\accountTokenModel;
@@ -19,6 +21,7 @@ use Splicewire\Beam\Accounts\Data\ProfileData;
 use Splicewire\Beam\Accounts\Data\ProfileUpdateInputData;
 use Splicewire\Beam\Accounts\Data\TeamData;
 use Splicewire\Beam\Accounts\Data\TokenData;
+use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
 use Splicewire\Beam\Accounts\Http\Controllers\Api\V1\ProfileController;
@@ -220,9 +223,104 @@ it('projects a team into the admin list row', function () {
         ->and($row->personal)->toBeTrue();
 });
 
+// ── Users (the identity roster) ───────────────────────────────────────────────────────────────
+
+it('projects a user into the admin list row', function () {
+    [$owner] = ownerWithTeam();
+    SpatieRole::create(['name' => Role::Admin->value, 'guard_name' => 'web']);
+    $owner->assignRole(Role::Admin->value);
+
+    $row = UserData::project($owner->fresh());
+
+    expect($row->id)->toBe((string) $owner->id)
+        ->and($row->name)->toBe('Owner')
+        ->and($row->email)->toBe('owner@example.test')
+        ->and($row->roles)->toContain(Role::Admin->value)
+        // ISO-8601, not raw Carbon — the projection contract every sibling resource holds.
+        ->and($row->createdAt)->toBeString()
+        ->and($row->createdAt)->toMatch('/^\d{4}-\d{2}-\d{2}T/');
+});
+
+it('scopes the user list to teams the actor shares — never the whole roster', function () {
+    [$owner, $team] = ownerWithTeam();
+    $teammate = User::create(['name' => 'Mate', 'email' => 'mate@example.test', 'password' => 'x']);
+    Membership::create(['team_id' => $team->id, 'user_id' => $teammate->id, 'role' => Role::Member->value]);
+
+    // A principal on an entirely separate team — the leak this scope exists to prevent.
+    $stranger = User::create(['name' => 'Stranger', 'email' => 'stranger@example.test', 'password' => 'x']);
+    $otherTeam = Team::create(['user_id' => $stranger->id, 'name' => 'Other', 'personal_team' => true]);
+    Membership::create(['team_id' => $otherTeam->id, 'user_id' => $stranger->id, 'role' => Role::Owner->value]);
+
+    $emails = UserData::scope(User::query())->pluck('email')->sort()->values()->all();
+
+    expect($emails)->toBe(['mate@example.test', 'owner@example.test'])
+        ->and($emails)->not->toContain('stranger@example.test');
+});
+
+it('resolves the acting principal even with no team seat at all', function () {
+    $loner = User::create(['name' => 'Loner', 'email' => 'loner@example.test', 'password' => 'x']);
+    Auth::login($loner);
+
+    $emails = UserData::scope(User::query())->pluck('email')->all();
+
+    expect($emails)->toBe(['loner@example.test']);
+});
+
+it('the same scope governs the per-record read, so a detail cannot resolve a hidden user', function () {
+    [$owner] = ownerWithTeam();
+    $stranger = User::create(['name' => 'Stranger', 'email' => 'stranger@example.test', 'password' => 'x']);
+    $otherTeam = Team::create(['user_id' => $stranger->id, 'name' => 'Other', 'personal_team' => true]);
+    Membership::create(['team_id' => $otherTeam->id, 'user_id' => $stranger->id, 'role' => Role::Owner->value]);
+
+    // Frame carries the resource scope onto subject resolution; assert the boundary directly —
+    // a list-only scope would let this resolve, which is the bug the shared closure prevents.
+    $resolved = UserData::scope(User::query())->whereKey($stranger->id)->first();
+
+    expect($resolved)->toBeNull()
+        ->and(UserData::scope(User::query())->whereKey($owner->id)->first())->not->toBeNull();
+});
+
+it('a central Root principal sees every user', function () {
+    [$owner] = ownerWithTeam();
+    $stranger = User::create(['name' => 'Stranger', 'email' => 'stranger@example.test', 'password' => 'x']);
+    $otherTeam = Team::create(['user_id' => $stranger->id, 'name' => 'Other', 'personal_team' => true]);
+    Membership::create(['team_id' => $otherTeam->id, 'user_id' => $stranger->id, 'role' => Role::Owner->value]);
+
+    // Root is assigned on the CENTRAL (null) team — the flip CentralRoot exists to handle.
+    app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+    SpatieRole::create(['name' => 'Root', 'guard_name' => 'web']);
+    $owner->assignRole('Root');
+    Auth::login($owner->fresh());
+
+    $emails = UserData::scope(User::query())->pluck('email')->sort()->values()->all();
+
+    expect($emails)->toContain('stranger@example.test')
+        ->and($emails)->toContain('owner@example.test');
+});
+
+it('user scope fails safe (empty) for a guest', function () {
+    ownerWithTeam();
+    Auth::logout();
+
+    expect(UserData::scope(User::query())->count())->toBe(0);
+});
+
+it('honours a host user-scope seam over the default', function () {
+    [$owner, $team] = ownerWithTeam();
+    $teammate = User::create(['name' => 'Mate', 'email' => 'mate@example.test', 'password' => 'x']);
+    Membership::create(['team_id' => $team->id, 'user_id' => $teammate->id, 'role' => Role::Member->value]);
+
+    // A host whose seats live elsewhere replaces the boundary wholesale.
+    config(['beam.accounts.users.scope' => fn ($query, $user) => $query->where('email', 'mate@example.test')]);
+
+    $emails = UserData::scope(User::query())->pluck('email')->all();
+
+    expect($emails)->toBe(['mate@example.test']);
+});
+
 // ── OOTB registration (the "fresh host gets the area" claim) ──────────────────────────────────
 
-it('registers tokens/invitations/members onto the Frame registries when beam is present', function () {
+it('registers tokens/invitations/members/teams/users onto the Frame registries when beam is present', function () {
     // Bind the real beam registry; the provider's afterResolving hook fires on first resolve.
     app()->singleton(ParticleResourceRegistry::class, fn () => new ParticleResourceRegistry);
 
@@ -237,8 +335,8 @@ it('registers tokens/invitations/members onto the Frame registries when beam is 
 
     $registry = app(ParticleResourceRegistry::class);
 
-    // Frame-manifest side: all four list surfaces present.
-    foreach (['tokens', 'invitations', 'members', 'teams'] as $key) {
+    // Frame-manifest side: all five list surfaces present.
+    foreach (['tokens', 'invitations', 'members', 'teams', 'users'] as $key) {
         $registry->definition($key); // throws if absent
     }
     expect($registry->definition('members')->sourceKind)->toBe('service')
@@ -246,10 +344,16 @@ it('registers tokens/invitations/members onto the Frame registries when beam is 
         ->and($registry->definition('invitations')->editable)->toBeFalse()
         ->and($registry->definition('tokens')->deletable)->toBeTrue();
 
+    // Users is read-only in all three directions: no create, no edit, no delete through Frame.
+    expect($registry->definition('users')->creatable)->toBeFalse()
+        ->and($registry->definition('users')->editable)->toBeFalse()
+        ->and($registry->definition('users')->deletable)->toBeFalse();
+
     // REST/op side: the model-backed attribute resources are on the same registry.
     expect($registry->has('tokens'))->toBeTrue()
         ->and($registry->has('invitations'))->toBeTrue()
-        ->and($registry->has('teams'))->toBeTrue();
+        ->and($registry->has('teams'))->toBeTrue()
+        ->and($registry->has('users'))->toBeTrue();
 });
 
 // ── Account profile (already package-owned — the 4th ticket-20 resource) ──────────────────────
