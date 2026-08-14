@@ -111,7 +111,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      * `register()` did, minus the config merge (now `hasConfigFile(['beam/accounts'])` in
      * {@see self::configurePackage()}). Runs after `PackageServiceProvider::register()` has
      * configured the package and registered its config, mirroring how
-     * `BeamMultiTenancyServiceProvider` structured its own conversion.
+     * `BeamTenancyServiceProvider` structured its own conversion.
      */
     public function packageRegistered(): void
     {
@@ -186,7 +186,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      * `PackageServiceProvider::boot()` runs the package-tools plumbing (config publish/merge,
      * migrations publish) THEN calls this hook — so everything the engine's own former `boot()`
      * did (auth/middleware/routes/Fortify/etc) now runs from here, mirroring exactly how
-     * `BeamMultiTenancyServiceProvider::packageBooted()` was structured post-conversion.
+     * `BeamTenancyServiceProvider::packageBooted()` was structured post-conversion.
      * `bootConfig()`/`bootMigrations()` are gone — package-tools' `hasConfigFile()`/
      * `hasMigrations()` (declared in {@see self::configurePackage()}) now own that plumbing.
      */
