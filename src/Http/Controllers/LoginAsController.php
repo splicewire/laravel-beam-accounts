@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Actions\LogInAs;
 use Splicewire\Beam\Accounts\Support\Demo;
 
@@ -23,6 +24,22 @@ class LoginAsController
         $login($subject);
         $request->session()->regenerate();
 
-        return redirect()->to(config('beam.accounts.demo.redirect', '/'));
+        return redirect()->to($this->redirectFor($subject));
+    }
+
+    /**
+     * The designated operator demo subject ({@see Demo::isOperator()}) lands on the operator shell
+     * when one is routed (its own `bootOperatorShell()` default, or a host's own `operator.home`) —
+     * the whole point of a DIFFERENT demo subject per role is landing somewhere that actually shows
+     * what that role can reach, not the same generic default every subject shares. Every other
+     * subject keeps the plain `beam.accounts.demo.redirect` default.
+     */
+    private function redirectFor(string $subject): string
+    {
+        if (Demo::isOperator($subject) && Route::has('operator.home')) {
+            return route('operator.home');
+        }
+
+        return config('beam.accounts.demo.redirect', '/');
     }
 }

@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
+use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Schemastud\Frame\Registry\NavMetadata;
 use Schemastud\Frame\Registry\ResourceDefinition;
 use Spatie\LaravelPackageTools\Package;
@@ -125,6 +126,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         $package
             ->name('laravel-beam-accounts')
             ->hasConfigFile(['beam/accounts'])
+            ->hasViews('beam-accounts')
             ->hasMigrations($migrations);
     }
 
@@ -276,11 +278,18 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         if ($this->app->bound(BeamInstallManifest::class)) {
             $this->app->make(BeamInstallManifest::class)->register(
                 package: 'splicewire/laravel-beam-accounts',
-                publishTags: ['beam-accounts-config', 'beam-accounts-migrations', 'beam-accounts-operator-shell'],
+                publishTags: ['beam-accounts-config', 'beam-accounts-migrations'],
                 migrates: true,
                 order: 5,
             );
         }
+
+        // `beam-accounts-operator-shell` is deliberately NOT in the install manifest's auto-run
+        // publishTags above — the stub is a minimal placeholder (no resource browsing, no in-place
+        // editing yet), and spraying it onto every host's resources/js/pages on a plain install
+        // would commit them to a page they'd immediately want to replace. Stays opaque (package-
+        // rendered, no host file) for now; `vendor:publish --tag=beam-accounts-operator-shell` is
+        // still there for a host that wants to eject and customize it today anyway.
 
         // beam-accounts is itself an "operator" of the estate-wide publish-only stub migrations
         // convention — self-registers the doctor/operator check on ITS OWN migrations, same as
@@ -392,11 +401,20 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             ->get('/operator', function (Request $request) {
                 $user = $request->user();
                 $model = accountUserModel();
+                $props = [
+                    'staff' => ['name' => $user->name, 'email' => $user->email],
+                    'stats' => ['users' => $model::count()],
+                ];
 
-                return Inertia::render('operator/dashboard', [
-                    'staff' => fn () => ['name' => $user->name, 'email' => $user->email],
-                    'stats' => fn () => ['users' => $model::count()],
-                ]);
+                // Opaque by default: no host file required at all, server-rendered Blade, always
+                // available the moment the package is installed. The moment a host publishes (or
+                // hand-authors) resources/js/pages/operator/dashboard.tsx — ejecting into a real,
+                // editable Inertia page — this prefers THAT instead, with no route change needed.
+                if (is_file(resource_path('js/pages/operator/dashboard.tsx'))) {
+                    return Inertia::render('operator/dashboard', $props);
+                }
+
+                return view('beam-accounts::operator-shell', $props);
             })
             ->name('operator.home');
     }
@@ -513,6 +531,43 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             return $link->created_by !== null
                 && (string) $link->created_by === (string) $user->getAuthIdentifier();
         });
+
+        $this->bootAuthoringGates();
+    }
+
+    /**
+     * The bare `author-ux` / `author-ux-{realm}` Gate aliases — normalized here instead of every host
+     * hand-rolling the identical pair (found byte-for-byte duplicated, docblock and all, in both
+     * `audiostud`'s and `laravel-beam-starter`'s own `AppServiceProvider`). `Gate::define()` is
+     * last-write-wins by name, so a host that still defines its own version of either (e.g. to layer
+     * extra logic on top) overrides this cleanly — nothing here needs a guard.
+     *
+     * `author-ux` reads through the `entitlement:author-ux` Gate beam-core's registerEntitlementAbilities()
+     * defines (now that {@see self::registerEntitlementKeys()} lists it). `author-ux-{realm}` has no
+     * `entitlement:` Gate to ride — it's realm-PARAMETERIZED, and beam-core only defines abilities for
+     * the flat key list — so it reads the resolver's raw key list directly instead, over beam-core's
+     * RealmRegistry (operator/tenant/site/user by default, plus any host `#[Realm]` preset).
+     *
+     * Deliberately does NOT fall back to `author-ux` for the per-realm check: `DefaultEntitlementResolver`
+     * composes the coarse `author-ux` key as soon as ANY single realm is granted, so an
+     * `author-ux-{realm} = author-ux || ...` shortcut would let a grant on just ONE realm leak authoring
+     * into every OTHER realm — defeating the whole point of the per-realm grain. A grantee of every realm
+     * still authors every realm (each `author-ux-{realm}` key composes independently); a narrowly-granted
+     * principal now correctly stays narrow.
+     */
+    protected function bootAuthoringGates(): void
+    {
+        Gate::define('author-ux', fn ($user) => $user->can('entitlement:author-ux'));
+
+        foreach (array_keys($this->app->make(RealmRegistry::class)->all()) as $realm) {
+            $ability = "author-ux-{$realm}";
+
+            Gate::define($ability, fn ($user) => in_array(
+                $ability,
+                $this->app->make(EntitlementResolver::class)->entitlementsFor($user),
+                true,
+            ));
+        }
     }
 
     protected function bootMiddleware(): void
