@@ -12,13 +12,13 @@ use function Splicewire\Beam\Accounts\accountTokenModel;
 
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
-use Splicewire\Beam\Accounts\Data\Frame\CreateInvitationData;
-use Splicewire\Beam\Accounts\Data\Frame\InvitationResourceData;
-use Splicewire\Beam\Accounts\Data\Frame\MembershipResourceData;
-use Splicewire\Beam\Accounts\Data\Frame\TeamResourceData;
-use Splicewire\Beam\Accounts\Data\Frame\TokenResourceData;
+use Splicewire\Beam\Accounts\Data\CreateInvitationData;
+use Splicewire\Beam\Accounts\Data\InvitationData;
+use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Data\ProfileData;
 use Splicewire\Beam\Accounts\Data\ProfileUpdateInputData;
+use Splicewire\Beam\Accounts\Data\TeamData;
+use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
 use Splicewire\Beam\Accounts\Http\Controllers\Api\V1\ProfileController;
@@ -97,7 +97,7 @@ it('scopes the token list to the acting user — never leaks another user\'s tok
     mintToken($owner, 'mine', 'a');
     mintToken($other, 'theirs', 'b');
 
-    $rows = TokenResourceData::scope(PersonalAccessToken::query())->get();
+    $rows = TokenData::scope(PersonalAccessToken::query())->get();
 
     expect($rows)->toHaveCount(1)
         ->and($rows->first()->name)->toBe('mine');
@@ -114,14 +114,14 @@ it('honours a host token-scope seam over the default', function () {
 
     mintToken($owner, 'mine', 'c');
 
-    expect(TokenResourceData::scope(PersonalAccessToken::query())->count())->toBe(0);
+    expect(TokenData::scope(PersonalAccessToken::query())->count())->toBe(0);
 });
 
 it('projects a token into the frame row shape', function () {
     [$owner] = ownerWithTeam();
     $token = mintToken($owner, 'ci', 'd');
 
-    $row = TokenResourceData::project($token);
+    $row = TokenData::project($token);
 
     expect($row->id)->toBe((string) $token->id)
         ->and($row->name)->toBe('ci')
@@ -134,7 +134,7 @@ it('prepares a new invitation for the current team as an owner', function () {
     [$owner, $team] = ownerWithTeam();
     $invitation = new Invitation;
 
-    InvitationResourceData::prepare($invitation, CreateInvitationData::from(['email' => 'new@example.test', 'role' => 'member']), $owner);
+    InvitationData::prepare($invitation, CreateInvitationData::from(['email' => 'new@example.test', 'role' => 'member']), $owner);
 
     expect($invitation->team_id)->toBe($team->id)
         ->and($invitation->email)->toBe('new@example.test')
@@ -148,7 +148,7 @@ it('re-invite updates the existing row (unique team_id,email) instead of collidi
     $first = Invitation::create(['team_id' => $team->id, 'email' => 'dup@example.test', 'role' => 'member', 'token' => 'old']);
 
     $model = new Invitation;
-    InvitationResourceData::prepare($model, CreateInvitationData::from(['email' => 'dup@example.test', 'role' => 'admin']), $owner);
+    InvitationData::prepare($model, CreateInvitationData::from(['email' => 'dup@example.test', 'role' => 'admin']), $owner);
     $model->role = 'admin';
     $model->save();
 
@@ -163,7 +163,7 @@ it('forbids a non-owner/admin from inviting', function () {
     Membership::create(['team_id' => $team->id, 'user_id' => $member->id, 'role' => Role::Member->value]);
     Auth::login($member->fresh());
 
-    expect(fn () => InvitationResourceData::prepare(new Invitation, CreateInvitationData::from(['email' => 'x@example.test']), $member->fresh()))
+    expect(fn () => InvitationData::prepare(new Invitation, CreateInvitationData::from(['email' => 'x@example.test']), $member->fresh()))
         ->toThrow(HttpException::class);
 });
 
@@ -173,7 +173,7 @@ it('scopes invitations to the current team and pending-only', function () {
     $accepted = Invitation::create(['team_id' => $team->id, 'email' => 'accepted@example.test', 'role' => 'member', 'token' => 'a']);
     $accepted->update(['accepted_at' => now()]);
 
-    $rows = InvitationResourceData::scope(Invitation::query())->get();
+    $rows = InvitationData::scope(Invitation::query())->get();
 
     expect($rows)->toHaveCount(1)
         ->and($rows->first()->email)->toBe('pending@example.test');
@@ -192,7 +192,7 @@ it('streams the current team members through the source', function () {
 
     $page = app(MembershipSource::class)->index(new UnionQuery(perPage: 20, cursor: null));
 
-    $emails = collect($page->items())->map(fn (MembershipResourceData $m) => $m->email)->sort()->values()->all();
+    $emails = collect($page->items())->map(fn (MembershipData $m) => $m->email)->sort()->values()->all();
     expect($emails)->toBe(['ann@example.test', 'owner@example.test']);
 });
 
@@ -212,7 +212,7 @@ it('projects a team into the admin list row', function () {
     $member = User::create(['name' => 'M', 'email' => 'm@example.test', 'password' => 'x']);
     Membership::create(['team_id' => $team->id, 'user_id' => $member->id, 'role' => Role::Member->value]);
 
-    $row = TeamResourceData::project($team->fresh());
+    $row = TeamData::project($team->fresh());
 
     expect($row->name)->toBe('T')
         ->and($row->ownerEmail)->toBe('owner@example.test')

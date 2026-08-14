@@ -1,6 +1,6 @@
 <?php
 
-namespace Splicewire\Beam\Accounts\Data\Frame;
+namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Database\Eloquent\Model;
 use Schemastud\Frame\Attributes\Column;
@@ -35,7 +35,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     readOnly: true,
 )]
 #[TypeScript]
-class TeamResourceData extends Data
+class TeamData extends Data
 {
     public function __construct(
         #[NotInList]

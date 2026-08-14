@@ -13,7 +13,7 @@ use Schemastud\Frame\Contracts\UnionSource;
 
 use function Splicewire\Beam\Accounts\accountCurrentTeam;
 
-use Splicewire\Beam\Accounts\Data\Frame\MembershipResourceData;
+use Splicewire\Beam\Accounts\Data\MembershipData;
 
 /**
  * The team-members union source (Frame OS ticket 20 — promoted from tower's
@@ -39,7 +39,7 @@ class MembershipSource implements UnionSource
 
         if ($cursor !== null) {
             $lastId = $cursor->parameter('id');
-            $offset = $stream->search(fn (MembershipResourceData $item) => $item->id === $lastId);
+            $offset = $stream->search(fn (MembershipData $item) => $item->id === $lastId);
             $stream = $offset === false ? $stream : $stream->slice($offset + 1)->values();
         }
 
@@ -55,7 +55,7 @@ class MembershipSource implements UnionSource
 
     public function find(string $source, string $id): ?ResolvedUnionItem
     {
-        $item = $this->stream()->first(fn (MembershipResourceData $member) => $member->id === $id);
+        $item = $this->stream()->first(fn (MembershipData $member) => $member->id === $id);
 
         if ($item === null) {
             return null;
@@ -65,9 +65,9 @@ class MembershipSource implements UnionSource
     }
 
     /**
-     * The current team's members as a projected stream, one {@see MembershipResourceData} per seat.
+     * The current team's members as a projected stream, one {@see MembershipData} per seat.
      *
-     * @return Collection<int, MembershipResourceData>
+     * @return Collection<int, MembershipData>
      */
     protected function stream(): Collection
     {
@@ -79,7 +79,7 @@ class MembershipSource implements UnionSource
 
         return $team->members()
             ->get()
-            ->map(fn (Model $user) => new MembershipResourceData(
+            ->map(fn (Model $user) => new MembershipData(
                 id: (string) $user->getKey(),
                 name: $user->name,
                 email: $user->email,

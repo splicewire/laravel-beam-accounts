@@ -1,6 +1,6 @@
 <?php
 
-namespace Splicewire\Beam\Accounts\Data\Frame;
+namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -49,7 +49,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     editable: false,
 )]
 #[TypeScript]
-class InvitationResourceData extends Data
+class InvitationData extends Data
 {
     public function __construct(
         #[NotInList]

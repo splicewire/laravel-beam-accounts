@@ -1,6 +1,6 @@
 <?php
 
-namespace Splicewire\Beam\Accounts\Data\Frame;
+namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Attributes\Validation\Email;
 use Spatie\LaravelData\Attributes\Validation\In;

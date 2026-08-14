@@ -1,6 +1,6 @@
 <?php
 
-namespace Splicewire\Beam\Accounts\Data\Frame;
+namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -47,7 +47,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     deletable: true,
 )]
 #[TypeScript]
-class TokenResourceData extends Data
+class TokenData extends Data
 {
     public function __construct(
         #[NotInList]

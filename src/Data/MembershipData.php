@@ -1,6 +1,6 @@
 <?php
 
-namespace Splicewire\Beam\Accounts\Data\Frame;
+namespace Splicewire\Beam\Accounts\Data;
 
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
@@ -22,7 +22,7 @@ use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
  * create/edit/delete all 405.
  */
 #[TypeScript]
-class MembershipResourceData extends Data
+class MembershipData extends Data
 {
     public function __construct(
         #[NotInList]

@@ -21,10 +21,10 @@ use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
-use Splicewire\Beam\Accounts\Data\Frame\InvitationResourceData;
-use Splicewire\Beam\Accounts\Data\Frame\MembershipResourceData;
-use Splicewire\Beam\Accounts\Data\Frame\TeamResourceData;
-use Splicewire\Beam\Accounts\Data\Frame\TokenResourceData;
+use Splicewire\Beam\Accounts\Data\InvitationData;
+use Splicewire\Beam\Accounts\Data\MembershipData;
+use Splicewire\Beam\Accounts\Data\TeamData;
+use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
@@ -44,11 +44,11 @@ use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
 use Splicewire\Beam\Accounts\Support\NullAuthUserExtras;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
-use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
-use Splicewire\Beam\Seed\BeamSeedManifest;
-use Splicewire\Beam\Particle\ParticleResourceRegistry;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
 use Splicewire\Beam\Install\BeamInstallManifest;
+use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
+use Splicewire\Beam\Particle\ParticleResourceRegistry;
+use Splicewire\Beam\Seed\BeamSeedManifest;
 
 /**
  * The account engine: Fortify/session as the default auth substrate, the self-service
@@ -121,17 +121,21 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             config(['permission-cascade.grant_model' => AccessGrant::class]);
         }
 
-        // UNLIKE grant_model/entitlement_resolver above, this is NOT defaulted-on here. Those two
-        // are pure-additive when unconfigured (nothing previously read a grant/entitlement, so
-        // turning them on can't disagree with an existing value) — but visibility_model is a
-        // STORAGE BACKEND SWITCH for a feature multiple HasVisibility models across the family
-        // already use column-based (Shelf/Silo, tower's RunnerTransform, beam-threads'
-        // ConversationParticle, audiostud's Composition/AudioSample/LyricPiece). Defaulting this
-        // on fleet-wide would silently redirect every one of them from their real, possibly
-        // populated `visibility` column to an empty morph table. Each host opts in per its OWN
-        // `config/permission-cascade.php` instead (see rushing/audiostud's, which already sets
-        // `reach_resolver`/`entitlement_resolver` the same way) — {@see \Splicewire\Beam\Accounts\Models\Visibility}
-        // just supplies the model+migration so a host doesn't have to build its own.
+        // UNLIKE grant_model/entitlement_resolver above, this is NOT defaulted-on here, and a host
+        // should NOT set `permission-cascade.visibility_model` in its own config either — that key
+        // is a single GLOBAL toggle with no per-model override, so setting it ANYWHERE moves EVERY
+        // HasVisibility model in the app onto the off-table seam at once. grant_model/
+        // entitlement_resolver are pure-additive when unconfigured (nothing previously read a
+        // grant/entitlement, so turning them on can't disagree with an existing value) —
+        // visibility_model is a STORAGE BACKEND SWITCH for a feature multiple HasVisibility models
+        // across the family already use column-based (Shelf/Silo, tower's RunnerTransform,
+        // beam-threads' ConversationParticle). Confirmed the hard way in rushing/audiostud: setting
+        // this key app-wide broke Shelf's uuid-keyed morph query against the new table's varchar
+        // column, on top of silently orphaning its real, populated `visibility` column. A model
+        // that wants the off-table seam overrides `HasVisibility::permissionCascadeVisibilityModel()`
+        // on ITSELF instead (see rushing/audiostud's `Composition`/`AudioSample`/`LyricPiece`) —
+        // {@see \Splicewire\Beam\Accounts\Models\Visibility} just supplies the model+migration so a
+        // host doesn't have to build its own.
 
         // OOTB entitlement resolver: bind the DefaultEntitlementResolver (staff → the staff bundle) UNLESS
         // the host declared its own via `config('permission-cascade.entitlement_resolver')`. Setting the
@@ -290,9 +294,9 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         }
 
         $attributeResources = [
-            TokenResourceData::class,
-            InvitationResourceData::class,
-            TeamResourceData::class,
+            TokenData::class,
+            InvitationData::class,
+            TeamData::class,
         ];
 
         // Registered via afterResolving so it lands regardless of the beam↔beam-accounts boot order.
@@ -312,7 +316,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
                     sourceKind: 'service',
                     model: null,
                     source: MembershipSource::class,
-                    data: MembershipResourceData::class,
+                    data: MembershipData::class,
                     creatable: false,
                     query: null,
                     editData: null,
