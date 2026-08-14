@@ -1,0 +1,53 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Rushing\PermissionCascade\Contracts\AccessGrant;
+use Splicewire\Beam\Facades\Beam;
+
+/**
+ * The directory-ACL grant ledger — `beam_access_grants`, the table behind
+ * {@see Splicewire\Beam\Accounts\Models\AccessGrant} (permission-cascade's {@see AccessGrant}).
+ * Reclassified from the old host-placed `teams/` directory into SHARED, alongside
+ * `create_teams_table` — see that file's docblock. Already create-only (net-new, nothing to squash);
+ * only the connection-tier reclassification and the guard style changed, matching the sibling
+ * shared/ files' plain `Schema::hasTable()` idempotency check.
+ *
+ * `grantable_id` AND `grantee_id` are strings — morph keys that must hold both uuid-keyed
+ * hosts (beam users/threads) and bigint-keyed hosts (audiostud users/roles) without a
+ * per-host column type. `ability` ∈ {view, manage}; `effect` ∈ {allow, deny}.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (Schema::hasTable($this->target())) {
+            return;
+        }
+
+        Schema::create($this->target(), function (Blueprint $table): void {
+            $table->id();
+            $table->string('grantable_type');
+            $table->string('grantable_id');   // morph key (uuid or bigint) — string for cross-host
+            $table->string('grantee_type');
+            $table->string('grantee_id');     // morph key (uuid or bigint) — string for cross-host
+            $table->string('ability');                 // view | manage
+            $table->string('effect');                  // allow | deny
+            $table->timestamps();
+
+            $table->index(['grantable_type', 'grantable_id']);
+            $table->index(['grantee_type', 'grantee_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists($this->target());
+    }
+
+    private function target(): string
+    {
+        return Beam::table('access_grants');
+    }
+};

@@ -71,39 +71,59 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
+        // Publish-only .stub migrations (NOT ->discoversMigrations(), which loads at runtime).
+        // Declared order matters: creates before their alters, parents before children (FKs),
+        // package-tools timestamps each entry a second apart in listed order at publish time.
+        //
+        // shared/  — identical central+tenant schema (picked up on both connections by
+        //            beam-tenancy's registerSharedMigrationsPath() host-side wiring).
+        // (bare)   — central-only.
+        // tenant/  — tenant-only.
+        //
+        // Two estates, each independently config-gated (restores the pre-publish-only-stub
+        // semantics that `4f9ba78` silently dropped — see register_migrations/
+        // register_auth_migrations in config/beam/accounts.php):
+        //
+        // AUTH estate — users/permission_tables/passkeys/PAT-provenance/the tenant identity
+        // estate. On by default; a host would only turn this off if it owns its own auth schema
+        // entirely (mirrors the old bootMigrations() split).
+        //
+        // TEAMS estate — teams/memberships/invitations/access-grants/share-links/view-requests,
+        // now reclassified into shared/ (was its own host-placed `teams/` directory; see
+        // shared/create_teams_table.php.stub's docblock for why). A host that runs its own
+        // separate team system (splicewire-app) turns this off so these tables are never
+        // published onto its disk at all.
+        $authMigrations = [
+            'shared/create_users_table',
+            'shared/create_permission_tables',
+            'create_passkeys_table',
+            'add_provenance_and_archived_to_personal_access_tokens_table',
+            'tenant/create_userables_table',
+            'tenant/create_guest_tokens_table',
+            'tenant/create_sign_offs_table',
+            'tenant/rename_userish_to_system_account',
+        ];
+
+        $teamsMigrations = [
+            'shared/create_teams_table',
+            'shared/create_memberships_table',
+            'shared/add_current_team_id_to_users_table',
+            'shared/create_invitations_table',
+            'shared/create_access_grants_table',
+            'shared/create_share_links_table',
+            'shared/create_view_requests_table',
+        ];
+
+        $migrations = config('beam.accounts.register_auth_migrations', true) ? $authMigrations : [];
+        $migrations = array_merge(
+            $migrations,
+            config('beam.accounts.register_migrations', true) ? $teamsMigrations : [],
+        );
+
         $package
             ->name('laravel-beam-accounts')
             ->hasConfigFile(['beam/accounts'])
-            // Publish-only .stub migrations (NOT ->discoversMigrations(), which loads at runtime).
-            // Declared order matters: creates before their alters, parents before children (FKs),
-            // package-tools timestamps each entry a second apart in listed order at publish time.
-            //
-            // shared/  — identical central+tenant schema (picked up on both connections by
-            //            beam-tenancy's registerSharedMigrationsPath() host-side wiring).
-            // (bare)   — central-only.
-            // tenant/  — tenant-only.
-            // teams/   — the teams/memberships/invitations/access-grants/share-links/view-requests
-            //            estate; NOT squashed (data-preserving renames already ran against real
-            //            deployed data — see the individual stub docblocks).
-            ->hasMigrations([
-                'shared/create_users_table',
-                'shared/create_permission_tables',
-                'create_passkeys_table',
-                'add_provenance_and_archived_to_personal_access_tokens_table',
-                'tenant/create_userables_table',
-                'tenant/create_guest_tokens_table',
-                'tenant/create_sign_offs_table',
-                'tenant/rename_userish_to_system_account',
-                'teams/create_teams_table',
-                'teams/create_memberships_table',
-                'teams/add_current_team_id_to_users_table',
-                'teams/create_invitations_table',
-                'teams/create_access_grants_table',
-                'teams/create_visibilities_table',
-                'teams/create_share_links_table',
-                'teams/create_view_requests_table',
-                'teams/add_lifecycle_to_invitations_table',
-            ]);
+            ->hasMigrations($migrations);
     }
 
     /**

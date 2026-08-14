@@ -1,0 +1,43 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Splicewire\Beam\Facades\Beam;
+
+/**
+ * `beam_teams`. Reclassified from the old host-placed `teams/` directory (one side only, chosen per
+ * host) into SHARED — identical schema on the central connection and every tenant, picked up by both
+ * migration passes via beam-tenancy's `registerSharedMigrationsPath()`. The old "one store, host
+ * decides where" model was never exercised either way (no host ever placed it per-tenant) and
+ * conflicted with `users` already being shared: a team a login can switch into needs to exist
+ * wherever that login's own row does. Squashed pre-prod (no deployed data to preserve migration
+ * history for) — a plain guarded create, no legacy-name rename branch.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (Schema::hasTable($this->target())) {
+            return;
+        }
+
+        Schema::create($this->target(), function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->index();
+            $table->string('name');
+            $table->boolean('personal_team')->default(false)->index();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists($this->target());
+    }
+
+    private function target(): string
+    {
+        return Beam::table('teams');
+    }
+};

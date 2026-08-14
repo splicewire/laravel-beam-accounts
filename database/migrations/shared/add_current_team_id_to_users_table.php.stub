@@ -1,0 +1,36 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Reclassified from the old host-placed `teams/` directory into SHARED, alongside
+ * `create_teams_table` (see that file's docblock) — this ALTER touches `users`, which is already
+ * shared/, so it must land in every schema `users` does. The old "central-only, identity spans
+ * tenants" reasoning assumed teams lived on exactly one side of a host; under shared/, every schema
+ * gets its own self-consistent picture (its own users, its own teams, its own current_team_id
+ * pointer), matching how `users`/`permission_tables` already work. `hasColumn`-guarded for
+ * idempotency, matching the sibling shared/ ALTER pattern (`create_users_table`'s `google_id`
+ * retrofit).
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (! Schema::hasColumn('users', 'current_team_id')) {
+            Schema::table('users', function (Blueprint $table): void {
+                $table->unsignedBigInteger('current_team_id')->nullable()->after('id');
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        if (Schema::hasColumn('users', 'current_team_id')) {
+            Schema::table('users', function (Blueprint $table): void {
+                $table->dropColumn('current_team_id');
+            });
+        }
+    }
+};

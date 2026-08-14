@@ -20,12 +20,13 @@ use Splicewire\Beam\Accounts\Models\Team;
  * provider is exercised on the false path, and asserts the code primitive (contracts/enum/models)
  * is still available.
  *
- * The former `register_migrations`/`register_auth_migrations` config toggles (and the assertion
- * that gating them off left no beam-accounts migration path registered) are GONE: migrations are
- * now publish-only stubs (estate-wide convention) — never auto-loaded via `loadMigrationsFrom()`
- * regardless of config, so that assertion's whole premise (a config-gated migration estate) no
- * longer exists. {@see \Splicewire\Beam\Accounts\Tests\Doctor\BeamAccountsMigrationsAuditTest}
- * is the doctor-audit test that now covers "no migrations get auto-loaded" mechanically.
+ * `register_migrations`/`register_auth_migrations` used to gate whether beam-accounts' migrations
+ * were auto-loaded at runtime (`loadMigrationsFrom()`); that assertion is gone since migrations are
+ * now publish-only stubs, never auto-loaded regardless of config —
+ * {@see \Splicewire\Beam\Accounts\Tests\Doctor\BeamAccountsMigrationsAuditTest} covers that
+ * mechanically. The two flags are still live, restored to gate what `configurePackage()` declares
+ * via `->hasMigrations()` — i.e. what `vendor:publish`/`splicewire:beam:install` puts on a host's
+ * disk in the first place, independent of auto-load. {@see MigrationPublishGateTest} covers that.
  */
 class ConfigGateTest extends Orchestra
 {

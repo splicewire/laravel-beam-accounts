@@ -1,0 +1,49 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Splicewire\Beam\Accounts\Models\ViewRequest;
+use Splicewire\Beam\Facades\Beam;
+
+/**
+ * `beam_view_requests` — the polymorphic view-access request ledger behind {@see ViewRequest}
+ * (ADR-0009, tracer 04, generalized). Reclassified from the old host-placed `teams/` directory into
+ * SHARED, alongside `create_teams_table` — see that file's docblock. Already create-only (net-new,
+ * nothing to squash); only the connection-tier reclassification and the guard style changed, matching
+ * the sibling shared/ files' plain `Schema::hasTable()` idempotency check. Morph keys are strings to
+ * hold both uuid- and bigint-keyed hosts.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (Schema::hasTable($this->target())) {
+            return;
+        }
+
+        Schema::create($this->target(), function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('requestable_type');
+            $table->string('requestable_id');
+            $table->string('requester_type');
+            $table->string('requester_id');
+            $table->string('status')->default('pending');
+            $table->timestamp('decided_at')->nullable();
+            $table->timestamps();
+
+            $table->index(['requestable_type', 'requestable_id', 'status']);
+            $table->index(['requester_type', 'requester_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists($this->target());
+    }
+
+    private function target(): string
+    {
+        return Beam::table('view_requests');
+    }
+};

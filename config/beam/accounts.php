@@ -22,6 +22,21 @@ return [
     // wants to wire the macro itself.
     'register_routes' => env('ACCOUNT_REGISTER_ROUTES', true),
 
+    // Gate what configurePackage() declares via ->hasMigrations() — a package-tools declaration
+    // controls PUBLISH (vendor:publish / splicewire:beam:install), not just runtime auto-load
+    // (which publish-only stubs never do regardless of these flags). Two independent estates:
+    //
+    //  - register_auth_migrations — users/permission_tables/passkeys/PAT-provenance/the tenant
+    //    identity estate. A host would only turn this off if it owns its own auth schema entirely
+    //    (its own users table, its own tenant identity migrations) and wants none of this
+    //    package's auth estate published onto its disk.
+    //  - register_migrations — the teams/memberships/invitations/access-grants/share-links/
+    //    view-requests estate (shared/ — identical schema on every connection; see
+    //    shared/create_teams_table.php.stub's docblock). A host running its own separate team
+    //    system turns this off so these tables are never published, matching splicewire-app.
+    'register_auth_migrations' => env('ACCOUNT_REGISTER_AUTH_MIGRATIONS', true),
+    'register_migrations' => env('ACCOUNT_REGISTER_MIGRATIONS', true),
+
     // Wire Fortify as the default auth substrate (registration/reset actions +
     // login/two-factor rate limiters). A host that consumes only the code primitive
     // (models/contracts/enum/traits) over its OWN auth — e.g. the platform app on
