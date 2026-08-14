@@ -99,9 +99,11 @@ it('skips seeding when demo affordances are disabled', function () {
 
 // ── ACC-01: the Demo Team's grant-derived reach — no separate "Staff" subject needed ──────────
 
-it('grants the demo team manage on every provisioned realm root, making Owner/Admin author-ux-verifiable and Member denied', function () {
+it('grants the demo team manage on every REGISTERED realm root (not just already-provisioned ones), making Owner/Admin author-ux-verifiable and Member denied', function () {
+    // Deliberately create a root for only ONE of the four base-registered realms (site/operator/
+    // tenant/user) — RealmReachGrant now eagerly provisions the rest via RealmRegistry rather than
+    // only granting reach onto whatever RealmRoot rows already happened to exist.
     RealmRoot::create(['realm' => 'site']);
-    RealmRoot::create(['realm' => 'operator']);
 
     seedDemo();
 
@@ -112,10 +114,12 @@ it('grants the demo team manage on every provisioned realm root, making Owner/Ad
     $member = User::where('email', Demo::email(Role::Member->value))->first();
 
     expect($resolver->entitlementsFor($owner))->toEqualCanonicalizing([
-        'author-ux-site', 'author-ux-operator', 'author-ux', 'os.enter', 'app-operator',
+        'author-ux-site', 'author-ux-operator', 'author-ux-tenant', 'author-ux-user',
+        'author-ux', 'os.enter', 'app-operator',
     ]);
     expect($resolver->entitlementsFor($admin))->toEqualCanonicalizing([
-        'author-ux-site', 'author-ux-operator', 'author-ux', 'os.enter', 'app-operator',
+        'author-ux-site', 'author-ux-operator', 'author-ux-tenant', 'author-ux-user',
+        'author-ux', 'os.enter', 'app-operator',
     ]);
     expect($resolver->entitlementsFor($member))->toBe([]);
 });
@@ -126,13 +130,19 @@ it('is idempotent about the realm-root grants it mints (re-running does not dupl
     seedDemo();
     seedDemo();
 
+    // One grant per base-registered realm (operator/tenant/site/user) — not just the one RealmRoot
+    // fixture row pre-created above.
     $model = config('permission-cascade.grant_model');
-    expect($model::query()->where('ability', AccessGrant::ABILITY_MANAGE)->count())->toBe(1);
+    expect($model::query()->where('ability', AccessGrant::ABILITY_MANAGE)->count())->toBe(4);
 });
 
-it('grants nothing when no realm root has been provisioned yet', function () {
+it('grants reach on every registered realm even when no realm root has been provisioned yet (the fresh-install case)', function () {
+    // No RealmRoot pre-created at all — BeamUxEntry::rootFor()-equivalent provisioning is normally
+    // LAZY (first ask), so a fresh install would otherwise have nothing for RealmReachGrant to grant
+    // against. It now eagerly provisions the RealmRegistry's base set instead, so a seeded demo/staff
+    // team gets real reach without an author ever having visited an authoring surface first.
     seedDemo();
 
     $model = config('permission-cascade.grant_model');
-    expect($model::query()->count())->toBe(0);
+    expect($model::query()->where('ability', AccessGrant::ABILITY_MANAGE)->count())->toBe(4);
 });

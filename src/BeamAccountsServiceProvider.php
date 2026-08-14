@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
 use Schemastud\Frame\Registry\NavMetadata;
@@ -49,6 +50,7 @@ use Splicewire\Beam\Doctor\BeamDoctorManifest;
 use Splicewire\Beam\Install\BeamInstallManifest;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
+use Splicewire\Beam\Realm\RealmRegistry;
 use Splicewire\Beam\Seed\BeamSeedManifest;
 
 /**
@@ -168,6 +170,19 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             config(['permission-cascade.entitlement_resolver' => DefaultEntitlementResolver::class]);
         }
 
+        // Binding the resolver alone is NOT enough to turn the gates on: beam-core's
+        // registerEntitlementAbilities() only defines a Laravel Gate ability for keys it already
+        // knows about (config('beam.core.entitlements.keys')) — an UNLISTED key is simply never
+        // `Gate::define()`'d, so `can:entitlement:app-operator` 403s even when
+        // DefaultEntitlementResolver::entitlementsFor() genuinely returns it. Every key this
+        // resolver can EVER emit is package-known (it's the exact vocabulary in
+        // DefaultEntitlementResolver::entitlementsFor()), so beam-accounts pushes its own keys in
+        // here — additively (array_unique) — rather than requiring every host to hand-list them.
+        // Realm-parameterized keys (`author-ux-{realm}`) are derived from beam-core's RealmRegistry
+        // (operator/tenant/site/user by default, plus any host `#[Realm]` preset), so a host that
+        // registers a new realm gets its gate for free too.
+        $this->registerEntitlementKeys();
+
         // The share-link scope-handler registry (tracer 06) — a singleton so a host registers
         // its handlers (in boot) on the same instance the /s/{token} resolver reads.
         $this->app->singleton(ShareLinkScopes::class);
@@ -203,6 +218,31 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
     }
 
     /**
+     * Push every entitlement key {@see DefaultEntitlementResolver::entitlementsFor()} can ever emit
+     * into `config('beam.core.entitlements.keys')` — additively, so a host's own extra keys survive —
+     * so beam-core's `registerEntitlementAbilities()` actually `Gate::define()`s them. Runs during
+     * `register()` (not `boot()`/`packageBooted()`): Laravel completes every provider's register phase
+     * before any provider's boot phase, so this is guaranteed to land before beam-core reads the key
+     * list, regardless of provider discovery order between the two packages.
+     */
+    protected function registerEntitlementKeys(): void
+    {
+        $realms = array_keys($this->app->make(RealmRegistry::class)->all());
+
+        $keys = [
+            'author-ux',
+            'os.enter',
+            'app-operator',
+            ...array_map(static fn (string $realm): string => "author-ux-{$realm}", $realms),
+        ];
+
+        config(['beam.core.entitlements.keys' => array_values(array_unique([
+            ...(array) config('beam.core.entitlements.keys', []),
+            ...$keys,
+        ]))]);
+    }
+
+    /**
      * `PackageServiceProvider::boot()` runs the package-tools plumbing (config publish/merge,
      * migrations publish) THEN calls this hook — so everything the engine's own former `boot()`
      * did (auth/middleware/routes/Fortify/etc) now runs from here, mirroring exactly how
@@ -225,6 +265,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         $this->bootFrameResources();
         $this->bootSeed();
         $this->bootTeamsMigrations();
+        $this->bootOperatorShell();
 
         // Self-register into beam-core's install manifest (order 5: users/permission_tables are
         // foundational — publish early, ahead of the default-order-100 packages that FK into them)
@@ -235,7 +276,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         if ($this->app->bound(BeamInstallManifest::class)) {
             $this->app->make(BeamInstallManifest::class)->register(
                 package: 'splicewire/laravel-beam-accounts',
-                publishTags: ['beam-accounts-config', 'beam-accounts-migrations'],
+                publishTags: ['beam-accounts-config', 'beam-accounts-migrations', 'beam-accounts-operator-shell'],
                 migrates: true,
                 order: 5,
             );
@@ -312,6 +353,52 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
 
         $this->loadMigrationsFrom(database_path('migrations/teams'));
         $this->loadMigrationsFrom(database_path('migrations/tenant'));
+    }
+
+    /**
+     * The OOTB `/operator` front-end realm — the piece "install beam, the operator realm just works"
+     * was still missing (ADR-0156's `#[OperatorRealm]` preset + `DefaultEntitlementResolver`'s
+     * `app-operator` entitlement already exist; nothing rendered anything at the route). A thin stats
+     * roll-up landing, matching `laravel-beam-starter`'s own hand-authored `operator/dashboard.tsx` —
+     * NOT the windowed `/os` desktop (retired; `@splicewire/beam-ux/shell`'s `DefaultOsDesktop` still
+     * exists for a host that wants that shape, it just isn't what this route mounts).
+     *
+     * Two independent overrides, mirroring `bootDemo()`/`bootShareLinks()`'s idiom:
+     *  - `config('beam.accounts.operator_shell.enabled', true)` — a host turns this off and defines its
+     *    own `/operator` entirely.
+     *  - `Route::has('operator.home')` — a host that already named its own route `operator.home` (e.g.
+     *    by copying this route into its own `routes/web.php` to customize it) is never double-registered.
+     *
+     * The page itself (`resources/js/pages/operator/dashboard.tsx`) ships as a publish-only stub — see
+     * {@see self::packageBooted()}'s `publishes()` call below — so `splicewire:beam:install` syncs the
+     * real .tsx file onto the host's disk (editable afterward like any other page) instead of the
+     * package trying to inject an un-editable component from node_modules.
+     */
+    protected function bootOperatorShell(): void
+    {
+        if (! config('beam.accounts.operator_shell.enabled', true)) {
+            return;
+        }
+
+        if (Route::has('operator.home')) {
+            return;
+        }
+
+        $this->publishes([
+            __DIR__.'/../stubs/js/pages/operator/dashboard.tsx' => resource_path('js/pages/operator/dashboard.tsx'),
+        ], 'beam-accounts-operator-shell');
+
+        Route::middleware(['web', 'auth', 'can:entitlement:app-operator'])
+            ->get('/operator', function (Request $request) {
+                $user = $request->user();
+                $model = accountUserModel();
+
+                return Inertia::render('operator/dashboard', [
+                    'staff' => fn () => ['name' => $user->name, 'email' => $user->email],
+                    'stats' => fn () => ['users' => $model::count()],
+                ]);
+            })
+            ->name('operator.home');
     }
 
     /**
