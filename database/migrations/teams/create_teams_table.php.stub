@@ -29,6 +29,11 @@ use Splicewire\Beam\Beam;
  * central connection (audiostud does, top-level); a broker routes the whole estate into the
  * per-tenant set so each customer gets their own team rows (teams.md#broker-flavor). The
  * current-schema guard keeps it idempotent wherever the host lands it.
+ *
+ * Unexercised: no host has ever actually placed this estate per-tenant — the two real consumers
+ * (audiostud, `beam`) both land it central. splicewire-app, the family's one Stancl broker, opts
+ * out of the estate entirely (`register_migrations` false; it runs its own separate
+ * `tenant_users`-based team system), so it is not evidence for the broker branch above.
  */
 return new class extends Migration
 {
