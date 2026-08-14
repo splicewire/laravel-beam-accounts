@@ -204,6 +204,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         $this->bootShareLinks();
         $this->bootFrameResources();
         $this->bootSeed();
+        $this->bootTeamsMigrations();
 
         // Self-register into beam-core's install manifest (order 5: users/permission_tables are
         // foundational — publish early, ahead of the default-order-100 packages that FK into them)
@@ -263,6 +264,34 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             order: 10,
             configGate: 'beam.accounts.demo.seed_users',
         );
+    }
+
+    /**
+     * `teams/`/`tenant/` ship as publish-only stubs (spatie/laravel-package-tools `hasMigrations()`)
+     * into subdirectories the stock framework migrator never recurses into — the SAME footgun
+     * `shared/` has (beam-install-turnkey trap 1), just without a fix until now: beam-core's own
+     * `BeamServiceProvider` registers `database/migrations/shared` for a single-tenant host, but
+     * nothing registered `teams/`/`tenant/`, so a host that ran `vendor:publish` + `migrate` (or
+     * even `splicewire:beam:install`, whose own verify-provisioning pass has no trap for this) got
+     * "Nothing to migrate" silently — the whole accounts/teams estate never landed.
+     *
+     * Mirrors beam-core's `sharedMigrationsOwnedByTenancy()` guard exactly: GUARDED on the tenancy
+     * provider not being present, so this never double-registers on a multi-tenant host (that
+     * package owns routing `tenant/` into its per-tenant pass, and `teams/` into whichever side
+     * `config/beam/accounts.php`'s multitenancy placement calls for). A single-tenant host — every
+     * host today; no consumer has ever placed this estate per-tenant (see
+     * `teams/create_visibilities_table`'s docblock) — runs both on its one central connection.
+     * `loadMigrationsFrom` over an empty/missing directory is a harmless no-op, so this is safe
+     * before the first publish too.
+     */
+    protected function bootTeamsMigrations(): void
+    {
+        if (class_exists('Splicewire\Beam\Tenancy\BeamTenancyServiceProvider')) {
+            return;
+        }
+
+        $this->loadMigrationsFrom(database_path('migrations/teams'));
+        $this->loadMigrationsFrom(database_path('migrations/tenant'));
     }
 
     /**
