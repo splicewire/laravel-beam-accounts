@@ -62,6 +62,14 @@ class InvitationData extends Data
         public ?string $acceptedAt,
         #[Column(label: 'Sent', sort: 3)]
         public ?string $createdAt,
+        // Detail-only: an opaque actor id and a mtime are not list columns. Both are nullable
+        // because the two tables this shape serves disagree — beam-accounts' `invitations.invited_by`
+        // is nullable (an invite can predate the stamp), while beam-tenancy's `tenant_invitations`
+        // makes it NOT NULL. The wider type is the one that holds for both.
+        #[NotInList]
+        public ?string $invitedBy = null,
+        #[NotInList]
+        public ?string $updatedAt = null,
     ) {}
 
     /**
@@ -124,6 +132,8 @@ class InvitationData extends Data
             role: $invitation->role,
             acceptedAt: $invitation->accepted_at?->toIso8601String(),
             createdAt: $invitation->created_at?->toIso8601String(),
+            invitedBy: $invitation->invited_by === null ? null : (string) $invitation->invited_by,
+            updatedAt: $invitation->updated_at?->toIso8601String(),
         );
     }
 }
