@@ -19,6 +19,7 @@ use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
 use Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver;
+use Splicewire\Beam\Accounts\Console\GenerateOidcSigningKeyCommand;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
@@ -41,6 +42,8 @@ use Splicewire\Beam\Accounts\Http\Controllers\ShareLinkController;
 use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Models\ShareLink;
+use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
+use Splicewire\Beam\Accounts\Oidc\SigningKey;
 use Splicewire\Beam\Accounts\Sharing\ShareLinkScopes;
 use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
@@ -214,6 +217,17 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         // `bind` so a host override wins with the same lazy semantics.
         $this->app->bind(AuthUserExtrasContributor::class, NullAuthUserExtras::class);
 
+        // The OIDC-issuer module's two primitives, always bindable from PHP regardless of the
+        // `oidc.enabled` gate (mirrors the `keys` seam's DeterministicToken posture) — only the
+        // host-facing command + routes are config-gated, in bootOidc() below.
+        $this->app->singleton(SigningKey::class, fn () => new SigningKey(
+            path: config('beam.accounts.oidc.signing_key_path'),
+        ));
+        $this->app->singleton(IdentityTokenMinter::class, fn ($app) => new IdentityTokenMinter(
+            key: $app->make(SigningKey::class),
+            issuer: rtrim((string) config('beam.accounts.oidc.issuer'), '/'),
+        ));
+
         if ($this->app->runningInConsole()) {
             $this->commands([LoginAsCommand::class]);
         }
@@ -263,6 +277,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         $this->bootApiGuardEnforcement();
         $this->bootDemo();
         $this->bootKeys();
+        $this->bootOidc();
         $this->bootShareLinks();
         $this->bootFrameResources();
         $this->bootSeed();
@@ -660,6 +675,32 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([MintKeyCommand::class]);
         }
+    }
+
+    /**
+     * The per-host OIDC-issuer module (tenant-database-upsell ticket 16): a self-hosted
+     * `/.well-known/openid-configuration` + `/.well-known/jwks.json` pair so this host can
+     * prove its own identity to an OIDC-federation consumer (GCP Workload Identity Federation,
+     * most immediately) with no static secret ever leaving the box. Default-off, mirroring the
+     * `keys` seam — the primitives (SigningKey/IdentityTokenMinter) are always bound above;
+     * only the public routes + the host-facing key-generation command are gated here.
+     *
+     * Registered WITHOUT the `web` middleware group deliberately: a federation consumer polls
+     * this endpoint on its own schedule (GCP caches a WIF provider's JWKS but still refetches
+     * periodically), and there is nothing here a session/CSRF stack needs to protect — the
+     * entire point of a JWKS route is that it's safe to serve to anyone, unauthenticated.
+     */
+    protected function bootOidc(): void
+    {
+        if (! config('beam.accounts.oidc.enabled', false)) {
+            return;
+        }
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([GenerateOidcSigningKeyCommand::class]);
+        }
+
+        Route::group([], __DIR__.'/../routes/oidc.php');
     }
 
     /**

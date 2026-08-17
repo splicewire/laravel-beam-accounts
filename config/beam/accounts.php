@@ -137,6 +137,28 @@ return [
         'table' => 'personal_access_tokens',
     ],
 
+    // The per-host OIDC-ISSUER seam (tenant-database-upsell ticket 16): tower proves its own
+    // identity to any OIDC-federation-capable consumer (GCP Workload Identity Federation,
+    // most immediately) via a self-hosted JWKS + short-lived self-signed JWTs, never a static
+    // secret. Per-host, never cross-host — mirrors the `keys` seam's posture exactly, just for
+    // an outbound identity instead of an inbound bearer. Default-off; a host turns this on,
+    // runs `splicewire:beam:accounts:oidc:generate-signing-key` once, and the
+    // `/.well-known/openid-configuration` + `/.well-known/jwks.json` routes go live.
+    'oidc' => [
+        'enabled' => env('ACCOUNT_OIDC_ENABLED', false),
+
+        // Tower's issuer URL — must be the real, publicly-reachable HTTPS origin a federation
+        // consumer's own outbound fetch of `{issuer}/.well-known/openid-configuration` resolves
+        // against. Defaults to APP_URL; override only if the issuer must differ (e.g. a
+        // dedicated subdomain).
+        'issuer' => env('ACCOUNT_OIDC_ISSUER', rtrim((string) env('APP_URL', 'http://localhost'), '/')),
+
+        // Where the RSA signing keypair lives on disk. Outside the webroot and outside any
+        // publish-only stub estate — this is host-generated secret material, never shipped by
+        // the package and never checked in.
+        'signing_key_path' => env('ACCOUNT_OIDC_SIGNING_KEY_PATH', storage_path('app/private/oidc-signing-key.pem')),
+    ],
+
     // Reusable capability links (ADR-0009, tracer 05): the ShareLink primitive + ShareLinks
     // action are always callable from PHP; this flag gates the HOST-FACING affordance (the
     // satellite's /s/{token} resolver + copy-link UI, tracer 06). Mirrors the `keys`/`api`
