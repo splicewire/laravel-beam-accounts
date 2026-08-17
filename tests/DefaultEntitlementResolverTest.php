@@ -15,7 +15,7 @@ use stdClass;
 
 /**
  * The OOTB DefaultEntitlementResolver post-ACC-01: `is_staff` is gone entirely. A principal resolves
- * `author-ux-{realm}` (+ the coarse `author-ux` alias, + `os.enter`/`app-operator` for the `operator`
+ * `ux.{realm}.author` (+ the coarse `ux.author` alias, + `os.enter`/`os.operate` for the `operator`
  * realm) off `manage` grants an Owner/Admin-held Team holds on a realm's root — data, not a flag. A
  * host-declared resolver still wins over the default.
  */
@@ -46,12 +46,12 @@ class DefaultEntitlementResolverTest extends TestCase
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
 
         $this->assertEqualsCanonicalizing(
-            ['author-ux-site', 'author-ux'],
+            ['ux.site.author', 'ux.author'],
             $resolver->entitlementsFor($owner)
         );
     }
 
-    public function test_an_admin_of_a_team_holding_the_operator_realm_grant_also_resolves_os_enter_and_app_operator(): void
+    public function test_an_admin_of_a_team_holding_the_operator_realm_grant_also_resolves_os_enter_and_os_operate(): void
     {
         $team = $this->team();
         $admin = $this->memberOf($team, Role::Admin);
@@ -61,7 +61,7 @@ class DefaultEntitlementResolverTest extends TestCase
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
 
         $this->assertEqualsCanonicalizing(
-            ['author-ux-operator', 'author-ux', 'os.enter', 'app-operator'],
+            ['ux.operator.author', 'ux.author', 'os.enter', 'os.operate'],
             $resolver->entitlementsFor($admin)
         );
     }

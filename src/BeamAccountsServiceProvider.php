@@ -175,12 +175,12 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         // Binding the resolver alone is NOT enough to turn the gates on: beam-core's
         // registerEntitlementAbilities() only defines a Laravel Gate ability for keys it already
         // knows about (config('beam.core.entitlements.keys')) — an UNLISTED key is simply never
-        // `Gate::define()`'d, so `can:entitlement:app-operator` 403s even when
+        // `Gate::define()`'d, so `can:entitlement:os.operate` 403s even when
         // DefaultEntitlementResolver::entitlementsFor() genuinely returns it. Every key this
         // resolver can EVER emit is package-known (it's the exact vocabulary in
         // DefaultEntitlementResolver::entitlementsFor()), so beam-accounts pushes its own keys in
         // here — additively (array_unique) — rather than requiring every host to hand-list them.
-        // Realm-parameterized keys (`author-ux-{realm}`) are derived from beam-core's RealmRegistry
+        // Realm-parameterized keys (`ux.{realm}.author`) are derived from beam-core's RealmRegistry
         // (operator/tenant/site/user by default, plus any host `#[Realm]` preset), so a host that
         // registers a new realm gets its gate for free too.
         $this->registerEntitlementKeys();
@@ -232,10 +232,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         $realms = array_keys($this->app->make(RealmRegistry::class)->all());
 
         $keys = [
-            'author-ux',
+            'ux.author',
             'os.enter',
-            'app-operator',
-            ...array_map(static fn (string $realm): string => "author-ux-{$realm}", $realms),
+            'os.operate',
+            ...array_map(static fn (string $realm): string => "ux.{$realm}.author", $realms),
         ];
 
         config(['beam.core.entitlements.keys' => array_values(array_unique([
@@ -367,7 +367,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
     /**
      * The OOTB `/operator` front-end realm — the piece "install beam, the operator realm just works"
      * was still missing (ADR-0156's `#[OperatorRealm]` preset + `DefaultEntitlementResolver`'s
-     * `app-operator` entitlement already exist; nothing rendered anything at the route). A thin stats
+     * `os.operate` entitlement already exist; nothing rendered anything at the route). A thin stats
      * roll-up landing, matching `laravel-beam-starter`'s own hand-authored `operator/dashboard.tsx` —
      * NOT the windowed `/os` desktop (retired; `@splicewire/beam-ux/shell`'s `DefaultOsDesktop` still
      * exists for a host that wants that shape, it just isn't what this route mounts).
@@ -397,7 +397,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             __DIR__.'/../stubs/js/pages/operator/dashboard.tsx' => resource_path('js/pages/operator/dashboard.tsx'),
         ], 'beam-accounts-operator-shell');
 
-        Route::middleware(['web', 'auth', 'can:entitlement:app-operator'])
+        Route::middleware(['web', 'auth', 'can:entitlement:os.operate'])
             ->get('/operator', function (Request $request) {
                 $user = $request->user();
                 $model = accountUserModel();
@@ -536,31 +536,32 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
     }
 
     /**
-     * The bare `author-ux` / `author-ux-{realm}` Gate aliases — normalized here instead of every host
+     * The bare `ux.author` / `ux.{realm}.author` Gate aliases — normalized here instead of every host
      * hand-rolling the identical pair (found byte-for-byte duplicated, docblock and all, in both
-     * `audiostud`'s and `laravel-beam-starter`'s own `AppServiceProvider`). `Gate::define()` is
+     * `audiostud`'s and `laravel-beam-starter`'s own `AppServiceProvider`, back when these were named
+     * `author-ux`/`author-ux-{realm}` — renamed to the dot-cascade fleet-wide). `Gate::define()` is
      * last-write-wins by name, so a host that still defines its own version of either (e.g. to layer
      * extra logic on top) overrides this cleanly — nothing here needs a guard.
      *
-     * `author-ux` reads through the `entitlement:author-ux` Gate beam-core's registerEntitlementAbilities()
-     * defines (now that {@see self::registerEntitlementKeys()} lists it). `author-ux-{realm}` has no
+     * `ux.author` reads through the `entitlement:ux.author` Gate beam-core's registerEntitlementAbilities()
+     * defines (now that {@see self::registerEntitlementKeys()} lists it). `ux.{realm}.author` has no
      * `entitlement:` Gate to ride — it's realm-PARAMETERIZED, and beam-core only defines abilities for
      * the flat key list — so it reads the resolver's raw key list directly instead, over beam-core's
      * RealmRegistry (operator/tenant/site/user by default, plus any host `#[Realm]` preset).
      *
-     * Deliberately does NOT fall back to `author-ux` for the per-realm check: `DefaultEntitlementResolver`
-     * composes the coarse `author-ux` key as soon as ANY single realm is granted, so an
-     * `author-ux-{realm} = author-ux || ...` shortcut would let a grant on just ONE realm leak authoring
+     * Deliberately does NOT fall back to `ux.author` for the per-realm check: `DefaultEntitlementResolver`
+     * composes the coarse `ux.author` key as soon as ANY single realm is granted, so a
+     * `ux.{realm}.author = ux.author || ...` shortcut would let a grant on just ONE realm leak authoring
      * into every OTHER realm — defeating the whole point of the per-realm grain. A grantee of every realm
-     * still authors every realm (each `author-ux-{realm}` key composes independently); a narrowly-granted
+     * still authors every realm (each `ux.{realm}.author` key composes independently); a narrowly-granted
      * principal now correctly stays narrow.
      */
     protected function bootAuthoringGates(): void
     {
-        Gate::define('author-ux', fn ($user) => $user->can('entitlement:author-ux'));
+        Gate::define('ux.author', fn ($user) => $user->can('entitlement:ux.author'));
 
         foreach (array_keys($this->app->make(RealmRegistry::class)->all()) as $realm) {
-            $ability = "author-ux-{$realm}";
+            $ability = "ux.{$realm}.author";
 
             Gate::define($ability, fn ($user) => in_array(
                 $ability,

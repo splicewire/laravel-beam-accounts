@@ -99,7 +99,7 @@ it('skips seeding when demo affordances are disabled', function () {
 
 // ── ACC-01: the Demo Team's grant-derived reach — no separate "Staff" subject needed ──────────
 
-it('grants the demo team manage on every REGISTERED realm root (not just already-provisioned ones), making Owner/Admin author-ux-verifiable and Member denied', function () {
+it('grants the demo team manage on every REGISTERED realm root (not just already-provisioned ones), making Owner/Admin ux-author-verifiable and Member denied', function () {
     // Deliberately create a root for only ONE of the four base-registered realms (site/operator/
     // tenant/user) — RealmReachGrant now eagerly provisions the rest via RealmRegistry rather than
     // only granting reach onto whatever RealmRoot rows already happened to exist.
@@ -114,12 +114,12 @@ it('grants the demo team manage on every REGISTERED realm root (not just already
     $member = User::where('email', Demo::email(Role::Member->value))->first();
 
     expect($resolver->entitlementsFor($owner))->toEqualCanonicalizing([
-        'author-ux-site', 'author-ux-operator', 'author-ux-tenant', 'author-ux-user',
-        'author-ux', 'os.enter', 'app-operator',
+        'ux.site.author', 'ux.operator.author', 'ux.tenant.author', 'ux.user.author',
+        'ux.author', 'os.enter', 'os.operate',
     ]);
     expect($resolver->entitlementsFor($admin))->toEqualCanonicalizing([
-        'author-ux-site', 'author-ux-operator', 'author-ux-tenant', 'author-ux-user',
-        'author-ux', 'os.enter', 'app-operator',
+        'ux.site.author', 'ux.operator.author', 'ux.tenant.author', 'ux.user.author',
+        'ux.author', 'os.enter', 'os.operate',
     ]);
     expect($resolver->entitlementsFor($member))->toBe([]);
 });

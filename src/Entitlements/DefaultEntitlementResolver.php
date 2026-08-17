@@ -18,12 +18,18 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * reach is DATA — `manage` grants (`rushing/laravel-permission-cascade`'s `AccessGrant`/`HasVisibility`
  * directory ACL) held by a Team the principal belongs to as Owner or Admin ({@see Role::grantEligible()}
  * — Member is excluded regardless of what the team holds), on a realm's root grantable row. For each
- * granted realm the principal composes `author-ux-{realm}`; if ANY realm is granted, the coarse
- * `author-ux` alias also composes; if the `operator` realm specifically is granted, `os.enter` and
- * `app-operator` compose too — reproducing today's blanket staff capability exactly, but as a Team's
+ * granted realm the principal composes `ux.{realm}.author`; if ANY realm is granted, the coarse
+ * `ux.author` alias also composes; if the `operator` realm specifically is granted, `os.enter` and
+ * `os.operate` compose too — reproducing today's blanket staff capability exactly, but as a Team's
  * grants rather than a boolean column. No special-cased "Staff Team" identity is needed anywhere in
  * this class: any Team holding `manage` on every realm's root behaves identically to the old
  * `is_staff = true` principal.
+ *
+ * ## Naming (entitlement-dot-namespace rename)
+ *
+ * `author-ux`/`author-ux-{realm}` → `ux.author`/`ux.{realm}.author` and `app-operator` → `os.operate`
+ * — a genuine dot-cascade for the two keys that ARE "ux authoring" concepts. `os.enter` is unchanged:
+ * it already read as dot-namespaced and needed no rename.
  *
  * The realm-root lookup itself is a port ({@see RealmGrantable}) — this class never names
  * `BeamUxEntry` (the paid beam-ux model realm roots actually are), since the dependency runs
@@ -58,15 +64,15 @@ class DefaultEntitlementResolver implements EntitlementResolver
     {
         $realms = $this->grantedRealms($principal);
 
-        $keys = array_map(static fn (string $realm): string => "author-ux-{$realm}", $realms);
+        $keys = array_map(static fn (string $realm): string => "ux.{$realm}.author", $realms);
 
         if ($realms !== []) {
-            $keys[] = 'author-ux';
+            $keys[] = 'ux.author';
         }
 
         if (in_array(self::OPERATOR_REALM, $realms, true)) {
             $keys[] = 'os.enter';
-            $keys[] = 'app-operator';
+            $keys[] = 'os.operate';
         }
 
         return $this->composer->compose([], $keys);
