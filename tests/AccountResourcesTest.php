@@ -31,7 +31,7 @@ use Splicewire\Beam\Accounts\Models\PersonalAccessToken;
 use Splicewire\Beam\Accounts\Models\Team;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
-use Splicewire\Beam\Beam;
+use Splicewire\Beam\Facades\Beam;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 

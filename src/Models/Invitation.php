@@ -4,7 +4,7 @@ namespace Splicewire\Beam\Accounts\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Splicewire\Beam\Beam;
+use Splicewire\Beam\Facades\Beam;
 
 class Invitation extends Model
 {

@@ -4,7 +4,7 @@ namespace Splicewire\Beam\Accounts\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Splicewire\Beam\Beam;
+use Splicewire\Beam\Facades\Beam;
 
 /**
  * A reusable, revocable, expiring capability link (ADR-0009, tracer 05) — the primitive that

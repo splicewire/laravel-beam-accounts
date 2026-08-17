@@ -5,7 +5,7 @@ namespace Splicewire\Beam\Accounts\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Rushing\PermissionCascade\Contracts\AccessGrant as AccessGrantContract;
-use Splicewire\Beam\Beam;
+use Splicewire\Beam\Facades\Beam;
 
 /**
  * The OOTB directory-ACL grant model — a deny-capable sharing row implementing

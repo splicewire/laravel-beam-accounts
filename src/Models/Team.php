@@ -11,7 +11,7 @@ use function Splicewire\Beam\Accounts\accountUserModel;
 
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
-use Splicewire\Beam\Beam;
+use Splicewire\Beam\Facades\Beam;
 
 /**
  * The reference implementation of {@see TeamContract} — a single-DB team over beam's

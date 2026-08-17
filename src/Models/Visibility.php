@@ -5,7 +5,7 @@ namespace Splicewire\Beam\Accounts\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Rushing\PermissionCascade\Contracts\VisibilityRecord as VisibilityRecordContract;
-use Splicewire\Beam\Beam;
+use Splicewire\Beam\Facades\Beam;
 
 /**
  * The OOTB off-table reach-tier record — a `reachable` morph row implementing

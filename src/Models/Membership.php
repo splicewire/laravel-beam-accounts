@@ -10,7 +10,7 @@ use function Splicewire\Beam\Accounts\accountUserModel;
 
 use Splicewire\Beam\Accounts\Contracts\MembershipContract;
 use Splicewire\Beam\Accounts\Enums\Role;
-use Splicewire\Beam\Beam;
+use Splicewire\Beam\Facades\Beam;
 
 /**
  * The reference implementation of {@see MembershipContract} — a single seat row on
