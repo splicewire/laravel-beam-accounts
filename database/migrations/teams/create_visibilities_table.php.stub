@@ -1,0 +1,90 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Rushing\PermissionCascade\Concerns\HasVisibility;
+use Rushing\PermissionCascade\Contracts\VisibilityRecord;
+use Splicewire\Beam\Accounts\Models\AccessGrant;
+use Splicewire\Beam\Accounts\Models\Visibility;
+use Splicewire\Beam\Facades\Beam;
+
+/**
+ * The off-table reach-tier ledger — `beam_visibilities`, the table behind
+ * {@see Visibility} (permission-cascade's
+ * {@see VisibilityRecord}). Net-new, so create-only; guarded on the CURRENT schema (the
+ * tenant-schema footgun) so it is idempotent and tenant-safe.
+ *
+ * `reachable_id` is a string — a morph key that must hold both uuid-keyed hosts (beam
+ * particles/users) and bigint-keyed hosts (audiostud rows) without a per-host column type,
+ * same as {@see AccessGrant}'s `grantable_id`/`grantee_id`.
+ * `tier` is the cascade's nullable string vocabulary (`private`/`tenant`/`platform`, or a
+ * host's own); `listed` is the optional discoverability flag a host opts into via
+ * {@see HasVisibility::visibilityListedColumn()}.
+ *
+ * TEAMS-estate, converts 1:1 alongside the rest of `teams/` (no squashing across this directory).
+ *
+ * Placement (multitenancy.md): host-placed, ONE side per host — the TEAMS estate sits deliberately
+ * outside `shared/` (both passes would stand up two divergent reach-tier ledgers) and its models
+ * pin no connection; the connection, not the model, knows the side. A single-tenant host runs it on
+ * its one central connection; a broker routes the estate into the per-tenant set so a customer's
+ * visibility tiers stay inside their own schema (teams.md#broker-flavor). The current-schema guard
+ * keeps it idempotent wherever the host lands it.
+ *
+ * Unexercised: no host has ever actually placed this estate per-tenant — the two real consumers
+ * (audiostud, `beam`) both land it central. splicewire-app, the family's one Stancl broker, opts
+ * out of the estate entirely (`register_migrations` false; it runs its own separate
+ * `tenant_users`-based team system), so it is not evidence for the broker branch above.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if ($this->existsInCurrentSchema($this->target())) {
+            return; // Idempotent re-run.
+        }
+
+        Schema::create($this->target(), function (Blueprint $table): void {
+            $table->id();
+            $table->string('reachable_type');
+            $table->string('reachable_id');   // morph key (uuid or bigint) — string for cross-host
+            $table->string('tier')->nullable();
+            $table->boolean('listed')->nullable();
+            $table->timestamps();
+
+            $table->unique(['reachable_type', 'reachable_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists($this->target());
+    }
+
+    private function target(): string
+    {
+        return Beam::table('visibilities');
+    }
+
+    /**
+     * Postgres gets the precise `information_schema` check against `current_schema()` — the
+     * tenant-schema footgun this guard exists for (`Schema::hasTable()`'s search_path can span
+     * more than the tenant's own schema). Every other driver (sqlite in a single-tenant dev host,
+     * for instance) has no multi-schema search-path to be fooled by, so the portable
+     * `Schema::hasTable()` is exact there too.
+     */
+    private function existsInCurrentSchema(string $table): bool
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            return Schema::hasTable($table);
+        }
+
+        $schema = DB::selectOne('select current_schema() as schema')->schema;
+
+        return DB::selectOne(
+            'select 1 from information_schema.tables where table_schema = ? and table_name = ?',
+            [$schema, $table],
+        ) !== null;
+    }
+};

@@ -145,6 +145,16 @@ abstract class TestCase extends Orchestra
             $table->timestamps();
         });
 
+        Schema::create(Beam::table('visibilities'), function (Blueprint $table): void {
+            $table->id();
+            $table->string('reachable_type');
+            $table->string('reachable_id');
+            $table->string('tier')->nullable();
+            $table->boolean('listed')->nullable();
+            $table->timestamps();
+            $table->unique(['reachable_type', 'reachable_id']);
+        });
+
         Schema::create(Beam::table('view_requests'), function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('requestable_type');
