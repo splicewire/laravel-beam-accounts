@@ -26,7 +26,12 @@ use Splicewire\Beam\Http\Controller;
  */
 class ProfileController extends Controller
 {
-    /** Update the caller's own name/email; echoes the same shape `GET me` returns. */
+    /**
+     * Update your profile
+     *
+     * Change your own name and email. Returns the same shape as reading your profile, so a client can
+     * swap the result straight into place.
+     */
     #[ResponseFromData(AuthUserData::class)]
     public function update(ProfileUpdateInputData $input, Request $request): ResponseBody
     {

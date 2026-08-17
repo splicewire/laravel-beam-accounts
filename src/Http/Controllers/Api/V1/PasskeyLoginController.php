@@ -29,7 +29,12 @@ class PasskeyLoginController extends Controller
     use ResolvesPasskeyCeremonies;
 
     /**
-     * Assertion challenge for the central RP. Discoverable (no user) → passwordless.
+     * Begin a passkey login
+     *
+     * Issue the challenge an authenticator signs to log in. No user is named, so any passkey registered
+     * for this site can answer it — this is the fully passwordless entry point.
+     *
+     * Send the signed result to the passkey login endpoint along with the `handle` returned here.
      */
     public function options(PasskeyChallengeStore $store, PasskeyAuthenticator $authenticator): ResponseBody
     {
@@ -45,7 +50,10 @@ class PasskeyLoginController extends Controller
     }
 
     /**
-     * Validate the assertion, resolve the user, and mint a passkey-stamped Sanctum token.
+     * Log in with a passkey
+     *
+     * Verify a signed challenge, resolve which user the passkey belongs to, and mint a bearer token for
+     * them. The token records that it was obtained by passkey.
      */
     #[ResponseFromData(AuthUserData::class)]
     public function verify(Request $request, PasskeyChallengeStore $store, PasskeyAuthenticator $authenticator): ResponseBody

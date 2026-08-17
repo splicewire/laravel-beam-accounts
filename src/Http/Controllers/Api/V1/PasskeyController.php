@@ -42,7 +42,12 @@ class PasskeyController extends Controller
         ]);
     }
 
-    /** Validate the attestation and persist a named credential for the current user. */
+    /**
+     * Register a passkey
+     *
+     * Complete passkey registration: validate the attestation produced by the authenticator against the
+     * challenge issued by the registration-options endpoint, and store it under a name the user chooses.
+     */
     public function store(Request $request, PasskeyChallengeStore $store, PasskeyAuthenticator $authenticator): ResponseBody
     {
         $validated = $request->validate([
@@ -77,7 +82,9 @@ class PasskeyController extends Controller
         return ResponseBody::from(['data' => $passkeys]);
     }
 
-    /** Rename a credential the current user owns (admin-redesign ticket 03). */
+    /** Rename a passkey
+     *
+     * Change the label on one of your own registered credentials. */
     public function update(Request $request, Passkey $passkey): ResponseBody
     {
         // laravel/passkeys registers a global `{passkey}` binding that resolves by id but is NOT
