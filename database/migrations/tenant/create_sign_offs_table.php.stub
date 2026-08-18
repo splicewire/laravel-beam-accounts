@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Splicewire\Beam\Schema\ConvergentTable;
 
 /**
  * Finality (dealer-network B3), subscriber side. A `SignOff` freezes a local
@@ -19,18 +20,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('sign_offs', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+        ConvergentTable::named('sign_offs')
+            ->define(function (Blueprint $table) {
+                $table->uuid('id')->primary();
 
-            $table->json('result');                       // the frozen ResolutionResult
-            $table->uuid('signed_by')->nullable();        // → tenant_users.id
-            $table->string('holder_scope_ref')->nullable(); // edge subject signed for (e.g. location)
-            $table->timestamp('signed_at');
+                $table->json('result');                       // the frozen ResolutionResult
+                $table->uuid('signed_by')->nullable();        // → tenant_users.id
+                $table->string('holder_scope_ref')->nullable(); // edge subject signed for (e.g. location)
+                $table->timestamp('signed_at');
 
-            $table->timestamps();
+                $table->timestamps();
 
-            $table->index('signed_at');
-        });
+                $table->index('signed_at');
+            })
+            ->assert();
     }
 
     public function down(): void

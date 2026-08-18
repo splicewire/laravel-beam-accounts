@@ -9,6 +9,7 @@ use Rushing\PermissionCascade\Contracts\VisibilityRecord;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Models\Visibility;
 use Splicewire\Beam\Facades\Beam;
+use Splicewire\Beam\Schema\ConvergentTable;
 
 /**
  * The off-table reach-tier ledger — `beam_visibilities`, the table behind
@@ -41,20 +42,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if ($this->existsInCurrentSchema($this->target())) {
-            return; // Idempotent re-run.
-        }
+        ConvergentTable::named($this->target())
+            // The current-schema predicate survives the conversion — see its docblock below for why
+            // Schema::hasTable() is the wrong question under schema-per-tenant.
+            ->existsUsing(fn (string $table): bool => $this->existsInCurrentSchema($table))
+            ->define(function (Blueprint $table): void {
+                $table->id();
+                $table->string('reachable_type');
+                $table->string('reachable_id');   // morph key (uuid or bigint) — string for cross-host
+                $table->string('tier')->nullable();
+                $table->boolean('listed')->nullable();
+                $table->timestamps();
 
-        Schema::create($this->target(), function (Blueprint $table): void {
-            $table->id();
-            $table->string('reachable_type');
-            $table->string('reachable_id');   // morph key (uuid or bigint) — string for cross-host
-            $table->string('tier')->nullable();
-            $table->boolean('listed')->nullable();
-            $table->timestamps();
-
-            $table->unique(['reachable_type', 'reachable_id']);
-        });
+                $table->unique(['reachable_type', 'reachable_id']);
+            })
+            ->assert();
     }
 
     public function down(): void

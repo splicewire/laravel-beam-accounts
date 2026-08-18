@@ -5,6 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Splicewire\Beam\Facades\Beam;
+use Splicewire\Beam\Schema\ConvergentTable;
 
 /**
  * The directory-ACL grant ledger — `beam_access_grants`, the table behind
@@ -12,7 +13,8 @@ use Splicewire\Beam\Facades\Beam;
  * Reclassified from the old host-placed `teams/` directory into SHARED, alongside
  * `create_teams_table` — see that file's docblock. Already create-only (net-new, nothing to squash);
  * only the connection-tier reclassification and the guard style changed, matching the sibling
- * shared/ files' plain `Schema::hasTable()` idempotency check.
+ * shared/ files' convergent guard (`docs/agents/convergent-migration-guards.convention.md` in
+ * laravel-beam).
  *
  * `grantable_id` AND `grantee_id` are strings — morph keys that must hold both uuid-keyed
  * hosts (beam users/threads) and bigint-keyed hosts (audiostud users/roles) without a
@@ -22,23 +24,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable($this->target())) {
-            return;
-        }
+        ConvergentTable::named($this->target())
+            ->define(function (Blueprint $table): void {
+                $table->id();
+                $table->string('grantable_type');
+                $table->string('grantable_id');   // morph key (uuid or bigint) — string for cross-host
+                $table->string('grantee_type');
+                $table->string('grantee_id');     // morph key (uuid or bigint) — string for cross-host
+                $table->string('ability');                 // view | manage
+                $table->string('effect');                  // allow | deny
+                $table->timestamps();
 
-        Schema::create($this->target(), function (Blueprint $table): void {
-            $table->id();
-            $table->string('grantable_type');
-            $table->string('grantable_id');   // morph key (uuid or bigint) — string for cross-host
-            $table->string('grantee_type');
-            $table->string('grantee_id');     // morph key (uuid or bigint) — string for cross-host
-            $table->string('ability');                 // view | manage
-            $table->string('effect');                  // allow | deny
-            $table->timestamps();
-
-            $table->index(['grantable_type', 'grantable_id']);
-            $table->index(['grantee_type', 'grantee_id']);
-        });
+                $table->index(['grantable_type', 'grantable_id']);
+                $table->index(['grantee_type', 'grantee_id']);
+            })
+            ->assert();
     }
 
     public function down(): void
