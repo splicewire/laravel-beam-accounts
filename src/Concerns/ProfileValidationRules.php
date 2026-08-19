@@ -15,18 +15,18 @@ trait ProfileValidationRules
      *                                   hint could never receive the real key without a TypeError.
      * @return array<string, array<int, ValidationRule|array<mixed>|string>>
      */
-    protected function profileRules(int|string|null $userId = null): array
+    public static function profileRules(int|string|null $userId = null): array
     {
         return [
-            'name' => $this->nameRules(),
-            'email' => $this->emailRules($userId),
+            'name' => self::nameRules(),
+            'email' => self::emailRules($userId),
         ];
     }
 
     /**
      * @return array<int, ValidationRule|array<mixed>|string>
      */
-    protected function nameRules(): array
+    public static function nameRules(): array
     {
         return ['required', 'string', 'max:255'];
     }
@@ -34,7 +34,7 @@ trait ProfileValidationRules
     /**
      * @return array<int, ValidationRule|array<mixed>|string>
      */
-    protected function emailRules(int|string|null $userId = null): array
+    public static function emailRules(int|string|null $userId = null): array
     {
         return [
             'required',

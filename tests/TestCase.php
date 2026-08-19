@@ -8,6 +8,7 @@ use Laravel\Fortify\Features;
 use Laravel\Fortify\FortifyServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
+use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Tests\Fixtures\FixtureRealmGrantable;
@@ -32,6 +33,12 @@ abstract class TestCase extends Orchestra
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             FortifyServiceProvider::class,
+            // laravel-data, so an input DTO injected as a controller parameter hydrates from the
+            // request instead of the container trying to construct it positionally. A real host gets
+            // this by package auto-discovery; testbench does not, which is why it must be listed.
+            // Its absence went unnoticed because no test exercised an injected input DTO — the
+            // Api\V1\ProfileController has taken one since HTTP-07 with no coverage behind it.
+            LaravelDataServiceProvider::class,
             // beam-core, so its BeamSeedManifest singleton binds — beam-accounts registers its
             // DemoTeamSeeder into it (bootSeed). beam-accounts hard-deps beam-core in composition.
             BeamServiceProvider::class,

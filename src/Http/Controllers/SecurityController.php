@@ -3,17 +3,25 @@
 namespace Splicewire\Beam\Accounts\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Fortify\Features;
-use Splicewire\Beam\Accounts\Http\Requests\PasswordUpdateRequest;
-use Splicewire\Beam\Accounts\Http\Requests\SecurityPageRequest;
+use Splicewire\Beam\Accounts\Data\PasswordUpdateInputData;
 
+/**
+ * The Inertia settings-security surface.
+ *
+ * `edit` took a `SecurityPageRequest` whose whole body was `rules(): return []` plus
+ * `authorize(): $this->user() !== null` — a FormRequest standing in for auth middleware. The route
+ * already runs behind the settings group's `auth` middleware, so the class asserted a condition that
+ * could not be false by the time it ran; it is gone rather than replaced.
+ */
 class SecurityController extends Controller
 {
-    public function edit(SecurityPageRequest $request): Response
+    public function edit(Request $request): Response
     {
         $props = [
             'canManageTwoFactor' => Features::canManageTwoFactorAuthentication(),
@@ -56,10 +64,10 @@ class SecurityController extends Controller
             ->all();
     }
 
-    public function update(PasswordUpdateRequest $request): RedirectResponse
+    public function update(Request $request, PasswordUpdateInputData $input): RedirectResponse
     {
         $request->user()->update([
-            'password' => $request->validated()['password'],
+            'password' => $input->password,
         ]);
 
         return back()->with('status', 'password-updated');
