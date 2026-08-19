@@ -92,9 +92,6 @@ return [
 
         // Where a successful demo login lands. Satellites point this at their home.
         'redirect' => '/',
-
-        // URL prefix for the signed login-as route.
-        'login_as_prefix' => 'account/login-as',
     ],
 
     // The "proprietary API layer" seam — a satellite's second door, for exposing its
