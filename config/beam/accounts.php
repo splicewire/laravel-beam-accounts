@@ -105,6 +105,12 @@ return [
         // and its typed foreign keys, with no data migration at all.
         'table' => null,
 
+        // The ability that means "this account is STAFF", used to refuse impersonating a peer
+        // operator. Must follow the HOST's notion of staff: numero defines `bypass-marquee` as its
+        // is_staff column, so leaving this at the estate default there would resolve false for every
+        // account and make staff impersonatable — it fails OPEN, not closed.
+        'staff_ability' => 'entitlement:os.operate',
+
         // The ability gating the ACTOR on `impersonate` — may this principal impersonate anyone?
         // The SUBJECT-side rule (not yourself, never another staff account) is UserPolicy and is not
         // configurable. audiostud gates on its own `bypass-marquee`; the estate default is the

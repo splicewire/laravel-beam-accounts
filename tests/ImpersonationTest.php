@@ -106,3 +106,14 @@ it('refuses to impersonate another staff account', function () {
 it('admits an ordinary customer', function () {
     expect((new UserPolicy)->impersonate($this->operator, $this->customer))->toBeTrue();
 });
+
+it('follows the HOST notion of staff, because the wrong key fails open', function () {
+    // numero defines its staff gate `bypass-marquee` AS the is_staff column. If the policy insisted
+    // on the estate-default `entitlement:os.operate` there, it would resolve false for every account
+    // — including staff — and quietly permit impersonating a peer operator. The refusal must follow
+    // whatever the host calls staff.
+    config()->set('beam.accounts.impersonation.staff_ability', 'bypass-marquee');
+    Gate::define('bypass-marquee', fn ($user) => $user->is($this->customer));
+
+    expect((new UserPolicy)->impersonate($this->operator, $this->customer))->toBeFalse();
+});

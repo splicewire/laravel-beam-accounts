@@ -88,9 +88,12 @@ class UserPolicy
      *    staff borrow each other's authority while the audit trail names only the borrowed identity,
      *    so privilege escalation becomes untraceable.
      *
-     * Staff is the `entitlement:os.operate` key, NOT numero's `is_staff` column — audiostud's own
-     * comment records that column as retired in favour of the entitlement, so numero was simply the
-     * older form and the entitlement is the destination.
+     * WHICH KEY MEANS "STAFF" IS THE HOST'S, via `beam.accounts.impersonation.staff_ability`. The
+     * estate default is `entitlement:os.operate` (audiostud's, whose own comment records the
+     * `is_staff` column as retired in favour of it) — but numero defines its staff gate
+     * `bypass-marquee` AS `$user->is_staff`, so a hardcoded default there would resolve false for
+     * every account and quietly make STAFF impersonatable. The check has to follow the host's own
+     * notion of staff or it fails open, which is why this is config and not a constant.
      *
      * Deliberately does NOT check that the ACTOR is staff: that is the op's `ability:`, which the
      * host binds to its own operator entitlement. This method answers "may this subject be
@@ -103,7 +106,9 @@ class UserPolicy
             return false;
         }
 
-        return ! Gate::forUser($user)->allows('entitlement:os.operate');
+        $staffAbility = config('beam.accounts.impersonation.staff_ability', 'entitlement:os.operate');
+
+        return ! Gate::forUser($user)->allows($staffAbility);
     }
 
     /**
