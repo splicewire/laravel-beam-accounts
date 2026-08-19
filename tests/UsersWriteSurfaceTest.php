@@ -2,10 +2,10 @@
 
 use Splicewire\Beam\Accounts\Actions\LogInAs;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Ops\LogInAsUser;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
-use Splicewire\Beam\Particle\Attributes\ParticleOp;
 use Splicewire\Beam\Particle\OperationKind;
 
 beforeEach(function () {
@@ -52,16 +52,20 @@ it('gates login-as to root, so an ordinary user cannot assume an identity', func
 // ── The login-as op ───────────────────────────────────────────────────────────────────────────
 
 it('declares login-as as a write op on the users resource', function () {
-    $op = (new ReflectionClass(LogInAsUser::class))
-        ->getAttributes(ParticleOp::class)[0]->newInstance();
+    $op = LogInAsUser::operation();
 
     expect($op->resource)->toBe('users')
         ->and($op->name)->toBe('login-as')
         ->and($op->kind)->toBe(OperationKind::Write)
-        ->and($op->ability)->toBe('loginAs')
         // The point of the rewrite: the subject is resolved from `{id}` against a model, not from a
         // demo-subject string. That is what made it expressible as an op at all.
-        ->and($op->model)->toBe(Splicewire\Beam\Accounts\Models\User::class);
+        ->and($op->model)->toBe(BeamAccounts::userModel())
+        // NOT an attribute literal. `Models\User` is pinned to the `central` connection and hosts
+        // swap the model routinely, so a hardcoded class would resolve {id} against the wrong table
+        // — which is exactly how this first failed.
+        ->and($op->model)->not->toBe(Splicewire\Beam\Accounts\Models\User::class)
+        // No `ability:` on purpose: a signed link is anonymous, and `ability` cannot express that.
+        ->and($op->ability)->toBeNull();
 });
 
 it('refuses to run when the demo affordances are off, whatever the policy says', function () {

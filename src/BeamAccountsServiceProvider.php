@@ -40,7 +40,6 @@ use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
-use Splicewire\Beam\Accounts\Http\Controllers\LoginAsController;
 use Splicewire\Beam\Accounts\Http\Controllers\ShareLinkController;
 use Splicewire\Beam\Accounts\Http\Middleware\SetCurrentTeamPermissions;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
@@ -56,7 +55,6 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
 use Splicewire\Beam\Install\BeamInstallManifest;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
-use Splicewire\Beam\Particle\ParticleOperationRegistry;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 use Splicewire\Beam\Realm\RealmRegistry;
 use Splicewire\Beam\Seed\BeamSeedManifest;
@@ -485,17 +483,6 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             UserData::class,
         ];
 
-        // The `users` operations. REGISTERED here, MOUNTED by the host — the same split `users`
-        // itself already lives under (this package registers the resource into the registry and
-        // mounts no `Route::particleResource('users', …)`). Registration is what makes an op
-        // registry-reachable, permission-bearing and codegen-visible; a host that wants the HTTP
-        // route adds `Route::particleOps('users', 'users', [LogInAsUser::class])` in its own group,
-        // where it also decides the prefix and middleware.
-        $this->app->afterResolving(
-            ParticleOperationRegistry::class,
-            fn () => app(AttributedParticleDiscovery::class)->registerClass(LogInAsUser::class),
-        );
-
         // Registered via afterResolving so it lands regardless of the beam↔beam-accounts boot order.
         $this->app->afterResolving(
             ParticleResourceRegistry::class,
@@ -691,11 +678,19 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             return;
         }
 
-        Route::middleware('web')
-            ->prefix(config('beam.accounts.demo.login_as_prefix', 'account/login-as'))
-            ->group(function () {
-                Route::get('{subject}', LoginAsController::class)->name('splicewire.account.login-as');
-            });
+        // The signed browser link now targets the OPERATION route (`users/{id}/op/login-as`) rather
+        // than a bespoke `account/login-as/{subject}` controller. Mounted GET because a human clicks
+        // it — `particleOp` takes the verb as an option precisely so a signed magic-link can be one.
+        // The op is already registered (see bootFrameResources), so this mounts by bare name.
+        //
+        // A host wanting the JSON/API half mounts the same op as POST in its own group; the handler
+        // returns AuthUserData there and a redirect here, off one declaration.
+        // `particleOps` with a runtime object REGISTERS and MOUNTS in one call, so the operation
+        // and its route share one demo gate — when demo is off neither exists, which is what the
+        // retired bespoke route did too.
+        Route::middleware('web')->group(function () {
+            Route::particleOps('users', 'users', [LogInAsUser::operation()], ['method' => 'get']);
+        });
     }
 
     /**

@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\URL;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 
 /**
@@ -35,10 +36,24 @@ class LoginAsCommand extends Command
 
         $minutes = (int) $this->option('minutes');
 
+        // Resolve the subject KEY to the demo user's id: the link now targets the particle operation
+        // `users/{id}/op/login-as`, which resolves `{id}` against the user model like every other op.
+        // The key stays the CLI's argument — it is the nicer thing to type — and the mapping to a
+        // user happens here, once, instead of on every request the old bespoke route served.
+        $user = BeamAccounts::userModel()::query()
+            ->where('email', BeamDemo::email($subject))
+            ->first();
+
+        if ($user === null) {
+            $this->error("Demo subject [{$subject}] has no user yet. Seed it first (`db:seed --class=DemoTeamSeeder`).");
+
+            return self::FAILURE;
+        }
+
         $url = URL::temporarySignedRoute(
-            'splicewire.account.login-as',
+            'users.op.login-as',
             now()->addMinutes($minutes),
-            ['subject' => $subject],
+            ['id' => $user->getKey()],
         );
 
         $this->info("Signed login link for demo {$subject} ({$minutes} min):");

@@ -68,25 +68,33 @@ it('is idempotent', function () {
     expect(User::where('email', 'like', 'demo-%')->count())->toBe(count(BeamDemo::keys()));
 });
 
-it('logs in as a demo subject through the signed route', function () {
+it('logs in as a demo subject through the operation route', function () {
     seedDemo();
 
-    $this->get('/account/login-as/'.Role::Owner->value)->assertRedirect('/');
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+
+    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertRedirect('/');
 
     expect(auth()->check())->toBeTrue();
     expect(auth()->user()->email)->toBe(BeamDemo::email(Role::Owner->value));
 });
 
-it('404s an unknown demo subject', function () {
+it('404s an id that resolves to no user', function () {
     seedDemo();
 
-    $this->get('/account/login-as/nobody')->assertNotFound();
+    // The op resolves {id} against the user model, so an unknown SUBJECT is no longer the failure
+    // mode — an unresolvable id is, and findOrFail is what answers it.
+    $this->get('/users/999999/op/login-as')->assertNotFound();
 });
 
-it('403s the login-as route when demo affordances are disabled', function () {
+it('403s the login-as operation when demo affordances are disabled', function () {
+    seedDemo();
+
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+
     config()->set('beam.accounts.demo.enabled', false);
 
-    $this->get('/account/login-as/'.Role::Owner->value)->assertForbidden();
+    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertForbidden();
 });
 
 it('skips seeding when demo affordances are disabled', function () {
