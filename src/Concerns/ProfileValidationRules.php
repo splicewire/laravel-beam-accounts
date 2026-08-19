@@ -4,8 +4,7 @@ namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
-
-use function Splicewire\Beam\Accounts\accountUserModel;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 
 trait ProfileValidationRules
 {
@@ -43,8 +42,8 @@ trait ProfileValidationRules
             'email',
             'max:255',
             $userId === null
-                ? Rule::unique(accountUserModel())
-                : Rule::unique(accountUserModel())->ignore($userId),
+                ? Rule::unique(BeamAccounts::userModel())
+                : Rule::unique(BeamAccounts::userModel())->ignore($userId),
         ];
     }
 }

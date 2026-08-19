@@ -4,29 +4,33 @@ namespace Splicewire\Beam\Accounts\Frame\Sources;
 
 use Illuminate\Contracts\Pagination\CursorPaginator as CursorPaginatorContract;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection;
 use Schemastud\Frame\Contracts\ResolvedUnionItem;
 use Schemastud\Frame\Contracts\UnionQuery;
 use Schemastud\Frame\Contracts\UnionSource;
-
-use function Splicewire\Beam\Accounts\accountCurrentTeam;
-
+use Splicewire\Beam\Accounts\Concerns\HasMembers;
 use Splicewire\Beam\Accounts\Data\MembershipData;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Models\Membership;
 
 /**
  * The team-members union source (Frame OS ticket 20 — promoted from tower's
  * `Splicewire\Tower\Frame\Sources\MembershipSource`, now domain-neutral in beam-accounts).
  *
- * Members are a MODEL-LESS resource: the list is the current team's membership PIVOT (role +
- * joinedAt), not a plain user query. A member row carries pivot columns a `Data::from(user)`
- * cannot reach, and "who is a member" is a per-team pivot scope, so this can neither be a
- * model-backed `#[ParticleResource]` nor a scoped user query — it adapts the pivot read to
- * Frame's {@see UnionSource} contract and rides beam-core's generic `source:` widening. LIST-ONLY
- * by construction.
+ * Source-backed, not model-backed — and the reason is DOMAIN-NEUTRALITY, not the absence of a
+ * model. The package does ship {@see Membership}, a real Eloquent model on `beam_memberships`;
+ * `Team::memberships()` uses it. What it cannot do is stand for *every* host's membership: a host
+ * whose team lives on a foreign pivot ({@see HasMembers} — the app's `Tenant` over `tenant_users`,
+ * uuid keys, `removed_at`) has no `Membership` rows at all. A `#[ParticleResource]` names ONE
+ * `model:`, so a model-backed declaration would bind this resource to beam's own table and break
+ * exactly the hosts the trait exists to serve. Hence the union-source route: it reads whatever
+ * pivot the host's `members()` relation exposes and adapts it to Frame's {@see UnionSource}
+ * contract, riding beam-core's generic `source:` widening. LIST-ONLY by construction.
  *
- * DOMAIN-NEUTRAL: the team is {@see accountCurrentTeam()} (a host binds its own scope resolver).
+ * DOMAIN-NEUTRAL: the team is {@see BeamAccounts::currentTeam()} (a host binds its own scope resolver).
  * beam resolves the instance off the container at request time, so no explicit binding is needed.
  */
 class MembershipSource implements UnionSource
@@ -71,14 +75,26 @@ class MembershipSource implements UnionSource
      */
     protected function stream(): Collection
     {
-        $team = accountCurrentTeam();
+        $team = BeamAccounts::currentTeam();
 
         if ($team === null || ! method_exists($team, 'members')) {
             return collect();
         }
 
-        return $team->members()
-            ->get()
+        // `members()` has two legal return shapes across the hosts this source serves, and calling
+        // `->get()` unconditionally is wrong for one of them: beam's own {@see Models\Team::members()}
+        // returns a `BelongsToMany` (needs `->get()`), while {@see HasMembers::members()} — the trait a
+        // foreign-pivot host uses — already returns a `get()`-ed Collection. `Collection::get()`
+        // requires a `$key`, so the unconditional call threw `ArgumentCountError` on every members
+        // list for a `HasMembers` host, and the `method_exists()` guard above passes for both, which
+        // is what hid it.
+        $members = $team->members();
+
+        if ($members instanceof Relation) {
+            $members = $members->get();
+        }
+
+        return $members
             ->map(fn (Model $user) => new MembershipData(
                 id: (string) $user->getKey(),
                 name: $user->name,

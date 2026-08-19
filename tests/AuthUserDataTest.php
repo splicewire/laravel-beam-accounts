@@ -45,7 +45,7 @@ it('mirrors a null access token', function () {
 
 it('reports isRoot for a central Root user', function () {
     $user = User::create(['name' => 'Root', 'email' => 'root@example.test']);
-    // Root is assigned on the central (null) team — CentralRoot flips there to check.
+    // Root is assigned on the central (null) team — BeamAccounts::isRoot() flips there to check.
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     $role = Role::create(['name' => 'Root', 'guard_name' => 'web', 'team_id' => null]);
     $user->assignRole($role);

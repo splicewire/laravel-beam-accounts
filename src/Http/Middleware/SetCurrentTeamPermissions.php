@@ -5,8 +5,7 @@ namespace Splicewire\Beam\Accounts\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Spatie\Permission\PermissionRegistrar;
-
-use function Splicewire\Beam\Accounts\accountGuard;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 
 /**
  * Bind spatie's team scope to the authenticated user's current team for the
@@ -17,7 +16,7 @@ class SetCurrentTeamPermissions
 {
     public function handle(Request $request, Closure $next)
     {
-        $user = $request->user(accountGuard());
+        $user = $request->user(BeamAccounts::guard());
 
         if ($user && method_exists($user, 'currentTeamOrPersonal')) {
             $team = $user->currentTeamOrPersonal();

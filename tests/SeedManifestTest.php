@@ -1,12 +1,13 @@
 <?php
 
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
+use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Seed\BeamSeedManifest;
 
 /*
  * beam-accounts registers its DemoTeamSeeder into beam-core's package-registered seed manifest
  * (splicewire:beam:seed), gated by `beam.accounts.demo.seed_users` so a production `beam:seed` never
- * fabricates demo subjects. The gate mirrors Demo::enabled() — null resolves to non-production.
+ * fabricates demo subjects. The gate mirrors BeamDemo::enabled() — null resolves to non-production.
  */
 
 it('registers the DemoTeamSeeder into the beam seed manifest, gated', function () {

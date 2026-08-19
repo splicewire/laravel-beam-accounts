@@ -5,11 +5,9 @@ namespace Splicewire\Beam\Accounts\Fortify;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
-
-use function Splicewire\Beam\Accounts\accountUserModel;
-
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
@@ -49,7 +47,7 @@ class CreateNewUser implements CreatesNewUsers
      */
     protected function createUser(array $input): Authenticatable
     {
-        $model = accountUserModel();
+        $model = BeamAccounts::userModel();
 
         return $model::create([
             'name' => $input['name'],

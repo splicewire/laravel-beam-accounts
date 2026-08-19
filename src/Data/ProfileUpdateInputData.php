@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Data\Data;
 
 /**
@@ -29,7 +30,7 @@ class ProfileUpdateInputData extends Data
      * through a transient carrier — the name/email policy stays sourced from the one beam-accounts concern.
      *
      * The email rule is unique-ignore-self keyed on the authenticated user's id (the principal in a tenant
-     * context is a TenantUser whose id mirrors the central User of record; `accountUserModel()` maps the
+     * context is a TenantUser whose id mirrors the central User of record; `BeamAccounts::userModel()` maps the
      * uniqueness back to the central users table). The route's `auth:sanctum` tier guarantees a user on a
      * real request — the null-safe access is only exercised by Scribe's rules() introspection (no auth
      * context), where `ignore(null)` is a harmless no-op.

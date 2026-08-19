@@ -4,7 +4,7 @@ use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Enums\Role;
-use Splicewire\Beam\Accounts\Support\Demo;
+use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Tests\Fixtures\RealmRoot;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
@@ -24,30 +24,30 @@ function seedDemo(): void
 it('derives the demo roster from the Role enum plus a solo subject', function () {
     // No parallel list: the roster IS Role::values() (each a shared-team subject) plus the
     // one structural extra, solo. Add a Role case → the roster grows with no seeder edit.
-    expect(Demo::keys())->toBe([...Role::values(), 'solo']);
+    expect(BeamDemo::keys())->toBe([...Role::values(), 'solo']);
 
     foreach (Role::cases() as $role) {
-        expect(Demo::has($role->value))->toBeTrue();
-        expect(Demo::isShared($role->value))->toBeTrue();
-        expect(Demo::roleFor($role->value))->toBe($role);
+        expect(BeamDemo::has($role->value))->toBeTrue();
+        expect(BeamDemo::isShared($role->value))->toBeTrue();
+        expect(BeamDemo::roleFor($role->value))->toBe($role);
     }
 
-    expect(Demo::has('solo'))->toBeTrue();
-    expect(Demo::isShared('solo'))->toBeFalse();
+    expect(BeamDemo::has('solo'))->toBeTrue();
+    expect(BeamDemo::isShared('solo'))->toBeFalse();
 });
 
 it('provisions one shared-team subject per role plus a solo team-of-one', function () {
     seedDemo();
 
-    foreach (Demo::keys() as $key) {
-        expect(User::where('email', Demo::email($key))->exists())->toBeTrue();
+    foreach (BeamDemo::keys() as $key) {
+        expect(User::where('email', BeamDemo::email($key))->exists())->toBeTrue();
     }
 
-    $owner = User::where('email', Demo::email(Role::Owner->value))->first();
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->first();
 
     // Every role subject sits on the one shared Demo Team, holding exactly its role.
     foreach (Role::cases() as $role) {
-        $user = User::where('email', Demo::email($role->value))->first();
+        $user = User::where('email', BeamDemo::email($role->value))->first();
         expect($user->current_team_id)->toBe($owner->current_team_id);
 
         $membership = $user->memberships()->where('team_id', $owner->current_team_id)->first();
@@ -55,7 +55,7 @@ it('provisions one shared-team subject per role plus a solo team-of-one', functi
     }
 
     // Solo gets its own personal team-of-one — the default satellite shape.
-    $solo = User::where('email', Demo::email('solo'))->first();
+    $solo = User::where('email', BeamDemo::email('solo'))->first();
     expect($solo->personalTeam())->not->toBeNull();
     expect($solo->personalTeam()->personal_team)->toBeTrue();
     expect($solo->current_team_id)->not->toBe($owner->current_team_id);
@@ -65,7 +65,7 @@ it('is idempotent', function () {
     seedDemo();
     seedDemo();
 
-    expect(User::where('email', 'like', 'demo-%')->count())->toBe(count(Demo::keys()));
+    expect(User::where('email', 'like', 'demo-%')->count())->toBe(count(BeamDemo::keys()));
 });
 
 it('logs in as a demo subject through the signed route', function () {
@@ -74,7 +74,7 @@ it('logs in as a demo subject through the signed route', function () {
     $this->get('/account/login-as/'.Role::Owner->value)->assertRedirect('/');
 
     expect(auth()->check())->toBeTrue();
-    expect(auth()->user()->email)->toBe(Demo::email(Role::Owner->value));
+    expect(auth()->user()->email)->toBe(BeamDemo::email(Role::Owner->value));
 });
 
 it('404s an unknown demo subject', function () {
@@ -109,9 +109,9 @@ it('grants the demo team manage on every REGISTERED realm root (not just already
 
     $resolver = app(DefaultEntitlementResolver::class);
 
-    $owner = User::where('email', Demo::email(Role::Owner->value))->first();
-    $admin = User::where('email', Demo::email(Role::Admin->value))->first();
-    $member = User::where('email', Demo::email(Role::Member->value))->first();
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->first();
+    $admin = User::where('email', BeamDemo::email(Role::Admin->value))->first();
+    $member = User::where('email', BeamDemo::email(Role::Member->value))->first();
 
     expect($resolver->entitlementsFor($owner))->toEqualCanonicalizing([
         'ux.site.author', 'ux.operator.author', 'ux.tenant.author', 'ux.user.author',

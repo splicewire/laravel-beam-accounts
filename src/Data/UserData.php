@@ -9,9 +9,9 @@ use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\User;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
-use Splicewire\Beam\Accounts\Support\CentralRoot;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**
@@ -41,7 +41,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * hosts ROUTINELY subclass this model as their own `App\Models\User`, so the seam is load-bearing
  * rather than theoretical — but PHP attributes cannot read config, so a host running a bespoke user
  * model subclasses this DTO and re-declares the attribute with its own class (the escape hatch
- * {@see TokenData} documents). The runtime model seam `accountUserModel()` already resolves the host
+ * {@see TokenData} documents). The runtime model seam `BeamAccounts::userModel()` already resolves the host
  * class everywhere else in the package; only the attribute's literal needs the subclass.
  */
 #[ParticleResource(
@@ -112,7 +112,7 @@ class UserData extends Data
             permissions: method_exists($user, 'getAllPermissions')
                 ? $user->getAllPermissions()->pluck('name')->all()
                 : [],
-            isRoot: CentralRoot::isRoot($user),
+            isRoot: BeamAccounts::isRoot($user),
         );
     }
 }

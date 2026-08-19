@@ -10,9 +10,7 @@ use Laravel\Passkeys\Contracts\PasskeyUser;
 use Laravel\Passkeys\PasskeyAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-
-use function Splicewire\Beam\Accounts\accountTenantUserModel;
-
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Notifications\ResetPasswordNotification;
 use Stancl\Tenancy\Database\Concerns\ResourceSyncing;
 
@@ -25,7 +23,7 @@ use Stancl\Tenancy\Database\Concerns\ResourceSyncing;
  * boot orchestration). The base carries only the generic auth/sync state every beam host
  * shares — including the SPA-routed password-reset notification, config-seamed so it needs
  * no host override; the one host-bound name — the tenant-side user model — is
- * resolved through config (`accountTenantUserModel()`), never imported, so the base takes no
+ * resolved through config (`BeamAccounts::tenantUserModel()`), never imported, so the base takes no
  * edge onto any host `App\Models\*` class (ADR-0138).
  *
  * The base intentionally does NOT declare `implements SyncMaster`: that contract's
@@ -110,7 +108,7 @@ class User extends Authenticatable implements PasskeyUser
 
     public function getTenantModelName(): string
     {
-        return accountTenantUserModel();
+        return BeamAccounts::tenantUserModel();
     }
 
     public function getCentralModelName(): string

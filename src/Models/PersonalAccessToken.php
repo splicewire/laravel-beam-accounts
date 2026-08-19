@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Models;
 
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 
 /**
  * The OOTB personal-access-token model for the account Tokens resource (Frame OS ticket 20).
@@ -12,7 +13,7 @@ use Splicewire\Beam\Accounts\Enums\TokenProvenance;
  * (`add_provenance_to_personal_access_tokens_table` / `add_archived_at_to_...`) — so it owns
  * the model too. It extends Sanctum's PAT with the extra fillable/cast for those columns and
  * nothing tenant-specific: the central-vs-per-tenant connection and a uuid key are HOST
- * concerns a satellite layers on its own subclass (see {@see accountTokenModel()} — a host
+ * concerns a satellite layers on its own subclass (see {@see BeamAccounts::tokenModel()} — a host
  * binds `beam.accounts.tokens.model` to it). Standalone, this plain model on the default
  * connection is the correct null-object.
  */

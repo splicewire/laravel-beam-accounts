@@ -8,10 +8,6 @@ use Illuminate\Support\Facades\Schema;
 use Schemastud\Frame\Contracts\UnionQuery;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\PermissionRegistrar;
-
-use function Splicewire\Beam\Accounts\accountCurrentTeam;
-use function Splicewire\Beam\Accounts\accountTokenModel;
-
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Data\CreateInvitationData;
@@ -23,6 +19,7 @@ use Splicewire\Beam\Accounts\Data\TeamData;
 use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
 use Splicewire\Beam\Accounts\Http\Controllers\Api\V1\ProfileController;
 use Splicewire\Beam\Accounts\Models\Invitation;
@@ -90,7 +87,7 @@ function ownerWithTeam(string $email = 'owner@example.test'): array
 // ── Tokens ──────────────────────────────────────────────────────────────────────────────────
 
 it('defaults the token model to the package PAT model', function () {
-    expect(accountTokenModel())->toBe(PersonalAccessToken::class);
+    expect(BeamAccounts::tokenModel())->toBe(PersonalAccessToken::class);
 });
 
 it('scopes the token list to the acting user — never leaks another user\'s tokens', function () {
@@ -203,7 +200,7 @@ it('the member source is empty when there is no active team', function () {
     $stray = User::create(['name' => 'Stray', 'email' => 'stray@example.test', 'password' => 'x']);
     Auth::login($stray);
 
-    expect(accountCurrentTeam())->toBeNull();
+    expect(BeamAccounts::currentTeam())->toBeNull();
     $page = app(MembershipSource::class)->index(new UnionQuery(perPage: 20, cursor: null));
     expect($page->items())->toHaveCount(0);
 });
@@ -286,7 +283,7 @@ it('a central Root principal sees every user', function () {
     $otherTeam = Team::create(['user_id' => $stranger->id, 'name' => 'Other', 'personal_team' => true]);
     Membership::create(['team_id' => $otherTeam->id, 'user_id' => $stranger->id, 'role' => Role::Owner->value]);
 
-    // Root is assigned on the CENTRAL (null) team — the flip CentralRoot exists to handle.
+    // Root is assigned on the CENTRAL (null) team — the flip BeamAccounts::isRoot() exists to handle.
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     SpatieRole::create(['name' => 'Root', 'guard_name' => 'web']);
     $owner->assignRole('Root');

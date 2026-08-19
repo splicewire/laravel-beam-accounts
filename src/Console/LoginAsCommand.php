@@ -4,7 +4,7 @@ namespace Splicewire\Beam\Accounts\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\URL;
-use Splicewire\Beam\Accounts\Support\Demo;
+use Splicewire\Beam\Accounts\Facades\BeamDemo;
 
 /**
  * Prints a signed browser login link for a demo subject. A session can't be minted from
@@ -19,7 +19,7 @@ class LoginAsCommand extends Command
 
     public function handle(): int
     {
-        if (! Demo::enabled()) {
+        if (! BeamDemo::enabled()) {
             $this->error('Demo affordances are disabled in this environment.');
 
             return self::FAILURE;
@@ -27,8 +27,8 @@ class LoginAsCommand extends Command
 
         $subject = (string) $this->argument('subject');
 
-        if (! Demo::has($subject)) {
-            $this->error("Unknown subject [{$subject}]. Expected one of: ".implode(', ', Demo::keys()));
+        if (! BeamDemo::has($subject)) {
+            $this->error("Unknown subject [{$subject}]. Expected one of: ".implode(', ', BeamDemo::keys()));
 
             return self::FAILURE;
         }

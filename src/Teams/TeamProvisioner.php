@@ -4,10 +4,8 @@ namespace Splicewire\Beam\Accounts\Teams;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Spatie\Permission\PermissionRegistrar;
-
-use function Splicewire\Beam\Accounts\accountGuard;
-
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
 
@@ -82,7 +80,7 @@ class TeamProvisioner
 
         $registrar->setPermissionsTeamId($team->getKey());
 
-        $roleModel = app(config('permission.models.role'))::findOrCreate($role->value, accountGuard());
+        $roleModel = app(config('permission.models.role'))::findOrCreate($role->value, BeamAccounts::guard());
         $user->syncRoles([$roleModel]);
 
         $registrar->setPermissionsTeamId($previous);

@@ -5,14 +5,14 @@ namespace Splicewire\Beam\Accounts\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Actions\LogInAs;
-use Splicewire\Beam\Accounts\Support\Demo;
+use Splicewire\Beam\Accounts\Facades\BeamDemo;
 
 class LoginAsController
 {
     public function __invoke(Request $request, LogInAs $login, string $subject)
     {
-        abort_unless(Demo::enabled(), 403);
-        abort_unless(Demo::has($subject), 404);
+        abort_unless(BeamDemo::enabled(), 403);
+        abort_unless(BeamDemo::has($subject), 404);
 
         // Outside local/testing the link must be signed — the `splicewire:beam:accounts:login-as` command
         // mints one — so the affordance can ride along in a preview deploy without
@@ -28,7 +28,7 @@ class LoginAsController
     }
 
     /**
-     * The designated operator demo subject ({@see Demo::isOperator()}) lands on the operator shell
+     * The designated operator demo subject ({@see BeamDemo::isOperator()}) lands on the operator shell
      * when one is routed (its own `bootOperatorShell()` default, or a host's own `operator.home`) —
      * the whole point of a DIFFERENT demo subject per role is landing somewhere that actually shows
      * what that role can reach, not the same generic default every subject shares. Every other
@@ -36,7 +36,7 @@ class LoginAsController
      */
     private function redirectFor(string $subject): string
     {
-        if (Demo::isOperator($subject) && Route::has('operator.home')) {
+        if (BeamDemo::isOperator($subject) && Route::has('operator.home')) {
             return route('operator.home');
         }
 

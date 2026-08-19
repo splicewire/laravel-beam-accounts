@@ -34,6 +34,8 @@ use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Fortify\ResetUserPassword;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
@@ -45,7 +47,6 @@ use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
 use Splicewire\Beam\Accounts\Oidc\SigningKey;
 use Splicewire\Beam\Accounts\Sharing\ShareLinkScopes;
-use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
 use Splicewire\Beam\Accounts\Support\NullAuthUserExtras;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
@@ -188,6 +189,14 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         // registers a new realm gets its gate for free too.
         $this->registerEntitlementKeys();
 
+        // The two facade subjects. `BeamAccountsManager` is the package's host-resolution seam
+        // (what `src/helpers.php` used to autoload as five namespaced functions);
+        // `BeamDemoManager` is the demo-subject roster (the former `Support\Demo`). Singletons —
+        // both are stateless config readers, so one instance per request is enough, and binding
+        // them by class name is what lets a test `BeamAccounts::swap()` them.
+        $this->app->singleton(BeamAccountsManager::class);
+        $this->app->singleton(BeamDemoManager::class);
+
         // The share-link scope-handler registry (tracer 06) — a singleton so a host registers
         // its handlers (in boot) on the same instance the /s/{token} resolver reads.
         $this->app->singleton(ShareLinkScopes::class);
@@ -323,7 +332,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      * and every beam-* package's seeder fires, each config-gated.
      *
      * The gate is the config key `beam.accounts.demo.seed_users`. It defaults to `env('ACCOUNT_SEED_DEMO_USERS')`
-     * (null), and here — mirroring {@see Demo::enabled()} — a null resolves to on-everywhere-but-production, so
+     * (null), and here — mirroring {@see BeamDemo::enabled()} — a null resolves to on-everywhere-but-production, so
      * a production `beam:seed` never fabricates demo subjects while dev/preview seed them by default. Explicit
      * config wins; the resolved boolean is written back onto the same key so the manifest's raw `config($gate)`
      * check reads the effective value.
@@ -415,7 +424,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         Route::middleware(['web', 'auth', 'can:entitlement:os.operate'])
             ->get('/operator', function (Request $request) {
                 $user = $request->user();
-                $model = accountUserModel();
+                $model = BeamAccounts::userModel();
                 $props = [
                     'staff' => ['name' => $user->name, 'email' => $user->email],
                     'stats' => ['users' => $model::count()],
@@ -648,7 +657,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      */
     protected function bootDemo(): void
     {
-        if (! Demo::enabled()) {
+        if (! BeamDemo::enabled()) {
             return;
         }
 

@@ -1,11 +1,10 @@
 <?php
 
-use function Splicewire\Beam\Accounts\accountGuard;
-
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 
 it('runs on the web/session guard only', function () {
-    expect(accountGuard())->toBe('web');
+    expect(BeamAccounts::guard())->toBe('web');
     expect(config('fortify.guard'))->toBe('web');
 });
 

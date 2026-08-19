@@ -1,7 +1,6 @@
 <?php
 
 use Splicewire\Beam\Accounts\Enums\Role;
-use Splicewire\Beam\Accounts\Support\Roles;
 
 it('is the single source of the role vocabulary', function () {
     expect(Role::values())->toBe(['owner', 'admin', 'member']);
@@ -33,11 +32,4 @@ it('scopes options to a context subset without a second list', function () {
         ['value' => 'admin', 'label' => 'Admin'],
         ['value' => 'member', 'label' => 'Member'],
     ]);
-});
-
-it('keeps the deprecated Support\\Roles shim delegating to the enum', function () {
-    expect(Roles::all())->toBe(Role::values())
-        ->and(Roles::OWNER)->toBe(Role::Owner->value)
-        ->and(Roles::ADMIN)->toBe(Role::Admin->value)
-        ->and(Roles::MEMBER)->toBe(Role::Member->value);
 });

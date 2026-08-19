@@ -6,11 +6,9 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
-use function Splicewire\Beam\Accounts\accountUserModel;
-
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Facades\Beam;
 
 /**
@@ -38,7 +36,7 @@ class Team extends Model implements TeamContract
 
     public function owner(): BelongsTo
     {
-        return $this->belongsTo(accountUserModel(), 'user_id');
+        return $this->belongsTo(BeamAccounts::userModel(), 'user_id');
     }
 
     public function memberships(): HasMany
@@ -48,7 +46,7 @@ class Team extends Model implements TeamContract
 
     public function members()
     {
-        return $this->belongsToMany(accountUserModel(), Beam::table('memberships'))
+        return $this->belongsToMany(BeamAccounts::userModel(), Beam::table('memberships'))
             ->withPivot('role')
             ->withTimestamps();
     }

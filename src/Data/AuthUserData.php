@@ -6,7 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\LaravelData\Data;
 use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
-use Splicewire\Beam\Accounts\Support\CentralRoot;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 
 /**
  * The pure IDENTITY-CORE auth projection — what `/me`, login, passkey-login, and profile-update
@@ -70,7 +70,7 @@ class AuthUserData extends Data
      * The identity-core payload, keyed by property name. The central-vs-tenant branch mirrors the
      * retired `AuthUserResource`: in tenant context roles/permissions are the live scoped set and the
      * tenants list is empty; in central context the tenants list is populated and roles/permissions
-     * are empty. `isRoot` is always the CENTRAL Root role via {@see CentralRoot} (a same-package call).
+     * are empty. `isRoot` is always the CENTRAL Root role via {@see BeamAccounts::isRoot()} (a same-package call).
      *
      * @return array<string, mixed>
      */
@@ -81,7 +81,7 @@ class AuthUserData extends Data
             'name' => $user->name,
             'email' => $user->email,
             'accessToken' => $accessToken,
-            'isRoot' => CentralRoot::isRoot($user),
+            'isRoot' => BeamAccounts::isRoot($user),
         ];
 
         if (tenancy()->initialized) {

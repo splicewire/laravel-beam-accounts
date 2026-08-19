@@ -5,11 +5,9 @@ namespace Splicewire\Beam\Accounts\Models;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-use function Splicewire\Beam\Accounts\accountUserModel;
-
 use Splicewire\Beam\Accounts\Contracts\MembershipContract;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Facades\Beam;
 
 /**
@@ -37,7 +35,7 @@ class Membership extends Model implements MembershipContract
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(accountUserModel(), 'user_id');
+        return $this->belongsTo(BeamAccounts::userModel(), 'user_id');
     }
 
     // --- MembershipContract ------------------------------------------------

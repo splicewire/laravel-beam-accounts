@@ -4,8 +4,8 @@ namespace Splicewire\Beam\Accounts\QueryBuilders;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Membership;
-use Splicewire\Beam\Accounts\Support\CentralRoot;
 
 /**
  * The load-bearing row-level scope for the account Users resource.
@@ -18,7 +18,7 @@ use Splicewire\Beam\Accounts\Support\CentralRoot;
  * DOMAIN-NEUTRAL default ({@see self::scopeToSharedTeams()}): the acting principal sees themselves
  * plus every user they share a team with — the same boundary the `members` resource already draws,
  * widened from one team to all of the actor's teams. A CENTRAL Root principal
- * ({@see CentralRoot::isRoot()}) sees the whole table, since support work spans tenants the operator
+ * ({@see BeamAccounts::isRoot()}) sees the whole table, since support work spans tenants the operator
  * is not a member of. A null actor yields an empty result (`whereRaw('1 = 0')`), never the whole
  * table — the fail-safe for an unauthenticated caller.
  *
@@ -39,7 +39,7 @@ class UsersQuery
             return $query->whereRaw('1 = 0');
         }
 
-        if (CentralRoot::isRoot($user)) {
+        if (BeamAccounts::isRoot($user)) {
             return $query;
         }
 

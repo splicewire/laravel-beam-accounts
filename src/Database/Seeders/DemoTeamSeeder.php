@@ -4,12 +4,10 @@ namespace Splicewire\Beam\Accounts\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-
-use function Splicewire\Beam\Accounts\accountUserModel;
-
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Models\Team;
-use Splicewire\Beam\Accounts\Support\Demo;
 use Splicewire\Beam\Accounts\Teams\RealmReachGrant;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
@@ -18,7 +16,7 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
  * reproducible way to log in as a known access level and verify its surfaces. Idempotent;
  * skips itself outside development/preview.
  *
- * The roster is **role-derived** ({@see Demo::subjects()} off the {@see Role} enum): the
+ * The roster is **role-derived** ({@see BeamDemo::subjects()} off the {@see Role} enum): the
  * shared "Demo Team" is owned by the Owner-role subject, and every other (invitable) role
  * joins as a member — so adding a `Role` case seeds a new member with zero seeder edits.
  * The `solo` subject models the default team-of-one shape.
@@ -36,28 +34,28 @@ class DemoTeamSeeder extends Seeder
 
     public function run(): void
     {
-        if (! Demo::enabled()) {
+        if (! BeamDemo::enabled()) {
             $this->command?->warn('beam-accounts: demo subjects skipped (demo affordances disabled in this environment).');
 
             return;
         }
 
-        $model = accountUserModel();
+        $model = BeamAccounts::userModel();
         $password = Hash::make((string) config('beam.accounts.demo.password', 'password'));
 
         // Every subject in the role-derived roster (+ solo) gets a deterministic account.
         $users = [];
-        foreach (Demo::keys() as $key) {
+        foreach (BeamDemo::keys() as $key) {
             $users[$key] = $model::query()->firstOrCreate(
-                ['email' => Demo::email($key)],
-                ['name' => Demo::name($key), 'password' => $password, 'email_verified_at' => now()],
+                ['email' => BeamDemo::email($key)],
+                ['name' => BeamDemo::name($key), 'password' => $password, 'email_verified_at' => now()],
             );
         }
 
         // One shared team carrying every role, so the role gates can be assumed and
         // compared side by side. Owned by the Owner-role subject; the other shared roles
         // are added as members — the whole membership list is derived from the roster.
-        $shared = array_filter(Demo::subjects(), fn (array $subject) => $subject['shared']);
+        $shared = array_filter(BeamDemo::subjects(), fn (array $subject) => $subject['shared']);
         $ownerKey = Role::Owner->value;
 
         $team = Team::updateOrCreate(

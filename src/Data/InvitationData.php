@@ -9,10 +9,8 @@ use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
-
-use function Splicewire\Beam\Accounts\accountCurrentTeam;
-
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
@@ -32,7 +30,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  *    an accepted / foreign-team invitation never resolves (404), never deletes.
  *  - NO in-place edit → `editable: false` (show/update 405) while create + delete stay open.
  *
- * DOMAIN-NEUTRAL: the team is {@see accountCurrentTeam()} (the current-or-personal team by default; a
+ * DOMAIN-NEUTRAL: the team is {@see BeamAccounts::currentTeam()} (the current-or-personal team by default; a
  * host binds `beam.accounts.teams.resolver` to scope to its own notion — e.g. tower's TENANT). Mail
  * send/resend + token-based accept stay a host REST survivor (over-ceiling for the generic pipeline).
  */
@@ -80,7 +78,7 @@ class InvitationData extends Data
      */
     public static function prepare(Model $invitation, CreateInvitationData $input, ?object $actor): void
     {
-        $team = accountCurrentTeam();
+        $team = BeamAccounts::currentTeam();
         abort_if($team === null, 403, 'No active team to invite into.');
 
         $teamKey = $team->getKey();
@@ -120,7 +118,7 @@ class InvitationData extends Data
     public static function scope(Builder $query): Builder
     {
         return $query
-            ->where('team_id', accountCurrentTeam()?->getKey())
+            ->where('team_id', BeamAccounts::currentTeam()?->getKey())
             ->whereNull('accepted_at');
     }
 

@@ -14,12 +14,13 @@ use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
  *
  * Members are LIST-ONLY through Frame — you can't create a member directly (they arrive by
  * accepting an invite), and the inline Role cell + owner-only remove are host-supplied escape
- * hatches against a REST survivor. Members are MODEL-LESS: the list is the team-memberships
- * PIVOT (role + joinedAt live there, not on a plain user), so the `members` resource is
- * SOURCE-backed ({@see MembershipSource}) — registered
- * imperatively as a raw ResourceDefinition (the model-required `#[ParticleResource]` attribute
- * can't express this shape). A source resource is `creatable: false` + `deletable: false`, so
- * create/edit/delete all 405.
+ * hatches against a REST survivor. The `members` resource is SOURCE-backed
+ * ({@see MembershipSource}) — registered imperatively as a raw ResourceDefinition rather than by
+ * `#[ParticleResource]`, because that attribute names ONE `model:` and this resource has to serve
+ * hosts whose membership lives on a foreign pivot as well as beam's own `beam_memberships` rows.
+ * (The package does ship a `Membership` model; it is the beam-native half, not the whole
+ * population — see {@see MembershipSource}'s docblock for the full argument.) A source resource is
+ * `creatable: false` + `deletable: false`, so create/edit/delete all 405.
  */
 #[TypeScript]
 class MembershipData extends Data
