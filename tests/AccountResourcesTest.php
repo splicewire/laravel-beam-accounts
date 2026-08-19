@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Schemastud\Frame\Contracts\UnionQuery;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\PermissionRegistrar;
+use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Data\CreateInvitationData;
@@ -341,10 +342,14 @@ it('registers tokens/invitations/members/teams/users onto the Frame registries w
         ->and($registry->definition('invitations')->editable)->toBeFalse()
         ->and($registry->definition('tokens')->deletable)->toBeTrue();
 
-    // Users is read-only in all three directions: no create, no edit, no delete through Frame.
+    // Users is UPDATE-ONLY: no create (registration mints users), no delete (destructive and
+    // cascade-bearing, wants a password-confirmed flow), but edit IS open — the edit-independent
+    // widening, so the self-service profile write is a declared particle rather than the parallel
+    // non-particle surface it used to be. The narrowing gate is UserPolicy (self, or central Root).
     expect($registry->definition('users')->creatable)->toBeFalse()
-        ->and($registry->definition('users')->editable)->toBeFalse()
-        ->and($registry->definition('users')->deletable)->toBeFalse();
+        ->and($registry->definition('users')->editable)->toBeTrue()
+        ->and($registry->definition('users')->deletable)->toBeFalse()
+        ->and($registry->definition('users')->policy)->toBe(UserPolicy::class);
 
     // REST/op side: the model-backed attribute resources are on the same registry.
     expect($registry->has('tokens'))->toBeTrue()

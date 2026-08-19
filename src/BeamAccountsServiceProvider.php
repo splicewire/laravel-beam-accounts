@@ -19,6 +19,7 @@ use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
 use Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver;
+use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Console\GenerateOidcSigningKeyCommand;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Console\MintKeyCommand;
@@ -46,6 +47,7 @@ use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
 use Splicewire\Beam\Accounts\Oidc\SigningKey;
+use Splicewire\Beam\Accounts\Ops\LogInAsUser;
 use Splicewire\Beam\Accounts\Sharing\ShareLinkScopes;
 use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
 use Splicewire\Beam\Accounts\Support\NullAuthUserExtras;
@@ -54,6 +56,7 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
 use Splicewire\Beam\Install\BeamInstallManifest;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
+use Splicewire\Beam\Particle\ParticleOperationRegistry;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 use Splicewire\Beam\Realm\RealmRegistry;
 use Splicewire\Beam\Seed\BeamSeedManifest;
@@ -482,6 +485,17 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             UserData::class,
         ];
 
+        // The `users` operations. REGISTERED here, MOUNTED by the host — the same split `users`
+        // itself already lives under (this package registers the resource into the registry and
+        // mounts no `Route::particleResource('users', …)`). Registration is what makes an op
+        // registry-reachable, permission-bearing and codegen-visible; a host that wants the HTTP
+        // route adds `Route::particleOps('users', 'users', [LogInAsUser::class])` in its own group,
+        // where it also decides the prefix and middleware.
+        $this->app->afterResolving(
+            ParticleOperationRegistry::class,
+            fn () => app(AttributedParticleDiscovery::class)->registerClass(LogInAsUser::class),
+        );
+
         // Registered via afterResolving so it lands regardless of the beam↔beam-accounts boot order.
         $this->app->afterResolving(
             ParticleResourceRegistry::class,
@@ -550,6 +564,19 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
     {
         Gate::define('manageMembers', [MembershipPolicy::class, 'manageMembers']);
         Gate::define('manageInvitations', [MembershipPolicy::class, 'manageInvitations']);
+
+        // The `users` resource's write gate ({@see UserPolicy}) — needed now that the resource
+        // widened `editable`. Registered against the CONFIGURED user model, since hosts routinely
+        // subclass ours, and deferred to `booted()` so a host's own AuthServiceProvider has already
+        // run: if the host has bound a User policy of its own, that one wins and this is skipped
+        // entirely. A package must not silently replace a host's identity policy.
+        $this->app->booted(function (): void {
+            $model = BeamAccounts::userModel();
+
+            if (Gate::getPolicyFor($model) === null) {
+                Gate::policy($model, UserPolicy::class);
+            }
+        });
 
         // A share link is managed (revoked) by its minter (ADR-0009, tracer 05). Not
         // team-scoped like invitations — the check is minter-ownership, compared as strings

@@ -11,6 +11,7 @@ use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
+use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\User;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
@@ -23,13 +24,28 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * which is the seat list of ONE team (the team-membership pivot, role + joinedAt): this is the
  * principal list, spanning every team the actor can see, and it reads the user table itself.
  *
- * READ-ONLY through Frame (`readOnly: true` ⇒ store/update 405, neither `deletable` nor `editable`
- * widened): users arrive by REGISTRATION and by accepting an invitation, never from an admin create
- * form — the same argument {@see TeamData} makes for teams. Frame's generic create has no notion of
- * minting credentials, dispatching a verification mail, or the personal-team seed that registration
- * owns; deletion of a principal is a destructive, cascade-bearing act that wants its own confirmed
- * flow, not a generic row delete. Both stay host REST survivors. The per-record DETAIL read stays
- * open (`showable` at its default) — it is what an operator opens to diagnose an access problem.
+ * WRITE SURFACE: **update only**, via ADR-0156 §83's edit-independent widening — `readOnly: true`
+ * (which is what projects `creatable: false`) PLUS an explicit `editable: true`. Read the pair
+ * together: `readOnly` here means "not created or deleted through the generic pipeline", not "not
+ * written at all".
+ *
+ * Not creatable, because users arrive by REGISTRATION and by accepting an invitation, never from an
+ * admin create form — minting credentials, dispatching verification mail, and seeding the personal
+ * team all belong to registration and none is expressible as a generic create. Not deletable,
+ * because deleting a principal is destructive and cascade-bearing and wants its own
+ * password-confirmed flow. Both stay host REST survivors, as {@see TeamData} argues for teams.
+ *
+ * `editable` IS open, and that is the change: this resource used to be flatly read-only, which meant
+ * the self-service profile edit had to live as an entirely parallel non-particle surface
+ * (`routes/account.php` → `ProfileController@update`) writing the very model this resource declares.
+ * Editing a user is now the declared thing it always was, with {@see ProfileUpdateInputData} as the
+ * `input:` — the same DTO the Inertia and API transports already validate against, so one shape
+ * feeds all three and the codegen chain finally sees the write.
+ *
+ * The gate is {@see UserPolicy}: **self, or central Root** — deliberately NARROWER than the read
+ * boundary, because a principal may legitimately see every peer on their teams and must not be able
+ * to edit them. The per-record DETAIL read stays open (`showable` at its default) — it is what an
+ * operator opens to diagnose an access problem.
  *
  * SECURITY-CRITICAL isolation — the user table is the widest shared table in the package — rides the
  * {@see TokenData} discipline: list and per-record resolution share ONE scope closure
@@ -53,8 +69,13 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     group: 'Settings',
     icon: 'users',
     form: 'bare',
+    input: ProfileUpdateInputData::class,
+    editData: ProfileUpdateInputData::class,
+    policy: UserPolicy::class,
     filterable: false,
     readOnly: true,
+    editable: true,
+    deletable: false,
 )]
 #[TypeScript]
 class UserData extends Data

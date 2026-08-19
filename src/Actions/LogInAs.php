@@ -27,6 +27,20 @@ class LogInAs
 
         $user = BeamAccounts::userModel()::query()->where('email', BeamDemo::email($subject))->firstOrFail();
 
+        return $this->asUser($user);
+    }
+
+    /**
+     * Log in as an already-resolved user, skipping the demo-subject lookup.
+     *
+     * The subject-keyed `__invoke` above is one particular way to NAME a user; this is the act
+     * itself. Split out so {@see Ops\LogInAsUser} — which resolves its subject from a `{id}` like
+     * every other particle operation — reuses the session-guard login rather than restating it.
+     * Deliberately carries NO demo gate of its own: both callers gate before they get here, and a
+     * silent second check would make the reason for a 403 ambiguous.
+     */
+    public function asUser(Authenticatable $user): Authenticatable
+    {
         Auth::guard(BeamAccounts::guard())->login($user);
 
         return $user;
