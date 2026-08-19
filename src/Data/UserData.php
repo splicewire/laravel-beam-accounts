@@ -29,11 +29,18 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * together: `readOnly` here means "not created or deleted through the generic pipeline", not "not
  * written at all".
  *
- * Not creatable, because users arrive by REGISTRATION and by accepting an invitation, never from an
- * admin create form — minting credentials, dispatching verification mail, and seeding the personal
- * team all belong to registration and none is expressible as a generic create. Not deletable,
- * because deleting a principal is destructive and cascade-bearing and wants its own
- * password-confirmed flow. Both stay host REST survivors, as {@see TeamData} argues for teams.
+ * Not creatable — but NOT because a create is inexpressible here. It plainly is: {@see InvitationData}
+ * in this same package mints a token and authorizes inside `prepare()`, and an `afterWrite()` hook
+ * exists for exactly the seed-the-personal-team half. The real reason is that REGISTRATION is a
+ * PUBLIC, UNAUTHENTICATED flow owned by Fortify, while a particle create is authenticated and
+ * policy-gated — two surfaces with different gates, not one surface written twice.
+ *
+ * That argument does NOT cover "an operator provisions a user", which is a genuinely different act
+ * from self-registration and would be a legitimate `creatable` with a `prepare()`/`afterWrite()` pair.
+ * It is left closed here because nothing has asked for it, not because the pipeline can't carry it.
+ *
+ * Not deletable, because deleting a principal is destructive and cascade-bearing and wants its own
+ * password-confirmed flow. That one stays a host REST survivor, as {@see TeamData} argues for teams.
  *
  * `editable` IS open, and that is the change: this resource used to be flatly read-only, which meant
  * the self-service profile edit had to live as an entirely parallel non-particle surface
