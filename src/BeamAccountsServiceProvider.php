@@ -453,17 +453,20 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      * the one stored declaration (the retired `AdminResourceRegistry` used to need each resource registered
      * TWICE, once per registry; that split is gone).
      *
-     * Gated by `beam.accounts.frame_resources.enabled` (default true) AND inert unless beam's particle
-     * registry is present — a beam-less host silently gets nothing. A host that curates its own resource
-     * roster (e.g. splicewire-app, which lists tower's tenant-scoped variants in config/frame.php) turns this
-     * off and re-consumes the package DTOs directly.
+     * **Always registers — there is no host off-switch, deliberately.**
+     * {@see ParticleResourceRegistry} keys by resource key and the LAST registration wins, so a host
+     * that curates its own roster (e.g. splicewire-app, which registers tenant-scoped variants of
+     * tokens/invitations/members) overrides simply by registering after this package. App providers
+     * boot after auto-discovered package providers, so that is the default outcome, not a race.
+     *
+     * A host that wants certainty lists the providers explicitly in `config/app.php` (preferred), or
+     * defers its own registration to an `$app->booted()` callback — the latter only works while
+     * exactly one party defers.
+     *
+     * Still inert unless beam's particle registry is present — that guard is structural, not policy.
      */
     protected function bootFrameResources(): void
     {
-        if (! config('beam.accounts.frame_resources.enabled', true)) {
-            return;
-        }
-
         // Inert unless beam's particle registry is present (a beam-less host gets nothing).
         if (
             ! class_exists(ParticleResourceRegistry::class)

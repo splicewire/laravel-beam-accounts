@@ -200,15 +200,6 @@ return [
         'realm_grantable' => null,
     ],
 
-    // The account + team-admin FRAME RESOURCES (Frame OS ticket 20): the OOTB list/detail surfaces a
-    // host gets by installing beam-accounts — Tokens (list + revoke), Invitations (list + create +
-    // revoke), Members (list-only). On by default, and inert unless beam's Frame registry is present.
-    // A host that curates its own resource roster (e.g. a satellite that registers tenant-scoped
-    // variants) turns this off and re-consumes the package DTOs itself.
-    'frame_resources' => [
-        'enabled' => env('ACCOUNT_FRAME_RESOURCES', true),
-    ],
-
     // The team-admin resources (Members / Invitations) scope to the acting request's team. The
     // domain-neutral default is the current user's current-or-personal team; a host whose "active
     // team" is a different notion (e.g. a per-request TENANT) binds a resolver here — a `(): ?object`
