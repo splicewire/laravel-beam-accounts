@@ -31,7 +31,8 @@
         "spatie/laravel-package-tools": "^1.16",
         "spatie/laravel-permission": "^6.0",
         "splicewire/laravel-beam": "*",
-        "stancl/tenancy": "^3.0"
+        "stancl/tenancy": "^3.0",
+        "rushing/laravel-schema-convergence": "*"
     },
     "require-dev": {
         "orchestra/testbench": "^9.0|^10.0|^11.0",

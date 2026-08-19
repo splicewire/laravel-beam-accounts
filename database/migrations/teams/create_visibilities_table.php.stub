@@ -9,7 +9,7 @@ use Rushing\PermissionCascade\Contracts\VisibilityRecord;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Models\Visibility;
 use Splicewire\Beam\Facades\Beam;
-use Splicewire\Beam\Schema\ConvergentTable;
+use Rushing\SchemaConvergence\ConvergentTable;
 
 /**
  * The off-table reach-tier ledger — `beam_visibilities`, the table behind

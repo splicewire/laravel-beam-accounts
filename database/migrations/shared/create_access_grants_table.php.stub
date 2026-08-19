@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Splicewire\Beam\Facades\Beam;
-use Splicewire\Beam\Schema\ConvergentTable;
+use Rushing\SchemaConvergence\ConvergentTable;
 
 /**
  * The directory-ACL grant ledger — `beam_access_grants`, the table behind
@@ -14,7 +14,7 @@ use Splicewire\Beam\Schema\ConvergentTable;
  * `create_teams_table` — see that file's docblock. Already create-only (net-new, nothing to squash);
  * only the connection-tier reclassification and the guard style changed, matching the sibling
  * shared/ files' convergent guard (`docs/agents/convergent-migration-guards.convention.md` in
- * laravel-beam).
+ * rushing/laravel-schema-convergence).
  *
  * `grantable_id` AND `grantee_id` are strings — morph keys that must hold both uuid-keyed
  * hosts (beam users/threads) and bigint-keyed hosts (audiostud users/roles) without a

@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Splicewire\Beam\Accounts\Models\ViewRequest;
 use Splicewire\Beam\Facades\Beam;
-use Splicewire\Beam\Schema\ConvergentTable;
+use Rushing\SchemaConvergence\ConvergentTable;
 
 /**
  * `beam_view_requests` — the polymorphic view-access request ledger behind {@see ViewRequest}
@@ -13,7 +13,7 @@ use Splicewire\Beam\Schema\ConvergentTable;
  * SHARED, alongside `create_teams_table` — see that file's docblock. Already create-only (net-new,
  * nothing to squash); only the connection-tier reclassification and the guard style changed, matching
  * the sibling shared/ files' convergent guard (`docs/agents/convergent-migration-guards.convention.md`
- * in laravel-beam). Morph keys are strings to hold both uuid- and bigint-keyed hosts.
+ * in rushing/laravel-schema-convergence). Morph keys are strings to hold both uuid- and bigint-keyed hosts.
  */
 return new class extends Migration
 {
