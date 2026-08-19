@@ -12,8 +12,8 @@ use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Tests\Fixtures\FixtureRealmGrantable;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
-use Splicewire\Beam\Facades\Beam;
 use Splicewire\Beam\BeamServiceProvider;
+use Splicewire\Beam\Facades\Beam;
 
 abstract class TestCase extends Orchestra
 {

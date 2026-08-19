@@ -38,8 +38,8 @@ class EntitlementComposer
      * Fold a baseline of entitlement keys with explicit grants and denies.
      *
      * @param  list<string>  $baseline  the plan-bundle keys (already resolved, e.g. via {@see bundleKeys()})
-     * @param  list<string>  $grants    comp/admin keys that union in
-     * @param  list<string>  $denies    keys that subtract out (win over baseline AND grants)
+     * @param  list<string>  $grants  comp/admin keys that union in
+     * @param  list<string>  $denies  keys that subtract out (win over baseline AND grants)
      * @return list<string> the deduped effective key set
      */
     public function compose(array $baseline, array $grants = [], array $denies = []): array
