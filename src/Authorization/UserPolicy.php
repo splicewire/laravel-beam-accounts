@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Authorization;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
@@ -73,6 +74,36 @@ class UserPolicy
     public function loginAs(?Authenticatable $actor, Model $user): bool
     {
         return BeamAccounts::isRoot($actor);
+    }
+
+    /**
+     * Assume an arbitrary real user's identity — operator impersonation, as distinct from the
+     * demo-only {@see self::loginAs()}.
+     *
+     * Two refusals, both lifted verbatim from the rule audiostud and numero each hand-rolled
+     * (particle-identity-resources ticket 03):
+     *
+     *  - NOT YOURSELF. Harmless but incoherent, and it would write a misleading audit pair.
+     *  - NOT ANOTHER STAFF ACCOUNT. This is the real one: impersonating a peer operator would let
+     *    staff borrow each other's authority while the audit trail names only the borrowed identity,
+     *    so privilege escalation becomes untraceable.
+     *
+     * Staff is the `entitlement:os.operate` key, NOT numero's `is_staff` column — audiostud's own
+     * comment records that column as retired in favour of the entitlement, so numero was simply the
+     * older form and the entitlement is the destination.
+     *
+     * Deliberately does NOT check that the ACTOR is staff: that is the op's `ability:`, which the
+     * host binds to its own operator entitlement. This method answers "may this subject be
+     * impersonated", and keeping the two apart is what lets a host re-gate the actor side without
+     * re-stating the subject side.
+     */
+    public function impersonate(?Authenticatable $actor, Model $user): bool
+    {
+        if ($actor === null || $this->isSelf($actor, $user)) {
+            return false;
+        }
+
+        return ! Gate::forUser($user)->allows('entitlement:os.operate');
     }
 
     /**

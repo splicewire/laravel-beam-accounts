@@ -94,6 +94,29 @@ return [
         'redirect' => '/',
     ],
 
+    /*
+     * Operator impersonation (particle-identity-resources ticket 03) — the audited "act as this
+     * customer" power, distinct from the demo login-as above.
+     */
+    'impersonation' => [
+        // The table backing ImpersonationEvent. Null ⇒ `beam_impersonation_events` via the beam
+        // table-prefix seam. A host that ALREADY has an `impersonation_events` table (audiostud,
+        // numero) points this at it and skips the published migration — keeping its existing rows
+        // and its typed foreign keys, with no data migration at all.
+        'table' => null,
+
+        // The ability gating the ACTOR on `impersonate` — may this principal impersonate anyone?
+        // The SUBJECT-side rule (not yourself, never another staff account) is UserPolicy and is not
+        // configurable. audiostud gates on its own `bypass-marquee`; the estate default is the
+        // operator entitlement.
+        'ability' => 'entitlement:os.operate',
+
+        // Where each half lands. A route NAME is preferred (survives URI moves) and is resolved when
+        // one exists; anything else is used as a literal path.
+        'start_redirect' => '/',
+        'stop_redirect' => '/',
+    ],
+
     // The "proprietary API layer" seam — a satellite's second door, for exposing its
     // own token-authenticated API to its own end-users/mobile clients. Prepared but
     // NOT provisioned: default-off, wired to no consumer, no endpoints. When a real

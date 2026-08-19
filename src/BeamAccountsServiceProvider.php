@@ -120,6 +120,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             'shared/create_access_grants_table',
             'shared/create_share_links_table',
             'shared/create_view_requests_table',
+            'shared/create_impersonation_events_table',
         ];
 
         $migrations = config('beam.accounts.register_auth_migrations', true) ? $authMigrations : [];

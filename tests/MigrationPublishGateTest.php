@@ -76,5 +76,10 @@ it('declares both estates by default', function () {
 
     expect($declared)->toContain('shared/create_users_table');
     expect($declared)->toContain('shared/create_teams_table');
-    expect($declared)->toHaveCount(15);
+    // 16th: shared/create_impersonation_events_table, added with the impersonation lift
+    // (particle-identity-resources ticket 03). It rides the TEAMS estate rather than AUTH — it is
+    // operator tooling over the team-scoped surfaces, not part of the identity schema a host would
+    // turn off when it owns its own auth tables.
+    expect($declared)->toContain('shared/create_impersonation_events_table');
+    expect($declared)->toHaveCount(16);
 });
