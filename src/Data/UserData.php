@@ -5,6 +5,8 @@ namespace Splicewire\Beam\Accounts\Data;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Rushing\DataFilters\Attributes\Sortable;
+use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\LaravelData\Data;
@@ -59,22 +61,30 @@ class UserData extends Data
 {
     public function __construct(
         #[NotInList]
+        #[Description('The user id.')]
         public string $id,
         #[Column(label: 'Name', sort: 0)]
+        #[Description('Display name; null until the user sets one.')]
         public ?string $name,
         #[Column(label: 'Email', sort: 1)]
+        #[Description('Email address, unique across the identity table.')]
         public string $email,
         /** @var string[] */
         #[Column(label: 'Roles', sort: 2)]
+        #[Description('Role names held on the current permissions team, not the resolved permission set.')]
         public array $roles,
         #[Column(label: 'Joined', sort: 3)]
+        #[Sortable(default: true, direction: 'desc')]
+        #[Description('When the account was created, ISO-8601. Newest first is the default order.')]
         public ?string $createdAt,
         // Detail-only: the resolved permission set is what an operator opens a record to read, and
         // it is too wide (and too many queries) to project across a list.
         /** @var string[] */
         #[NotInList]
+        #[Description('The resolved permission set. Detail-only — too wide to project across a list.')]
         public array $permissions,
         #[NotInList]
+        #[Description('Whether the user holds the CENTRAL Root role, checked on the null team.')]
         public bool $isRoot,
     ) {}
 

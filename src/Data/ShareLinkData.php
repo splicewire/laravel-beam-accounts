@@ -4,6 +4,8 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Rushing\DataFilters\Attributes\Sortable;
+use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Data;
 use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
@@ -17,14 +19,27 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
 class ShareLinkData extends Data
 {
     public function __construct(
+        // Attachment point only — see AccessGrantData for why the sort key names `created_at`
+        // while the attribute sits on `id`. Minting order is the useful default for a link list;
+        // `expiresAt` would sort the never-expiring links into one indistinguishable null block.
+        #[Sortable(name: 'created_at', column: 'created_at', default: true, direction: 'desc')]
+        #[Description('The share-link id.')]
         public int|string $id,
+        #[Description('The opaque token in the share URL. Treat it as a secret.')]
         public string $token,
+        #[Description('Scope handler key deciding what the link grants access to.')]
         public string $scope,
+        #[Description('The full resolve URL a recipient opens.')]
         public string $url,
+        #[Description('When the link stops working, ISO-8601; null if it never expires.')]
         public ?string $expiresAt,
+        #[Description('When the minter revoked the link, ISO-8601; null if still live.')]
         public ?string $revokedAt,
+        #[Description('How many times the link has been resolved.')]
         public int $useCount,
+        #[Description('Resolve cap; null for unlimited.')]
         public ?int $maxUses,
+        #[Description('Whether the link resolves right now — not revoked, not expired, under any cap.')]
         public bool $isValid,
     ) {}
 

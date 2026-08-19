@@ -3,6 +3,8 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Database\Eloquent\Model;
+use Rushing\DataFilters\Attributes\Sortable;
+use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\LaravelData\Data;
@@ -39,16 +41,23 @@ class TeamData extends Data
 {
     public function __construct(
         #[NotInList]
+        #[Description('The team id.')]
         public string $id,
         #[Column(label: 'Team', sort: 0)]
+        #[Description('Display name of the team.')]
         public string $name,
         #[Column(label: 'Owner', sort: 1)]
+        #[Description('Email of the team owner; null if the owner record is missing.')]
         public ?string $ownerEmail,
         #[Column(label: 'Members', sort: 2)]
+        #[Description('How many seats the team currently holds, the owner included.')]
         public int $memberCount,
         #[Column(label: 'Personal', sort: 3)]
+        #[Description('True for the team-of-one minted at registration, false for a shared team.')]
         public bool $personal,
         #[Column(label: 'Created', sort: 4)]
+        #[Sortable(default: true, direction: 'desc')]
+        #[Description('When the team was provisioned, ISO-8601. Newest first is the default order.')]
         public ?string $createdAt,
     ) {}
 

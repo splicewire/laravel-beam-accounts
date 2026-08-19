@@ -5,6 +5,8 @@ namespace Splicewire\Beam\Accounts\Data;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Rushing\DataFilters\Attributes\Sortable;
+use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\LaravelData\Data;
@@ -51,22 +53,30 @@ class InvitationData extends Data
 {
     public function __construct(
         #[NotInList]
+        #[Description('The invitation id. Delete it to revoke a still-pending invite.')]
         public string $id,
         #[Column(label: 'Email', sort: 0)]
+        #[Description('Address the invitation was sent to. Unique per team.')]
         public string $email,
         #[Column(label: 'Role', sort: 1)]
+        #[Description('Role the invitee joins as: admin or member. Owner is not invitable.')]
         public string $role,
         #[Column(label: 'Status', sort: 2)]
+        #[Description('When the invite was accepted, ISO-8601; null while it is still pending.')]
         public ?string $acceptedAt,
         #[Column(label: 'Sent', sort: 3)]
+        #[Sortable(default: true, direction: 'desc')]
+        #[Description('When the invitation was sent, ISO-8601. Newest first is the default order.')]
         public ?string $createdAt,
         // Detail-only: an opaque actor id and a mtime are not list columns. Both are nullable
         // because the two tables this shape serves disagree — beam-accounts' `invitations.invited_by`
         // is nullable (an invite can predate the stamp), while beam-tenancy's `tenant_invitations`
         // makes it NOT NULL. The wider type is the one that holds for both.
         #[NotInList]
+        #[Description('Opaque id of the user who sent the invitation; null if it predates the stamp.')]
         public ?string $invitedBy = null,
         #[NotInList]
+        #[Description('When the invitation was last re-sent or its role changed, ISO-8601.')]
         public ?string $updatedAt = null,
     ) {}
 

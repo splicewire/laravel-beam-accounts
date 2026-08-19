@@ -5,6 +5,8 @@ namespace Splicewire\Beam\Accounts\Data;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Rushing\DataFilters\Attributes\Sortable;
+use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\LaravelData\Data;
@@ -51,12 +53,17 @@ class TokenData extends Data
 {
     public function __construct(
         #[NotInList]
+        #[Description('Opaque token id. Use it to revoke; it is not the token secret.')]
         public string $id,
         #[Column(label: 'Name', sort: 0)]
+        #[Description('The label you gave the token when you created it.')]
         public string $name,
         #[Column(label: 'Created', sort: 1)]
+        #[Sortable(default: true, direction: 'desc')]
+        #[Description('When the token was issued, ISO-8601. Newest first is the default order.')]
         public ?string $createdAt,
         #[Column(label: 'Last used', sort: 2)]
+        #[Description('When the token last authenticated a request, ISO-8601; null if it never has.')]
         public ?string $lastUsedAt,
     ) {}
 
