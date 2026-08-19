@@ -105,10 +105,14 @@ return [
         // and its typed foreign keys, with no data migration at all.
         'table' => null,
 
-        // The ability that means "this account is STAFF", used to refuse impersonating a peer
-        // operator. Must follow the HOST's notion of staff: numero defines `bypass-marquee` as its
-        // is_staff column, so leaving this at the estate default there would resolve false for every
-        // account and make staff impersonatable — it fails OPEN, not closed.
+        // The ability meaning "this account is STAFF", used to refuse impersonating a peer operator.
+        //
+        // TEMPORARY MIGRATION BRIDGE, not a general seam. `entitlement:os.operate` is the correct
+        // and only intended answer; the retired `is_staff` column is not a supported alternative.
+        // The key exists because a host still on the column would otherwise FAIL OPEN — numero does
+        // not define the entitlement at all, so the default resolves false for every account and
+        // makes staff impersonatable. Retire the key once numero and beam convert
+        // (particle-identity-resources ticket 04).
         'staff_ability' => 'entitlement:os.operate',
 
         // The ability gating the ACTOR on `impersonate` — may this principal impersonate anyone?

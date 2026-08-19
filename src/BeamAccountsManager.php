@@ -15,7 +15,7 @@ use Splicewire\Beam\Accounts\Models\PersonalAccessToken;
  *
  * This is where `src/helpers.php` went. That file autoloaded five namespaced functions through
  * composer's `files` entry, all but one a config read, behind a single
- * `if (! function_exists('…accountUserModel'))` guard that tested only the first name — so a host
+ * `if (! function_exists(...))` guard that tested only the FIRST name — so a host
  * that defined any of the other four got either a redeclare fatal or four silently-missing
  * functions. Methods on a bound instance have no such guard to get wrong, and they are
  * `swap()`-able in a test where a global function never was.
