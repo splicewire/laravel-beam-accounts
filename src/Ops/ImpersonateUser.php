@@ -52,6 +52,18 @@ class ImpersonateUser
         $actor ??= $request->user();
 
         abort_if($actor === null, 403, 'Not authenticated.');
+
+        // Self gets its own 400, ahead of the policy, because the two refusals mean different
+        // things and both originals said so: impersonating yourself is a NONSENSICAL request
+        // (400), while impersonating a peer operator is a FORBIDDEN one (403). The policy answers
+        // both as one boolean — correct as a gate, but it cannot carry two status codes, so the
+        // distinction is restated here rather than lost.
+        abort_if(
+            (string) $actor->getAuthIdentifier() === (string) $user->getKey(),
+            400,
+            'You cannot impersonate yourself.',
+        );
+
         abort_if(
             ! Gate::forUser($actor)->allows('impersonate', $user),
             403,
