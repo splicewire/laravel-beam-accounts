@@ -88,19 +88,17 @@ class UserPolicy
      *    staff borrow each other's authority while the audit trail names only the borrowed identity,
      *    so privilege escalation becomes untraceable.
      *
-     * Staff is `entitlement:os.operate`. That is the answer, and the only correct one — the
-     * `is_staff` COLUMN is a retired concept, not a supported alternative.
+     * Staff is `entitlement:os.operate`. Hardcoded, deliberately: there is ONE staff vocabulary in
+     * this estate and this is it. There was briefly a `staff_ability` config key here — a migration
+     * bridge for hosts still on the retired `is_staff` column — and it is gone
+     * (particle-identity-resources ticket 04). Both hosts that needed it have converted; every host
+     * now derives staff from the ACC-01 realm-grant cascade, so a per-host override would only ever
+     * reintroduce the second vocabulary the ticket existed to kill.
      *
-     * `beam.accounts.impersonation.staff_ability` exists only as a MIGRATION BRIDGE for a host that
-     * has not converted yet, and it is deliberately not a general "bring your own staff notion"
-     * seam. The bridge is load-bearing while it lasts: numero still defines its staff gate
-     * `bypass-marquee` as `$user->is_staff` and does not define the entitlement at all, so pointing
-     * this at the default there would resolve false for EVERY account and quietly make staff
-     * impersonatable. It fails OPEN, which is why the key cannot simply be dropped ahead of the
-     * hosts converting.
-     *
-     * Retire the key once numero and beam are on the entitlement — see the estate census in
-     * particle-identity-resources ticket 04.
+     * Do NOT reintroduce it as a "bring your own staff notion" seam. A host that answers this
+     * question differently makes the refusal below mean something different per host, and the
+     * failure mode is silent and open: a staff predicate that is wrong in the false direction makes
+     * peer operators impersonatable while the audit trail names only the borrowed identity.
      *
      * Deliberately does NOT check that the ACTOR is staff: that is the op's `ability:`, which the
      * host binds to its own operator entitlement. This method answers "may this subject be
@@ -113,9 +111,7 @@ class UserPolicy
             return false;
         }
 
-        $staffAbility = config('beam.accounts.impersonation.staff_ability', 'entitlement:os.operate');
-
-        return ! Gate::forUser($user)->allows($staffAbility);
+        return ! Gate::forUser($user)->allows('entitlement:os.operate');
     }
 
     /**

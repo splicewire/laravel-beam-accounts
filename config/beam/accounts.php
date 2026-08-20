@@ -105,15 +105,12 @@ return [
         // and its typed foreign keys, with no data migration at all.
         'table' => null,
 
-        // The ability meaning "this account is STAFF", used to refuse impersonating a peer operator.
-        //
-        // TEMPORARY MIGRATION BRIDGE, not a general seam. `entitlement:os.operate` is the correct
-        // and only intended answer; the retired `is_staff` column is not a supported alternative.
-        // The key exists because a host still on the column would otherwise FAIL OPEN — numero does
-        // not define the entitlement at all, so the default resolves false for every account and
-        // makes staff impersonatable. Retire the key once numero and beam convert
-        // (particle-identity-resources ticket 04).
-        'staff_ability' => 'entitlement:os.operate',
+        // There is NO `staff_ability` key here, and that is deliberate. "This account is STAFF" —
+        // the fact UserPolicy uses to refuse impersonating a peer operator — is
+        // `entitlement:os.operate`, hardcoded in the policy. The estate has one staff vocabulary;
+        // a config key here could only ever be a way to reintroduce a second one
+        // (particle-identity-resources ticket 04, which removed the migration bridge that briefly
+        // lived at this spot).
 
         // The ability gating the ACTOR on `impersonate` — may this principal impersonate anyone?
         // The SUBJECT-side rule (not yourself, never another staff account) is UserPolicy and is not

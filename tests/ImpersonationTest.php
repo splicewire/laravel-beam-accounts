@@ -107,13 +107,20 @@ it('admits an ordinary customer', function () {
     expect((new UserPolicy)->impersonate($this->operator, $this->customer))->toBeTrue();
 });
 
-it('follows the HOST notion of staff, because the wrong key fails open', function () {
-    // numero defines its staff gate `bypass-marquee` AS the is_staff column. If the policy insisted
-    // on the estate-default `entitlement:os.operate` there, it would resolve false for every account
-    // — including staff — and quietly permit impersonating a peer operator. The refusal must follow
-    // whatever the host calls staff.
+it('reads entitlement:os.operate and nothing else, even if a host tries to redirect it', function () {
+    // The inverse of the test this replaces. `staff_ability` was a migration bridge for hosts still
+    // on the retired `is_staff` column; it is gone (particle-identity-resources ticket 04) and must
+    // not come back — a per-host staff notion makes this refusal mean something different per host,
+    // and it fails OPEN when it is wrong. A stale config key must be inert, not honoured.
     config()->set('beam.accounts.impersonation.staff_ability', 'bypass-marquee');
     Gate::define('bypass-marquee', fn ($user) => $user->is($this->customer));
+
+    // `bypass-marquee` says the customer IS staff. The policy does not ask it, so the customer stays
+    // impersonatable.
+    expect((new UserPolicy)->impersonate($this->operator, $this->customer))->toBeTrue();
+
+    // ...and the one key it does ask still refuses.
+    Gate::define('entitlement:os.operate', fn ($user) => $user->is($this->customer));
 
     expect((new UserPolicy)->impersonate($this->operator, $this->customer))->toBeFalse();
 });
