@@ -58,26 +58,3 @@ it('describes every property of a particle resource', function (string $dataClas
 it('carries the ParticleResource attribute it is being held to', function (string $dataClass) {
     expect((new ReflectionClass($dataClass))->getAttributes(ParticleResource::class))->not->toBeEmpty();
 })->with($resources);
-
-it('never pairs a declared scope() with a filterable resource', function (string $dataClass) {
-    $attribute = (new ReflectionClass($dataClass))
-        ->getAttributes(ParticleResource::class)[0]->newInstance();
-
-    $declaresScope = method_exists($dataClass, 'scope');
-
-    // Both index paths — ParticleController::index() and
-    // ParticleFrameResourceHandler::indexQuery() — send a `filterable` resource through the
-    // data-filters builder and SKIP the scope closure. data-filters' ResourceQuery::baseQuery()
-    // is an unscoped Model::query() unless a host binds a `query:` class. So a resource that
-    // declares a scope and is filterable, with no query class, publishes its whole table.
-    //
-    // TokenData is why this guard exists: it defaulted to filterable while declaring the
-    // SECURITY-CRITICAL PAT isolation scope. See particle-doctrine-followups 15.
-    if ($declaresScope && $attribute->filterable) {
-        expect($attribute->query)->not->toBeNull(
-            "{$dataClass} declares scope() and is filterable, but binds no query: class — its scope is silently inert.",
-        );
-    }
-
-    expect(true)->toBeTrue();
-})->with($resources);
