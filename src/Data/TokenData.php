@@ -45,6 +45,13 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     group: 'Settings',
     icon: 'key',
     form: 'bare',
+    // MUST stay false while this resource declares a `scope`. Both index paths —
+    // ParticleController::index() and ParticleFrameResourceHandler::indexQuery() — route a
+    // `filterable` resource through the data-filters builder and SKIP the scope closure entirely,
+    // and data-filters' own ResourceQuery::baseQuery() defaults to a bare, unscoped
+    // `Model::query()`. With no `query:` class bound, defaulting this to true would publish every
+    // user's tokens on a table shared across the whole host. See particle-doctrine-followups 15.
+    filterable: false,
     readOnly: true,
     deletable: true,
 )]
