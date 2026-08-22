@@ -19,7 +19,10 @@ return new class extends Migration
             ->define(function (Blueprint $table): void {
                 $table->id();
                 $table->foreignId('team_id')->constrained(Beam::table('teams'))->cascadeOnDelete();
-                $table->unsignedBigInteger('user_id');
+                // uuid for the same reason as `create_teams_table`'s — see the note there. `team_id`
+                // stays a `foreignId` because `teams.id` really is `$table->id()`; the convention is
+                // that a FK agrees with the key it points at, not that everything is uuid.
+                $table->uuid('user_id');
                 $table->string('role')->default('member');
                 $table->timestamps();
 

@@ -25,7 +25,9 @@ return new class extends Migration
                 $table->string('email');
                 $table->string('role')->default('member');
                 $table->string('token')->unique();
-                $table->unsignedBigInteger('invited_by')->nullable();
+                // The inviting USER, so uuid — see the note in `create_teams_table`. `team_id` above
+                // stays `foreignId` because it points at `teams.id`, which really is `$table->id()`.
+                $table->uuid('invited_by')->nullable();
                 $table->timestamp('accepted_at')->nullable();
                 $table->timestamps();
 

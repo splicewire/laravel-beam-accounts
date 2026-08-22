@@ -22,7 +22,14 @@ return new class extends Migration
         ConvergentTable::named($this->target())
             ->define(function (Blueprint $table): void {
                 $table->id();
-                $table->unsignedBigInteger('user_id')->index();
+                // uuid, not bigint: `users.id` is uuid-keyed across the family and `User` carries
+                // `HasUuids` (`laravel-beam/docs/agents/key-type.convention.md` — "a table's key type,
+                // its foreign keys, and its model must all say the same thing"). Declaring bigint here
+                // emitted a bigint FK at a uuid primary key, which SQLite stores without complaint and
+                // Postgres/MySQL reject. Every host had this hand-corrected in its PUBLISHED copy while
+                // the stub stayed wrong, so only a greenfield install saw it — and since the guard
+                // became convergent it is a hard `migrate` failure there rather than a silent one.
+                $table->uuid('user_id')->index();
                 $table->string('name');
                 $table->boolean('personal_team')->default(false)->index();
                 $table->timestamps();
