@@ -13,8 +13,6 @@ use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
-use Schemastud\Frame\Registry\NavMetadata;
-use Schemastud\Frame\Registry\ResourceDefinition;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
@@ -55,6 +53,7 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
 use Splicewire\Beam\Install\BeamInstallManifest;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
+use Splicewire\Beam\Particle\ParticleResource;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 use Splicewire\Beam\Realm\RealmRegistry;
 use Splicewire\Beam\Seed\BeamSeedManifest;
@@ -89,8 +88,9 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         // tenant/  — tenant-only.
         //
         // Two estates, each independently config-gated (restores the pre-publish-only-stub
-        // semantics that `4f9ba78` silently dropped — see register_migrations/
-        // register_auth_migrations in config/beam/accounts.php):
+        // semantics that `4f9ba78` silently dropped — see publish_migrations/
+        // publish_auth_migrations in config/beam/accounts.php, renamed from register_* at
+        // beam-docs-satellite ticket 25 and read through {@see self::publishesEstate()}):
         //
         // AUTH estate — users/permission_tables/passkeys/PAT-provenance/the tenant identity
         // estate. On by default; a host would only turn this off if it owns its own auth schema
@@ -105,6 +105,11 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             'shared/create_users_table',
             'shared/create_permission_tables',
             'create_passkeys_table',
+            // The CREATE has to precede its own ALTER, and until ticket 25 NOBODY in the estate
+            // owned it — Sanctum only PUBLISHES its copy, so a host that never ran
+            // `vendor:publish --tag=sanctum-migrations` had no table and the ALTER below no-opped
+            // through its hasTable guard, silently, forever.
+            'create_personal_access_tokens_table',
             'add_provenance_and_archived_to_personal_access_tokens_table',
             'tenant/create_userables_table',
             'tenant/create_guest_tokens_table',
@@ -123,10 +128,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             'shared/create_impersonation_events_table',
         ];
 
-        $migrations = config('beam.accounts.register_auth_migrations', true) ? $authMigrations : [];
+        $migrations = self::publishesEstate('auth_migrations') ? $authMigrations : [];
         $migrations = array_merge(
             $migrations,
-            config('beam.accounts.register_migrations', true) ? $teamsMigrations : [],
+            self::publishesEstate('migrations') ? $teamsMigrations : [],
         );
 
         $package
@@ -134,6 +139,23 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             ->hasConfigFile(['beam/accounts'])
             ->hasViews('beam-accounts')
             ->hasMigrations($migrations);
+    }
+
+    /**
+     * Whether one publish estate is on, honouring both the current `publish_*` key and the
+     * deprecated `register_*` one it was renamed from (beam-docs-satellite ticket 25 — the old name
+     * said "register" while gating PUBLISH, contradicting the docblock three lines above it).
+     *
+     * EITHER key turning it off turns it off, which is the only reading that is safe under
+     * `mergeConfigFrom`: a host that published `config/beam/accounts.php` before the rename carries
+     * `register_auth_migrations => false` and NO `publish_auth_migrations` key, so the package
+     * default (true) would merge in underneath and silently re-enable a publish that host had
+     * deliberately turned off. Both default true, so a host setting neither is unaffected.
+     */
+    private static function publishesEstate(string $estate): bool
+    {
+        return (bool) config("beam.accounts.publish_{$estate}", true)
+            && (bool) config("beam.accounts.register_{$estate}", true);
     }
 
     /**
@@ -449,7 +471,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      * The account + team-admin FRAME RESOURCES (Frame OS ticket 20) — the OOTB list/detail surfaces a
      * host gets by installing beam-accounts: Tokens (list + revoke), Invitations (list + create + revoke),
      * Members (list-only). Two are attribute-declared `#[ParticleResource]` DTOs; Members is SOURCE-backed
-     * (model-less pivot), registered imperatively as a raw ResourceDefinition (the model-required attribute
+     * (a pivot-backed list), registered imperatively as a ParticleResource (the attribute
      * can't express it). One `register()`/`registerDefinition()` call per resource is enough for BOTH the
      * REST transport and Frame's manifest — beam's merged {@see ParticleResourceRegistry} serves both off
      * the one stored declaration (the retired `AdminResourceRegistry` used to need each resource registered
@@ -466,6 +488,17 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      * exactly one party defers.
      *
      * Still inert unless beam's particle registry is present — that guard is structural, not policy.
+     *
+     * **Registers DIRECTLY, not through `afterResolving` (particle-contribution-seam ticket 07).** This
+     * method used to wrap the whole body in `$app->afterResolving(ParticleResourceRegistry::class, …)` on
+     * the reasoning that it made the beam↔beam-accounts boot order irrelevant. It did the opposite: beam
+     * resolves that singleton in its OWN `packageBooted()`, and Laravel returns a cached singleton without
+     * firing resolving callbacks, so the hook never ran and all five declarations below were silently
+     * absent in every host measured. The direct call needs no hook to be order-safe — beam BINDS the
+     * registry in the register phase, and Laravel runs `register()` on every provider before `boot()` on
+     * any, so `bound()` is already true here whatever the provider order.
+     * {@see \Splicewire\Beam\Particle\DeadResolvingHookGuard}
+     * now throws if anyone re-introduces the hook.
      */
     protected function bootFrameResources(): void
     {
@@ -473,54 +506,43 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         if (
             ! class_exists(ParticleResourceRegistry::class)
             || ! class_exists(AttributedParticleDiscovery::class)
+            || ! $this->app->bound(ParticleResourceRegistry::class)
         ) {
             return;
         }
 
-        $attributeResources = [
-            TokenData::class,
-            InvitationData::class,
-            TeamData::class,
-            UserData::class,
-        ];
+        $registry = $this->app->make(ParticleResourceRegistry::class);
 
-        // Registered via afterResolving so it lands regardless of the beam↔beam-accounts boot order.
-        $this->app->afterResolving(
-            ParticleResourceRegistry::class,
-            function (ParticleResourceRegistry $registry) use ($attributeResources): void {
-                foreach ($attributeResources as $dataClass) {
-                    $registry->register(
-                        AttributedParticleDiscovery::resourceFromAttribute($dataClass)
-                    );
-                }
+        foreach ([TokenData::class, InvitationData::class, TeamData::class, UserData::class] as $dataClass) {
+            $registry->register(AttributedParticleDiscovery::resourceFromAttribute($dataClass));
+        }
 
-                // Members — the source-backed (model-less) list, imperatively (the model-required
-                // attribute can't express it), mirroring tower's TowerFrameResourceProvider.
-                $registry->registerDefinition(new ResourceDefinition(
-                    key: 'members',
-                    sourceKind: 'service',
-                    model: null,
-                    source: MembershipSource::class,
-                    data: MembershipData::class,
-                    creatable: false,
-                    query: null,
-                    editData: null,
-                    policy: null,
-                    form: 'bare',
-                    nav: new NavMetadata(
-                        label: 'Members',
-                        group: 'Settings',
-                        icon: 'users',
-                        section: null,
-                        navOrder: null,
-                        routeName: null,
-                    ),
-                    layout: null,
-                    deletable: false,
-                    editable: false,
-                ));
-            }
-        );
+        // Members — backed by the team pivot rather than a plain model, so it is declared
+        // imperatively (the attribute has nowhere to put a backing class). Mirrors tower's
+        // TowerFrameResourceProvider.
+        //
+        // No `BacksModel` on the backing, deliberately: a seat is a pivot row and no single model
+        // identifies it. That used to be spelled `model: null`, which only worked because frame's
+        // declaration type allowed a null there and beam's did not — the merge blocker ticket 11 §A10
+        // named. With the model field gone there is nothing to null out.
+        //
+        // ⚠️ `members` is registered by TWO packages: this one and tower. Both were raw definitions
+        // before, both are ParticleResources now, and the registry is still last-wins by key — so
+        // whichever provider boots later still wins. The merge did not create that collision and does
+        // not resolve it; it is recorded on the map for ticket 15.
+        $registry->register(new ParticleResource(
+            key: 'members',
+            backing: MembershipSource::class,
+            data: MembershipData::class,
+            filterable: false,
+            form: 'bare',
+            label: 'Members',
+            group: 'Settings',
+            icon: 'users',
+            readOnly: true,
+            deletable: false,
+            editable: false,
+        ));
     }
 
     /**

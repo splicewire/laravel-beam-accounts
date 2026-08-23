@@ -5,7 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
-use Schemastud\Frame\Contracts\UnionQuery;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
@@ -191,7 +190,7 @@ it('streams the current team members through the source', function () {
     $member = User::create(['name' => 'Ann', 'email' => 'ann@example.test', 'password' => 'x']);
     Membership::create(['team_id' => $team->id, 'user_id' => $member->id, 'role' => Role::Member->value]);
 
-    $page = app(MembershipSource::class)->index(new UnionQuery(perPage: 20, cursor: null));
+    $page = app(MembershipSource::class)->records([], null, 20);
 
     $emails = collect($page->items())->map(fn (MembershipData $m) => $m->email)->sort()->values()->all();
     expect($emails)->toBe(['ann@example.test', 'owner@example.test']);
@@ -202,7 +201,7 @@ it('the member source is empty when there is no active team', function () {
     Auth::login($stray);
 
     expect(BeamAccounts::currentTeam())->toBeNull();
-    $page = app(MembershipSource::class)->index(new UnionQuery(perPage: 20, cursor: null));
+    $page = app(MembershipSource::class)->records([], null, 20);
     expect($page->items())->toHaveCount(0);
 });
 
@@ -319,7 +318,7 @@ it('honours a host user-scope seam over the default', function () {
 // ── OOTB registration (the "fresh host gets the area" claim) ──────────────────────────────────
 
 it('registers tokens/invitations/members/teams/users onto the Frame registries when beam is present', function () {
-    // Bind the real beam registry; the provider's afterResolving hook fires on first resolve.
+    // Bind the real beam registry; the provider's boot registers into it directly.
     app()->singleton(ParticleResourceRegistry::class, fn () => new ParticleResourceRegistry);
 
     // Re-run register()+boot() now that the registry is bindable in this test app. A fresh
@@ -337,7 +336,9 @@ it('registers tokens/invitations/members/teams/users onto the Frame registries w
     foreach (['tokens', 'invitations', 'members', 'teams', 'users'] as $key) {
         $registry->definition($key); // throws if absent
     }
-    expect($registry->definition('members')->sourceKind)->toBe('service')
+    // `sourceKind` left frame's contract with particle-contribution-seam 13; the backing is a type
+    // now, asserted off beam's registry rather than a string on the manifest.
+    expect($registry->get('members')->backing)->toBe(MembershipSource::class)
         ->and($registry->definition('members')->deletable)->toBeFalse()
         ->and($registry->definition('invitations')->editable)->toBeFalse()
         ->and($registry->definition('tokens')->deletable)->toBeTrue();
@@ -375,23 +376,49 @@ it('owns the account-profile projection (name/email edit + access/roles/entitlem
     expect($props)->toContain('roles')->toContain('permissions');
 });
 
-it('the frame-resources seam is on by default and honours the disable flag', function () {
-    // Default: the boot method registers (proven by the enabled test above).
-    expect(config('beam.accounts.frame_resources.enabled', true))->toBeTrue();
-
-    // Disabled: bootFrameResources short-circuits before touching any registry. A fresh, isolated
-    // container (no setUp-armed afterResolving hook) proves the guard — a disabled boot arms nothing,
-    // so a registry resolved from THAT container stays empty.
+it('registers even when the registry singleton is ALREADY resolved (particle-contribution-seam 07)', function () {
+    // The regression test for the bug this method shipped with for its whole life. Registration used to
+    // ride `$app->afterResolving(ParticleResourceRegistry::class, …)`. In a real host, beam resolves that
+    // singleton during its OWN boot, long before this provider runs — and Laravel returns a cached
+    // singleton WITHOUT firing resolving callbacks, so all five declarations were silently absent
+    // everywhere. It went unnoticed for exactly the reason this test now pins: the old suite resolved the
+    // registry only AFTER booting the provider, which is the one order in which the hook does fire.
+    //
+    // So resolve FIRST, boot SECOND — the real host's order — and assert the declarations still land.
     $app = new Application(dirname(__DIR__));
-    $app->instance('config', new Repository([
-        'beam' => ['accounts' => ['frame_resources' => ['enabled' => false]]],
-    ]));
+    $app->instance('config', new Repository([]));
     $app->singleton(ParticleResourceRegistry::class, fn () => new ParticleResourceRegistry);
+
+    $app->make(ParticleResourceRegistry::class);
+    expect($app->resolved(ParticleResourceRegistry::class))->toBeTrue();
 
     $provider = new BeamAccountsServiceProvider($app);
     $boot = new ReflectionMethod($provider, 'bootFrameResources');
     $boot->setAccessible(true);
     $boot->invoke($provider);
 
-    expect($app->make(ParticleResourceRegistry::class)->has('tokens'))->toBeFalse();
+    $registry = $app->make(ParticleResourceRegistry::class);
+
+    expect($registry->has('tokens'))->toBeTrue()
+        ->and($registry->has('invitations'))->toBeTrue()
+        ->and($registry->has('teams'))->toBeTrue()
+        ->and($registry->has('users'))->toBeTrue()
+        ->and($registry->get('members')->backing)->toBe(MembershipSource::class);
+});
+
+it('is inert when the host has no particle registry bound', function () {
+    // The one guard that survives, and it is structural rather than policy: a host that installs
+    // beam-accounts without beam's particle surface has nowhere to register, and should get nothing
+    // rather than a fatal. (The `beam.accounts.frame_resources.enabled` off-switch this test used to
+    // assert is DELETED, along with its `beam.tenancy.*` twin — a config flag duplicated, less
+    // reliably, what the registry's own last-wins semantics already give a host.)
+    $app = new Application(dirname(__DIR__));
+    $app->instance('config', new Repository([]));
+
+    $provider = new BeamAccountsServiceProvider($app);
+    $boot = new ReflectionMethod($provider, 'bootFrameResources');
+    $boot->setAccessible(true);
+    $boot->invoke($provider);
+
+    expect($app->bound(ParticleResourceRegistry::class))->toBeFalse();
 });

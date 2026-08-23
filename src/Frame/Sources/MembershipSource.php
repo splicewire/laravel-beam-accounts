@@ -8,13 +8,13 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection;
-use Schemastud\Frame\Contracts\ResolvedUnionItem;
-use Schemastud\Frame\Contracts\UnionQuery;
-use Schemastud\Frame\Contracts\UnionSource;
 use Splicewire\Beam\Accounts\Concerns\HasMembers;
 use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Membership;
+use Splicewire\Beam\Particle\Backing\ResolvedRecord;
+use Splicewire\Beam\Particle\Backing\ResolvesRecord;
+use Splicewire\Beam\Particle\Backing\StreamsRecords;
 
 /**
  * The team-members union source (Frame OS ticket 20 — promoted from tower's
@@ -33,31 +33,31 @@ use Splicewire\Beam\Accounts\Models\Membership;
  * DOMAIN-NEUTRAL: the team is {@see BeamAccounts::currentTeam()} (a host binds its own scope resolver).
  * beam resolves the instance off the container at request time, so no explicit binding is needed.
  */
-class MembershipSource implements UnionSource
+class MembershipSource implements ResolvesRecord, StreamsRecords
 {
-    public function index(UnionQuery $query): CursorPaginatorContract
+    public function records(array $filters, ?string $cursor, int $perPage): CursorPaginatorContract
     {
         $stream = $this->stream();
 
-        $cursor = $query->cursor !== null ? Cursor::fromEncoded($query->cursor) : null;
+        $page = $cursor !== null ? Cursor::fromEncoded($cursor) : null;
 
-        if ($cursor !== null) {
-            $lastId = $cursor->parameter('id');
+        if ($page !== null) {
+            $lastId = $page->parameter('id');
             $offset = $stream->search(fn (MembershipData $item) => $item->id === $lastId);
             $stream = $offset === false ? $stream : $stream->slice($offset + 1)->values();
         }
 
-        $slice = $stream->take($query->perPage + 1)->values();
+        $slice = $stream->take($perPage + 1)->values();
 
         return new CursorPaginator(
             $slice,
-            $query->perPage,
-            $cursor,
+            $perPage,
+            $page,
             ['parameters' => ['id']],
         );
     }
 
-    public function find(string $source, string $id): ?ResolvedUnionItem
+    public function resolve(string $id, array $filters): ?ResolvedRecord
     {
         $item = $this->stream()->first(fn (MembershipData $member) => $member->id === $id);
 
@@ -65,7 +65,7 @@ class MembershipSource implements UnionSource
             return null;
         }
 
-        return new ResolvedUnionItem(item: $item, schemaRef: null);
+        return new ResolvedRecord(record: $item, schemaRef: null);
     }
 
     /**
