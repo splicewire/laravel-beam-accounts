@@ -15,7 +15,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * `scope` gates to created_by = me, `project` maps a link to its read shape. Read-only index;
  * revoke is a `share-links.revoke` operation (minter-gated).
  */
-#[ParticleResource(key: 'share-links', model: ShareLink::class, filterable: false)]
+#[ParticleResource(key: 'share-links', backing: ShareLink::class, filterable: false)]
 class ShareLinkData extends Data
 {
     public function __construct(

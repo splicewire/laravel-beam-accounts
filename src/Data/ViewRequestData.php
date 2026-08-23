@@ -14,7 +14,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * "My access requests" (ADR-0009, tracer 04) — the view-requests the current user filed, with
  * status, as a declarative particle resource. Owner-side (incoming) requests stay per-resource.
  */
-#[ParticleResource(key: 'view-requests', model: ViewRequest::class, filterable: false)]
+#[ParticleResource(key: 'view-requests', backing: ViewRequest::class, filterable: false)]
 class ViewRequestData extends Data
 {
     public function __construct(

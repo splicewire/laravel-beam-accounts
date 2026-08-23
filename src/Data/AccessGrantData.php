@@ -16,7 +16,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * grantee, as a declarative particle resource. Points at the OOTB AccessGrant model; a host that
  * binds a different grant_model registers its own read resource.
  */
-#[ParticleResource(key: 'access-grants', model: AccessGrant::class, filterable: false)]
+#[ParticleResource(key: 'access-grants', backing: AccessGrant::class, filterable: false)]
 class AccessGrantData extends Data
 {
     public function __construct(
