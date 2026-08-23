@@ -40,7 +40,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  */
 #[ParticleResource(
     key: 'tokens',
-    model: PersonalAccessToken::class,
+    backing: PersonalAccessToken::class,
     label: 'API tokens',
     group: 'Settings',
     icon: 'key',

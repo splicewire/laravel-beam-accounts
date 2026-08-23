@@ -38,7 +38,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  */
 #[ParticleResource(
     key: 'invitations',
-    model: Invitation::class,
+    backing: Invitation::class,
     label: 'Invitations',
     group: 'Settings',
     icon: 'mail',

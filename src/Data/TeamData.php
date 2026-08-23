@@ -29,7 +29,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  */
 #[ParticleResource(
     key: 'teams',
-    model: Team::class,
+    backing: Team::class,
     label: 'Teams',
     group: 'Platform',
     icon: 'building',

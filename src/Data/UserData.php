@@ -71,7 +71,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  */
 #[ParticleResource(
     key: 'users',
-    model: User::class,
+    backing: User::class,
     label: 'Users',
     group: 'Settings',
     icon: 'users',
