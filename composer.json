@@ -63,7 +63,7 @@
                     {
                         "fromPrefix": "splicewire/laravel-beam-accounts",
                         "toPrefix": "splicewire/laravel-tower",
-                        "because": "the account engine is reusable by any beam site; the auth surface lives DOWN here and is consumed UP by the tower host (host-specific TowerAuthUserData/Extras subclass stays in tower) — beam-accounts never requires tower"
+                        "because": "the account engine is reusable by any beam site; the auth surface lives DOWN here and is consumed UP by the tower host — beam-accounts never requires tower. particle-contribution-seam 18 deleted the host-specific TowerAuthUserData/Extras subclass entirely: a package extends the auth projection by contributing a named slice of the `me` particle resource, which composes, rather than by swapping a one-slot class-string or binding a one-slot port"
                     },
                     {
                         "fromPrefix": "splicewire/laravel-beam-accounts",
