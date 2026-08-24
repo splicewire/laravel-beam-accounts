@@ -1,7 +1,5 @@
 <?php
 
-use Splicewire\Beam\Accounts\Data\AuthUserData;
-
 return [
     // The session guard the account surface runs on. Satellites are session/cookie
     // consumer apps — the token 'api' guard is a separate, opt-in door (issue 07).
@@ -57,16 +55,12 @@ return [
     // Name given to the personal team provisioned on registration. {name} is the user's name.
     'personal_team_name' => "{name}'s Team",
 
-    // Config-swappable Data DTOs (extension-seam asset 07, idiom #2). A host publishes this
-    // config and swaps a class-string for a subclass that adds its own flat top-level props; the
-    // base resolves the configured class and hydrates it via `::from()`, so the subclass fills
-    // its extra props itself. `auth_user` is the identity-core auth projection (`/me`, login,
-    // passkey-login, profile-update). The host also binds an AuthUserExtrasContributor to supply
-    // those extra fields' VALUES; standalone beam-accounts keeps the base class + Null contributor
-    // and projects a pure identity core (host fields ABSENT, not empty).
-    'data' => [
-        'auth_user' => AuthUserData::class,
-    ],
+    // ⚠️ There is no `data.auth_user` slot any more (particle-contribution-seam 18). It held ONE
+    // class-string, so two packages could never both add props to the auth projection — which is
+    // why a commerce concept and an embed concept had to meet in the top host instead of shipping
+    // with the packages that own them. A package now adds its own named slice of the `me` read
+    // projection through the particle contribution seam
+    // ({@see \Splicewire\Beam\Particle\Contribution\ResourceContribution}), which composes.
 
     // Demo subjects + the `splicewire:beam:accounts:login-as` affordance — a standardized way to land in
     // the app as a known subject at a known access level (owner/admin/member/solo) and

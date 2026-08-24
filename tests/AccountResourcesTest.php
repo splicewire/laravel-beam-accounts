@@ -369,8 +369,8 @@ it('owns the account-profile projection (name/email edit + access/roles/entitlem
         ->and(class_exists(AuthUserData::class))->toBeTrue()
         ->and(class_exists(ProfileController::class))->toBeTrue();
 
-    // The access projection carries roles + permissions (the entitlements axis a host extends via
-    // the AuthUserExtrasContributor seam).
+    // The access projection carries roles + permissions (the entitlements axis a package extends by
+    // contributing a slice of the `me` resource — particle-contribution-seam 18).
     $refl = new ReflectionClass(AuthUserData::class);
     $props = array_map(fn ($p) => $p->getName(), $refl->getConstructor()->getParameters());
     expect($props)->toContain('roles')->toContain('permissions');

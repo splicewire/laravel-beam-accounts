@@ -1,21 +1,21 @@
 <?php
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
-use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
-use Splicewire\Beam\Accounts\Support\NullAuthUserExtras;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Stancl\Tenancy\Contracts\Tenant;
 use Stancl\Tenancy\Tenancy;
 
-it('binds the Null contributor by default', function () {
-    expect(app(AuthUserExtrasContributor::class))->toBeInstanceOf(NullAuthUserExtras::class);
-});
-
-it('defaults the auth_user shape class to the base AuthUserData', function () {
-    expect(config('beam.accounts.data.auth_user'))->toBe(AuthUserData::class);
+// ⚠️ The two seams this file used to open with are GONE (particle-contribution-seam 18): a bound
+// `AuthUserExtrasContributor` port with a Null default (VALUE), and a config-swappable
+// `beam.accounts.data.auth_user` class-string (SHAPE). Each held ONE slot, so two packages could
+// never both extend the projection. Extra fields now arrive as named slices on the `me` particle
+// resource, contributed by the packages that own them — asserted in `MeResourceTest`, not here,
+// because this class no longer knows the seam exists.
+it('has no host-extension seam left on the DTO', function () {
+    expect(interface_exists('Splicewire\\Beam\\Accounts\\Contracts\\AuthUserExtrasContributor'))->toBeFalse();
+    expect(config('beam.accounts.data'))->toBeNull();
 });
 
 it('projects the identity core for a central user', function () {
@@ -53,14 +53,17 @@ it('reports isRoot for a central Root user', function () {
     expect(AuthUserData::fromUser($user, null)->isRoot)->toBeTrue();
 });
 
-it('degrades cleanly standalone — host fields are ABSENT, not empty', function () {
+it('degrades cleanly standalone — contributed fields are ABSENT, not empty', function () {
     $user = User::create(['name' => 'Solo', 'email' => 'solo@example.test']);
 
-    // With the Null contributor and the base shape class, the projection is the pure identity core.
+    // `fromUser` is the identity core and nothing else: no contribution folds here, by design
+    // (ticket 16 §A4 — four of its five callers mint a token and none is a particle read).
     $array = AuthUserData::fromUser($user, 'tok')->toArray();
 
-    // The host fields (Tower's entitlements / platformEmbedPk) never appear — not as [] or null,
-    // literally absent — because the base class doesn't declare them and NullAuthUserExtras adds nothing.
+    // The contributed slices (`commerce`, `embed`) never appear — not as [] or null, literally
+    // absent, which is the distinction the retired port's `[]` Null default could not make.
+    expect($array)->not->toHaveKey('commerce');
+    expect($array)->not->toHaveKey('embed');
     expect($array)->not->toHaveKey('entitlements');
     expect($array)->not->toHaveKey('platformEmbedPk');
     // `access_token` (snake) is the WIRE key — mapped via #[MapOutputName] to preserve byte-for-byte
@@ -69,30 +72,6 @@ it('degrades cleanly standalone — host fields are ABSENT, not empty', function
     expect(array_keys($array))->toBe([
         'id', 'name', 'email', 'access_token', 'roles', 'permissions', 'tenants', 'isRoot', 'isDemo', 'tenant',
     ]);
-});
-
-it('merges a host contributor extras by name via ::from()', function () {
-    // A fake host: swap the SHAPE class to a subclass that adds a flat field, and bind a
-    // contributor that supplies its VALUE keyed by property name.
-    config(['beam.accounts.data.auth_user' => FakeHostAuthUserData::class]);
-    app()->bind(AuthUserExtrasContributor::class, fn () => new class implements AuthUserExtrasContributor
-    {
-        public function contribute(Authenticatable $user): array
-        {
-            return ['badge' => 'vip'];
-        }
-    });
-
-    $user = User::create(['name' => 'Cy', 'email' => 'cy@example.test']);
-
-    $data = AuthUserData::fromUser($user, 'tok');
-
-    expect($data)->toBeInstanceOf(FakeHostAuthUserData::class);
-    // Identity core still present…
-    expect($data->email)->toBe('cy@example.test');
-    // …and the host field hydrated by name (no constructor forwarding needed).
-    expect($data->badge)->toBe('vip');
-    expect($data->toArray())->toHaveKey('badge');
 });
 
 it('projects the identity core for a tenant user', function () {
@@ -120,11 +99,6 @@ it('projects the identity core for a tenant user', function () {
     expect($data->roles)->toBe([]);        // no tenant-scoped roles assigned in the fixture
     expect($data->permissions)->toBe([]);
 });
-
-class FakeHostAuthUserData extends AuthUserData
-{
-    public string $badge = 'none';
-}
 
 class FakeTenant implements Tenant
 {

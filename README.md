@@ -78,28 +78,32 @@ the single seam:
 AuthUserData::fromUser($user, $accessToken);   // central-vs-tenant branch; isRoot via Support\CentralRoot
 ```
 
-A host that needs extra fields on the projection adds them through a **two-idiom extension seam** —
-without beam-accounts ever learning those fields exist:
-
-- **SHAPE** (config-swappable class): `config('beam.accounts.data.auth_user')` — default
-  `AuthUserData::class`. A host publishes this config and swaps a **subclass** that declares its own
-  flat, top-level props. `fromUser` resolves the configured class and hydrates it via `::from()`
-  (spatie maps by property **name**, not positional `new`), so the subclass's extra props fill
-  themselves — **no constructor forwarding**.
-- **VALUE** (bound port + Null default): `Contracts\AuthUserExtrasContributor` — the host binds a
-  contributor whose `contribute($user)` returns the extra fields keyed by property name; `fromUser`
-  spreads them blind into `::from()`. The default binding is `Support\NullAuthUserExtras` (returns
-  `[]`).
+A package that owns a concern adds **its own named slice** of the projection through the particle
+contribution seam — beam-accounts never learns the field exists, and unlike the two single-slot seams
+this replaces, more than one package may contribute at once:
 
 ```php
-// host service provider:
-app()->bind(AuthUserExtrasContributor::class, App\Auth\MyAuthUserExtras::class);
-config(['beam.accounts.data.auth_user' => App\Data\MyAuthUserData::class]);
+// beam-commerce's own service provider — the package that OWNS entitlements ships them:
+$registry->register(new ResourceContribution(
+    key: 'me',
+    as: 'commerce',
+    data: AuthUserCommerceData::class,
+    value: fn ($user, $ctx, $filters) => new AuthUserCommerceData(...),
+));
 ```
 
-**Standalone degrades cleanly:** with the base class + the Null contributor, a beam-accounts site
-projects the pure identity core — the host fields are **absent** (not empty). (Feeds the
-auth-relocation ADR; auth-cluster spec §2 + extension-seam asset 07.)
+The slice lands nested under its `as` key (`data.commerce.entitlements`), which is what makes two
+packages claiming one sub-projection a loud registration conflict instead of a silent last-wins.
+
+⚠️ The two seams this replaces are **deleted** (particle-contribution-seam 18): a config-swappable
+SHAPE class-string (`beam.accounts.data.auth_user`) and a bound VALUE port
+(`Contracts\AuthUserExtrasContributor`). Each held exactly one slot, so a commerce field and an embed
+field could only meet in a host that saw both packages — which is how two package-owned concepts ended
+up hoisted into the top host that owns neither.
+
+**Standalone degrades cleanly:** with no contributing package installed, `GET /me` projects the pure
+identity core and each slice key is **absent** — not present-and-empty, which is the distinction the
+retired port's `[]` default could not make.
 
 ## What stays in the satellite
 

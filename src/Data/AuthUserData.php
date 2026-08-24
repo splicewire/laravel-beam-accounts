@@ -5,7 +5,7 @@ namespace Splicewire\Beam\Accounts\Data;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\LaravelData\Data;
-use Splicewire\Beam\Accounts\Contracts\AuthUserExtrasContributor;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 
 /**
@@ -13,19 +13,27 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
  * converge on (auth-cluster spec asset 11 §2). It carries ONLY identity fields and names no
  * commerce/embed type, so beam-accounts never depends up on a host package.
  *
- * A host that needs extra fields on the projection (e.g. Tower's `entitlements` / `platformEmbedPk`)
- * uses the two-idiom extension seam (asset 07):
+ * ## Extra fields come from the particle contribution seam, not from here
  *
- *  - SHAPE (idiom #2, config-swappable class): `config('beam.accounts.data.auth_user')` — a host
- *    publishes a subclass class-string; the base is the default. `fromUser` resolves it and hydrates
- *    THAT class, so the subclass's flat top-level props fill themselves.
- *  - VALUE (idiom #1, bound port + Null default): {@see AuthUserExtrasContributor} — the host binds a
- *    contributor that returns the extra fields keyed by name; the base spreads them blind.
+ * A package that owns a concern adds its own named slice of the `me` read projection by registering a
+ * {@see \Splicewire\Beam\Particle\Contribution\ResourceContribution} on key `me` — beam-commerce ships
+ * `commerce.entitlements`, beam-embed ships `embed.platformEmbedPk`, each from the package that owns
+ * the concept. This class stays closed.
  *
- * Construction is `::from()` (spatie hydrates by reflection/property name), NOT positional `new`, so a
- * subclass that ADDS props needs no constructor forwarding, and the base drops any host keys it doesn't
- * declare — standalone beam-accounts degrades to a coherent identity core with the host fields ABSENT.
+ * ⚠️ Two seams used to live here and both are gone (particle-contribution-seam 16/18). A
+ * config-swappable SHAPE class-string (`beam.accounts.data.auth_user`) and a bound VALUE port
+ * (`AuthUserExtrasContributor`, with a Null default) each held exactly ONE slot, so two packages could
+ * never both extend the projection — which is why two package-owned fields (a commerce concept and an
+ * embed concept) had to be hoisted into the top host to meet. That is the same disease as tower's
+ * 22-prop `tenants`, second mechanism: `tenants` was forced up by last-registration-wins on a resource
+ * key, this by last-bind-wins on a container binding. `ComposeMany` cures both.
+ *
+ * Construction is `::from()` (spatie hydrates by reflection/property name), NOT positional `new`, so the
+ * identity core is assembled by name in {@see identityCore()}. A host that installs neither contributing
+ * package gets a coherent identity core with the slices ABSENT — not present-and-empty, which is the
+ * distinction the old `[]` Null default could not make.
  */
+#[TypeScript]
 class AuthUserData extends Data
 {
     public function __construct(
@@ -49,21 +57,19 @@ class AuthUserData extends Data
     ) {}
 
     /**
-     * The single build seam. Resolves the host-swapped SHAPE class + the bound VALUE contributor,
-     * then hydrates by name via `::from()` — so a host subclass fills its own extra props and the
-     * base drops keys it doesn't declare.
+     * The single build seam for the IDENTITY CORE — the token paths' projection, and the base the `me`
+     * particle resource projects before any contribution folds on.
+     *
+     * ⚠️ It deliberately does NOT reach for a contribution. Four of this method's five callers mint or
+     * refresh a token (login, passkey-login, profile-update, log-in-as-user) and none of them is a
+     * particle READ; adding a fold point inside a DTO builder so contributions reached them would be a
+     * second contribution mechanism living somewhere the seam does not, which ticket 04 §A8 forbade and
+     * ticket 16 §A4 refused again on measurement — the SPA's `applyLogin` consumes neither contributed
+     * prop, and `fetchMe` runs on boot regardless.
      */
     public static function fromUser(Authenticatable $user, ?string $accessToken = null): static
     {
-        $core = static::identityCore($user, $accessToken);
-
-        // VALUE seam (idiom #1): assoc array keyed by property name; [] on a null host.
-        $extras = app(AuthUserExtrasContributor::class)->contribute($user);
-
-        // SHAPE seam (idiom #2): the host-swapped class; base is the default.
-        $class = config('beam.accounts.data.auth_user', static::class);
-
-        return $class::from([...$core, ...$extras]);
+        return static::from(static::identityCore($user, $accessToken));
     }
 
     /**
