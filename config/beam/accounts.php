@@ -243,6 +243,17 @@ return [
     'tokens' => [
         'model' => null,
         'scope' => null,
+
+        // The connection `personal_access_tokens` lives on. null = the app default, which is the only
+        // answer a non-tenanted host can use. A tenanted host whose tokens live on the shared central
+        // database sets 'central' here.
+        //
+        // This is a config key rather than a `protected $connection` on the model because a hardcoded
+        // one is unoverridable off the host it was written for: `splicewire/tower`'s token model pinned
+        // 'central' (beam-docs-satellite ticket 25). That resolves fine wherever stancl/tenancy clones
+        // the default connection into `central` at boot — which is why it never broke — and is
+        // unusable on a host composing tower without that step.
+        'connection' => null,
     ],
 
     // The users resource — the identity roster. `scope` is the load-bearing row-level isolation on
