@@ -31,6 +31,7 @@ use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
+use Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
@@ -91,7 +92,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         // Two estates, each independently config-gated (restores the pre-publish-only-stub
         // semantics that `4f9ba78` silently dropped — see publish_migrations/
         // publish_auth_migrations in config/beam/accounts.php, renamed from register_* at
-        // beam-docs-satellite ticket 25 and read through {@see self::publishesEstate()}):
+        // beam-docs-satellite ticket 25 and read through {@see self::publishesEstateNamed()}):
         //
         // AUTH estate — users/permission_tables/passkeys/PAT-provenance/the tenant identity
         // estate. On by default; a host would only turn this off if it owns its own auth schema
@@ -102,44 +103,68 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
         // shared/create_teams_table.php.stub's docblock for why). A host that runs its own
         // separate team system (splicewire-app) turns this off so these tables are never
         // published onto its disk at all.
-        $authMigrations = [
-            'shared/create_users_table',
-            'shared/create_permission_tables',
-            'create_passkeys_table',
-            // The CREATE has to precede its own ALTER, and until ticket 25 NOBODY in the estate
-            // owned it — Sanctum only PUBLISHES its copy, so a host that never ran
-            // `vendor:publish --tag=sanctum-migrations` had no table and the ALTER below no-opped
-            // through its hasTable guard, silently, forever.
-            'create_personal_access_tokens_table',
-            'add_provenance_and_archived_to_personal_access_tokens_table',
-            'tenant/create_userables_table',
-            'tenant/create_guest_tokens_table',
-            'tenant/create_sign_offs_table',
-            'tenant/rename_userish_to_system_account',
-        ];
+        $migrations = [];
 
-        $teamsMigrations = [
-            'shared/create_teams_table',
-            'shared/create_memberships_table',
-            'shared/add_current_team_id_to_users_table',
-            'shared/create_invitations_table',
-            'shared/create_access_grants_table',
-            'shared/create_share_links_table',
-            'shared/create_view_requests_table',
-            'shared/create_impersonation_events_table',
-        ];
-
-        $migrations = self::publishesEstate('auth_migrations') ? $authMigrations : [];
-        $migrations = array_merge(
-            $migrations,
-            self::publishesEstate('migrations') ? $teamsMigrations : [],
-        );
+        foreach (self::gatedEstates() as $estate => $stubs) {
+            if (self::publishesEstateNamed($estate)) {
+                $migrations = array_merge($migrations, $stubs);
+            }
+        }
 
         $package
             ->name('laravel-beam-accounts')
             ->hasConfigFile(['beam/accounts'])
             ->hasViews('beam-accounts')
             ->hasMigrations($migrations);
+    }
+
+    /**
+     * The two independently-gated publish estates, keyed by the config-key suffix that gates each.
+     *
+     * PUBLIC and static because {@see \Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit} reads
+     * the same lists to verify the claim a host makes by turning a gate off ("this estate is already
+     * committed on my disk"). Two copies of these names would be two copies that drift, and the whole
+     * point of the audit is that a second statement of the estate went stale without anyone noticing —
+     * tower's `config/beam/accounts.php` docblock still describes migrations that repo deleted.
+     *
+     * Declared order matters and is load-bearing: creates before their alters, parents before children
+     * (FKs). package-tools stamps each entry a second apart in listed order at publish time, which is
+     * the only thing making `create_personal_access_tokens_table` precede its own provenance ALTER.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function gatedEstates(): array
+    {
+        return [
+            // AUTH — users/permission_tables/passkeys/PAT create+provenance/the tenant identity estate.
+            'auth_migrations' => [
+                'shared/create_users_table',
+                'shared/create_permission_tables',
+                'create_passkeys_table',
+                // The CREATE has to precede its own ALTER, and until ticket 25 NOBODY in the estate
+                // owned it — Sanctum only PUBLISHES its copy, so a host that never ran
+                // `vendor:publish --tag=sanctum-migrations` had no table and the ALTER below no-opped
+                // through its hasTable guard, silently, forever.
+                'create_personal_access_tokens_table',
+                'add_provenance_and_archived_to_personal_access_tokens_table',
+                'tenant/create_userables_table',
+                'tenant/create_guest_tokens_table',
+                'tenant/create_sign_offs_table',
+                'tenant/rename_userish_to_system_account',
+            ],
+
+            // TEAMS — teams/memberships/invitations/access-grants/share-links/view-requests.
+            'migrations' => [
+                'shared/create_teams_table',
+                'shared/create_memberships_table',
+                'shared/add_current_team_id_to_users_table',
+                'shared/create_invitations_table',
+                'shared/create_access_grants_table',
+                'shared/create_share_links_table',
+                'shared/create_view_requests_table',
+                'shared/create_impersonation_events_table',
+            ],
+        ];
     }
 
     /**
@@ -151,9 +176,11 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
      * `mergeConfigFrom`: a host that published `config/beam/accounts.php` before the rename carries
      * `register_auth_migrations => false` and NO `publish_auth_migrations` key, so the package
      * default (true) would merge in underneath and silently re-enable a publish that host had
-     * deliberately turned off. Both default true, so a host setting neither is unaffected.
+     * deliberately turned off. `splicewire-app` is exactly that host (recorded in
+     * `splicewire-recohere`'s SESSION-8 ledger, which calls the flip "do NOT force"). Both default
+     * true, so a host setting neither is unaffected.
      */
-    private static function publishesEstate(string $estate): bool
+    public static function publishesEstateNamed(string $estate): bool
     {
         return (bool) config("beam.accounts.publish_{$estate}", true)
             && (bool) config("beam.accounts.register_{$estate}", true);
@@ -395,6 +422,14 @@ class BeamAccountsServiceProvider extends PackageServiceProvider
             $this->app->make(BeamDoctorManifest::class)->register(
                 'splicewire/laravel-beam-accounts',
                 BeamAccountsMigrationsAudit::class,
+            );
+
+            // Verifies the CLAIM a host makes by turning a publish gate off — that the estate is
+            // already committed on its disk. Tower asserted it, deleted two of the files, and nothing
+            // noticed until a fresh clone could not migrate at all (beam-docs-satellite ticket 25).
+            $this->app->make(BeamDoctorManifest::class)->register(
+                'splicewire/laravel-beam-accounts',
+                PublishGateCoverageAudit::class,
             );
         }
     }

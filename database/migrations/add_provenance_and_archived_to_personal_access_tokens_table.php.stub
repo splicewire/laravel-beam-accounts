@@ -15,19 +15,29 @@ use Splicewire\Beam\Accounts\Enums\TokenProvenance;
  * erasing it; archiving also neutralizes the stored hash at the application layer so an archived
  * token can never authenticate again).
  *
- * ALTER-ONLY, CENTRAL-ONLY: `personal_access_tokens` itself is created by Sanctum's own migration,
- * not this package's — there is no `Schema::create` here to fold into, and no tenant twin (the table
- * doesn't exist on the tenant estate at all, so there is nothing to classify "shared" against).
+ * ALTER-ONLY, CENTRAL-ONLY: no tenant twin (the table doesn't exist on the tenant estate at all, so
+ * there is nothing to classify "shared" against).
+ *
+ * CORRECTED at beam-docs-satellite ticket 25. This docblock used to say the table "is created by
+ * Sanctum's own migration, not this package's". Sanctum v4 CREATES NOTHING — its provider calls
+ * `publishesMigrations()` and never `loadMigrationsFrom()` — so on a host that never published
+ * Sanctum's copy there was no table, no error, and the guard below skipped this ALTER forever. The
+ * CREATE is now this package's too (`create_personal_access_tokens_table.php.stub`, listed
+ * immediately before this file), which is what makes the guard's skip case rare rather than routine.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        // GUARDED on the table's EXISTENCE, not its columns: Sanctum's own migration creates
-        // `personal_access_tokens`, and a host that does not publish it has no table to alter — this
-        // file would otherwise fatal `migrate:fresh` on every such host (beam-facade ticket 39, at
-        // `~/Herd/schemastud`). Skipping is safe because Sanctum stamps its create in the
-        // `0001_01_01_*` band, so wherever the table exists at all it exists before this runs.
+        // GUARDED on the table's EXISTENCE, not its columns: a host that has neither this package's
+        // create nor a published Sanctum copy has no table to alter, and this file would otherwise
+        // fatal `migrate:fresh` on every such host (beam-facade ticket 39, at `~/Herd/schemastud`).
+        //
+        // The ordering argument this comment used to make was WRONG (ticket 25): Sanctum's stamp is
+        // `2019_12_14_000001`, not the `0001_01_01_*` band. The conclusion survives on a different
+        // and actually true premise — every create that can supply this table sorts before it. Ours
+        // is listed immediately above this file in the same publish run (package-tools stamps in
+        // listed order), and Sanctum's 2019 stamp precedes any publish-time `now()`.
         if (! Schema::hasTable('personal_access_tokens')) {
             return;
         }

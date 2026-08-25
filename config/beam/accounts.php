@@ -20,20 +20,27 @@ return [
     // wants to wire the macro itself.
     'register_routes' => env('ACCOUNT_REGISTER_ROUTES', true),
 
-    // Gate what configurePackage() declares via ->hasMigrations() — a package-tools declaration
-    // controls PUBLISH (vendor:publish / splicewire:beam:install), not just runtime auto-load
-    // (which publish-only stubs never do regardless of these flags). Two independent estates:
+    // Gate what configurePackage() declares via ->hasMigrations(). These control PUBLISH
+    // (vendor:publish / splicewire:beam:install) — copying a .stub onto the host's disk — and never
+    // runtime registration, which publish-only stubs do not do regardless of these flags. They were
+    // named `register_*` until beam-docs-satellite ticket 25; the old keys are still honoured (see
+    // below) but say the opposite of what they do, three lines under a docblock that gets it right.
     //
-    //  - register_auth_migrations — users/permission_tables/passkeys/PAT-provenance/the tenant
-    //    identity estate. A host would only turn this off if it owns its own auth schema entirely
-    //    (its own users table, its own tenant identity migrations) and wants none of this
-    //    package's auth estate published onto its disk.
-    //  - register_migrations — the teams/memberships/invitations/access-grants/share-links/
+    // OFF IS A CLAIM, AND THE INSTALLER VERIFIES IT. Turning one of these off asserts "every member
+    // of that estate is already committed on my disk" — which is what all three starters mean, having
+    // published once and committed the output. `splicewire:beam:install` now checks the claim
+    // ({@see \Splicewire\Beam\Doctor\PublishGateCoverageAudit}), because tower's `420f9e0` turned the
+    // gate off, deleted its own `users` and `passkeys` creates, and nothing noticed until a fresh
+    // install could not build a database at all.
+    //
+    //  - publish_auth_migrations — users/permission_tables/passkeys/PAT-create/PAT-provenance/the
+    //    tenant identity estate.
+    //  - publish_migrations — the teams/memberships/invitations/access-grants/share-links/
     //    view-requests estate (shared/ — identical schema on every connection; see
     //    shared/create_teams_table.php.stub's docblock). A host running its own separate team
     //    system turns this off so these tables are never published, matching splicewire-app.
-    'register_auth_migrations' => env('ACCOUNT_REGISTER_AUTH_MIGRATIONS', true),
-    'register_migrations' => env('ACCOUNT_REGISTER_MIGRATIONS', true),
+    'publish_auth_migrations' => env('ACCOUNT_PUBLISH_AUTH_MIGRATIONS', env('ACCOUNT_REGISTER_AUTH_MIGRATIONS', true)),
+    'publish_migrations' => env('ACCOUNT_PUBLISH_MIGRATIONS', env('ACCOUNT_REGISTER_MIGRATIONS', true)),
 
     // Wire Fortify as the default auth substrate (registration/reset actions +
     // login/two-factor rate limiters). A host that consumes only the code primitive

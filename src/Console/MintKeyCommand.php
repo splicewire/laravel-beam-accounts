@@ -17,7 +17,9 @@ use Splicewire\Beam\Accounts\Keys\DeterministicToken;
 class MintKeyCommand extends Command
 {
     protected $signature = 'splicewire:beam:accounts:mint-key
-        {id : The fixed token id (pin a high, unique id clear of createToken() auto-increment)}
+        {id : The fixed token id — an integer on a bigint-keyed host (pin one clear of createToken()
+              auto-increment), or a uuid on a uuid-keyed one (pin it deterministically, e.g. uuid5 over
+              the key name, so a re-mint reproduces it)}
         {plaintext : The fixed plaintext (the part after "id|")}
         {--tokenable-id= : The owning model id}
         {--tokenable-type=user : The owning model morph type/alias}
@@ -31,7 +33,12 @@ class MintKeyCommand extends Command
         $abilities = (array) $this->option('ability');
 
         $token = new DeterministicToken(
-            id: (int) $this->argument('id'),
+            // NOT cast to int (beam-docs-satellite ticket 25). `DeterministicToken` is typed
+            // `int|string` and folds the value verbatim into the bearer string, so a uuid-keyed host —
+            // which is every splicewire-operated host — needs its uuid to survive this line. The cast
+            // silently turned any uuid into `0`, which on Postgres is then an invalid uuid literal.
+            // Non-lossy for bigint hosts: a numeric-string argument stays numeric either way.
+            id: $this->argument('id'),
             plaintext: (string) $this->argument('plaintext'),
             tokenableType: (string) $this->option('tokenable-type'),
             tokenableId: $this->option('tokenable-id') ?? '',
