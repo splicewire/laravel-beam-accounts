@@ -16,10 +16,13 @@ use Splicewire\Beam\Accounts\Keys\DeterministicToken;
  */
 class MintKeyCommand extends Command
 {
+    // Every {…} definition must fit on ONE line: Laravel's signature parser matches them with
+    // `/\{\s*(.*?)\s*\}/`, a regex with no `s` modifier, so `.` never crosses a newline. A
+    // definition wrapped across lines is not a parse error — it is silently skipped, and the
+    // argument simply does not exist at runtime. That is exactly what happened to {id}: the
+    // command shipped with no way to pass the value the whole primitive is pinned on.
     protected $signature = 'splicewire:beam:accounts:mint-key
-        {id : The fixed token id — an integer on a bigint-keyed host (pin one clear of createToken()
-              auto-increment), or a uuid on a uuid-keyed one (pin it deterministically, e.g. uuid5 over
-              the key name, so a re-mint reproduces it)}
+        {id : The fixed token id — an int on a bigint-keyed host (pin one clear of createToken() auto-increment), or a uuid on a uuid-keyed one (pin it deterministically, e.g. uuid5 over the key name, so a re-mint reproduces it)}
         {plaintext : The fixed plaintext (the part after "id|")}
         {--tokenable-id= : The owning model id}
         {--tokenable-type=user : The owning model morph type/alias}

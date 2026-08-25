@@ -59,9 +59,73 @@ class KeysModuleEnabledTest extends Orchestra
         });
     }
 
+    /** Re-key the table by uuid, the way every splicewire-operated host runs it. */
+    protected function useUuidKeyedTokensTable(): void
+    {
+        Schema::dropIfExists('personal_access_tokens');
+
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('tokenable_type');
+            $table->string('tokenable_id');
+            $table->string('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
     public function test_command_is_registered_when_the_module_is_enabled(): void
     {
         $this->assertArrayHasKey('splicewire:beam:accounts:mint-key', $this->app[Kernel::class]->all());
+    }
+
+    /**
+     * The id is the argument the whole primitive is pinned on, so its definition existing at all
+     * is worth asserting directly — a signature typo does not fail loudly, it just drops the
+     * argument, and the mint then silently keys every row on nothing.
+     */
+    public function test_command_declares_the_pinned_id_argument(): void
+    {
+        $definition = $this->app[Kernel::class]->all()['splicewire:beam:accounts:mint-key']->getDefinition();
+
+        $this->assertTrue($definition->hasArgument('id'));
+        $this->assertTrue($definition->getArgument('id')->isRequired());
+    }
+
+    /**
+     * The console is where a uuid is most at risk: an argument arrives as a string, and a `(int)`
+     * on the way into DeterministicToken turns it into 0 — a row keyed wrong, and on Postgres an
+     * invalid uuid literal outright. This drives the real command against a uuid-keyed table.
+     */
+    public function test_command_mints_a_uuid_keyed_row_without_coercing_the_id(): void
+    {
+        $this->useUuidKeyedTokensTable();
+
+        $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+
+        $this->artisan('splicewire:beam:accounts:mint-key', [
+            'id' => $uuid,
+            'plaintext' => 'numeroSatelliteServiceToken00000000000v1',
+            '--tokenable-id' => 'owner-uuid',
+            '--name' => 'numero-satellite',
+        ])->expectsOutputToContain($uuid.'|numeroSatelliteServiceToken00000000000v1')
+            ->assertSuccessful();
+
+        $this->assertSame($uuid, DB::table('personal_access_tokens')->value('id'));
+        $this->assertSame(1, DB::table('personal_access_tokens')->count());
+
+        // Idempotent through the console door too: the second run re-finds the pinned row.
+        $this->artisan('splicewire:beam:accounts:mint-key', [
+            'id' => $uuid,
+            'plaintext' => 'numeroSatelliteServiceToken00000000000v1',
+            '--tokenable-id' => 'owner-uuid',
+            '--name' => 'numero-satellite',
+        ])->assertSuccessful();
+
+        $this->assertSame(1, DB::table('personal_access_tokens')->count());
     }
 
     public function test_command_mints_a_deterministic_row(): void

@@ -28,6 +28,31 @@ beforeEach(function () {
     });
 });
 
+/**
+ * Re-key the table by uuid. Sanctum's shipped migration is bigint-keyed, but every
+ * splicewire-operated host keys `personal_access_tokens` by uuid, and a Sanctum bearer IS
+ * `{id}|{plaintext}` — `PersonalAccessToken::findToken()` splits on the pipe and looks the row
+ * up BY PRIMARY KEY. So the id is a wire-format field, not merely a storage detail: if the
+ * minter coerces it, the bearer it hands back cannot find its own row. Built here rather than
+ * by mutating the package's .stub so the shipped default stays the shipped default.
+ */
+function useUuidKeyedTokensTable(): void
+{
+    Schema::dropIfExists('personal_access_tokens');
+
+    Schema::create('personal_access_tokens', function (Blueprint $table) {
+        $table->uuid('id')->primary();
+        $table->string('tokenable_type');
+        $table->string('tokenable_id');
+        $table->string('name');
+        $table->string('token', 64)->unique();
+        $table->text('abilities')->nullable();
+        $table->timestamp('last_used_at')->nullable();
+        $table->timestamp('expires_at')->nullable();
+        $table->timestamps();
+    });
+}
+
 function makeToken(array $overrides = []): DeterministicToken
 {
     return new DeterministicToken(
@@ -77,6 +102,72 @@ it('accepts a string (uuid) id — folded verbatim into the bearer', function ()
 
     expect(makeToken(['id' => $uuid])->bearer())
         ->toBe($uuid.'|numeroSatelliteServiceToken00000000000v1');
+});
+
+it('mints against a uuid-keyed table storing the pinned uuid verbatim as the row id', function () {
+    // The property under test is that NOTHING between the caller and the row generates or
+    // coerces the key. `mint()` writes through the query builder, so Eloquent's
+    // `HasUniqueIds::setUniqueIds()` — which only generates `if (empty($this->{$column}))` —
+    // never even runs; the pinned value is the only candidate the insert ever sees.
+    useUuidKeyedTokensTable();
+
+    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+
+    makeToken(['id' => $uuid])->mint();
+
+    $rows = DB::table('personal_access_tokens')->get();
+    expect($rows)->toHaveCount(1);
+
+    // Not a freshly generated uuid, not `0` from an int cast, not null.
+    expect($rows->first()->id)->toBe($uuid)
+        ->and($rows->first()->token)->toBe(hash('sha256', 'numeroSatelliteServiceToken00000000000v1'));
+});
+
+it('returns a bearer whose id half is the pinned uuid, so it can find its own row', function () {
+    useUuidKeyedTokensTable();
+
+    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+
+    $bearer = makeToken(['id' => $uuid])->mint();
+
+    expect($bearer)->toBe($uuid.'|numeroSatelliteServiceToken00000000000v1');
+
+    // Walk the bearer the way Sanctum's findToken() does: split on the pipe, look the row up
+    // by primary key, then compare the hashed plaintext. A coerced id breaks this lookup.
+    [$id, $plaintext] = explode('|', $bearer, 2);
+    $row = DB::table('personal_access_tokens')->where('id', $id)->first();
+
+    expect($row)->not->toBeNull()
+        ->and($row->token)->toBe(hash('sha256', $plaintext));
+});
+
+it('is idempotent on a uuid-keyed table — one row, same bearer', function () {
+    useUuidKeyedTokensTable();
+
+    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+
+    $first = makeToken(['id' => $uuid])->mint();
+    $second = makeToken(['id' => $uuid])->mint();
+
+    expect($second)->toBe($first)
+        ->and(DB::table('personal_access_tokens')->count())->toBe(1)
+        ->and(DB::table('personal_access_tokens')->where('id', $uuid)->count())->toBe(1);
+});
+
+it('still mints on the bigint default when the pinned id arrives as a numeric string', function () {
+    // The callers dropped their `(int)` casts so a uuid survives. This proves that removal is
+    // non-lossy for the bigint hosts: a console argument is always a string, and '990003'
+    // must still land on, and find, the same row as the int 990003.
+    $bearer = makeToken(['id' => '990003'])->mint();
+
+    expect($bearer)->toBe('990003|numeroSatelliteServiceToken00000000000v1');
+
+    expect(DB::table('personal_access_tokens')->count())->toBe(1)
+        ->and((int) DB::table('personal_access_tokens')->value('id'))->toBe(990003);
+
+    // Same row as the int-id mint would touch: re-minting with the int does not add a second.
+    makeToken(['id' => 990003])->mint();
+    expect(DB::table('personal_access_tokens')->count())->toBe(1);
 });
 
 it('two independent instances mint the identical credential — no central authority needed', function () {
