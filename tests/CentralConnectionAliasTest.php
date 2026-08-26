@@ -17,24 +17,24 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\AliasProbeProvider;
 use Splicewire\Beam\BeamServiceProvider;
 
 /**
- * The `central` alias (map ticket 79): {@see BeamUser} pins a LITERAL connection name, so at a host
- * that never defined `central` — 10 of the estate's 12 Herd hosts and all four starters when
- * measured, 2026-08-22 — merely RESOLVING the model threw
- * `InvalidArgumentException: Database connection [central] not configured.`
+ * The `central` alias, INHERITED (beam-facade ticket 96; originally ticket 79, registered here).
  *
- * The package's own suite never caught this because every other test drives
- * {@see Fixtures\User}, a plain Authenticatable with no pin — the pinned base model was, until this
- * file, unexercised. Same shape as the estate: the wall is latent because nothing reaches the model
- * until a host registers `UserData` or points `beam.accounts.user_model` at it.
+ * The alias itself moved to
+ * {@see \Splicewire\Beam\BeamServiceProvider::registerCentralConnectionAlias()} — the tier that
+ * declares a pin owns making it resolvable, and beam-core declares one of its own
+ * (`CentralActivityLog`) that no registration in this package could reach. Core's own
+ * `CentralConnectionAliasTest` owns the alias RULES (the two no-op guards, host-block-wins, the
+ * copy). This file owns the only claim that is this package's: **{@see BeamUser}'s pin still
+ * resolves, and still reaches the default database, purely by requiring beam-core.**
+ *
+ * That is a real regression surface rather than a restatement. Nothing else in this suite exercises
+ * the pinned base model — every other test drives {@see Fixtures\User}, a plain Authenticatable with
+ * no pin — so if the move is ever undone from the wrong end, or core stops registering in
+ * `packageRegistered()`, this is the file that goes red.
  *
  * Deliberately a FILE-backed sqlite rather than `:memory:`: two connections both configured as
  * `:memory:` are two SEPARATE databases, so an in-memory suite can prove the connection RESOLVES but
- * never that the alias reaches the same data. {@see self::test_a_write_through_the_pinned_model_lands_in_the_default_database()}
- * is the one that matters.
- *
- * The guard branches are driven through {@see AliasProbeProvider} rather than through
- * `defineEnvironment` — see that class for why a Testbench `database.*` override cannot reach the
- * register-time read.
+ * never that the alias reaches the same data.
  */
 class CentralConnectionAliasTest extends Orchestra
 {
@@ -48,7 +48,8 @@ class CentralConnectionAliasTest extends Orchestra
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             LaravelDataServiceProvider::class,
-            // beam-core, for the `particleOps` route attribute the accounts provider's boot uses.
+            // beam-core, for the `particleOps` route attribute the accounts provider's boot uses —
+            // and, since ticket 96, for the `central` alias this file asserts is inherited.
             BeamServiceProvider::class,
             BeamAccountsServiceProvider::class,
         ];
@@ -79,67 +80,17 @@ class CentralConnectionAliasTest extends Orchestra
         }
     }
 
-    /**
-     * Re-run the alias against the config state this test has set up, as the register phase would
-     * see it at a real host, and drop any connection already opened under the old block.
-     */
-    protected function aliasAgainstCurrentConfig(): void
+    public function test_central_is_registered_without_this_package_registering_it(): void
     {
-        DB::purge('central');
-
-        (new AliasProbeProvider($this->app))->probeCentralConnectionAlias();
-    }
-
-    public function test_the_provider_registers_central_with_no_host_action(): void
-    {
-        // Nothing in defineEnvironment() defined `central`; the provider did, at register time.
+        // Nothing in defineEnvironment() defined `central`, and nothing in this package does either
+        // any more — beam-core's provider did, at register time, one tier down.
         $this->assertNotNull(config('database.connections.central'));
         $this->assertSame('sqlite', config('database.connections.central.driver'));
     }
 
-    public function test_the_pinned_model_resolves_its_connection(): void
+    public function test_the_pinned_auth_principal_resolves_its_connection(): void
     {
         $this->assertSame('central', (new BeamUser)->getConnection()->getName());
-    }
-
-    public function test_the_alias_is_a_copy_of_the_default_connection(): void
-    {
-        config(['database.connections.central' => null]);
-
-        $this->aliasAgainstCurrentConfig();
-
-        $this->assertSame(
-            config('database.connections.testing'),
-            config('database.connections.central'),
-        );
-    }
-
-    public function test_a_host_defined_central_block_wins(): void
-    {
-        config(['database.connections.central' => [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => 'host_',
-        ]]);
-
-        $this->aliasAgainstCurrentConfig();
-
-        $this->assertSame('host_', config('database.connections.central.prefix'));
-        $this->assertSame(':memory:', config('database.connections.central.database'));
-    }
-
-    public function test_no_alias_is_fabricated_when_central_is_itself_the_default(): void
-    {
-        config([
-            'database.default' => 'central',
-            'database.connections.central' => null,
-        ]);
-
-        $this->aliasAgainstCurrentConfig();
-
-        // Nothing to copy FROM — the missing block IS the default block, a real misconfiguration
-        // whose own error message is more useful than a self-referential copy.
-        $this->assertNull(config('database.connections.central'));
     }
 
     /**
@@ -151,11 +102,13 @@ class CentralConnectionAliasTest extends Orchestra
      * base is a READ/resolve surface until a host subclasses it, which is exactly the surface
      * `UserData` — the only package-estate consumer — uses.
      */
-    public function test_the_pinned_model_reads_the_default_database(): void
+    public function test_the_pinned_auth_principal_reads_the_default_database(): void
     {
+        // Realign the alias against the config THIS test set up — a Testbench ordering artifact,
+        // not a property of the code. {@see AliasProbeProvider}.
         config(['database.connections.central' => null]);
-
-        $this->aliasAgainstCurrentConfig();
+        DB::purge('central');
+        (new AliasProbeProvider($this->app))->probeCentralConnectionAlias();
 
         Schema::create('users', function (Blueprint $table): void {
             $table->uuid('id')->primary();
@@ -174,8 +127,8 @@ class CentralConnectionAliasTest extends Orchestra
             'email' => 'principal@example.test',
         ]);
 
-        // Same row, read over `central` — so the alias is an alias and not a second, parallel
-        // database. Under two `:memory:` blocks this assertion would be 0.
+        // Same row, read over `central` — so the inherited alias is an alias and not a second,
+        // parallel database. Under two `:memory:` blocks this assertion would be 0.
         $this->assertSame(
             'principal@example.test',
             BeamUser::query()->sole()->email,

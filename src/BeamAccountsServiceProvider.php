@@ -198,9 +198,13 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
      */
     public function packageRegistered(): void
     {
-        // The auth principal is pinned to a LITERAL connection name; make that name resolve
-        // everywhere before anything can resolve the model. {@see self::registerCentralConnectionAlias()}
-        $this->registerCentralConnectionAlias();
+        // The `central` connection alias is NOT registered here any more (beam-facade ticket 96) —
+        // it lives in {@see \Splicewire\Beam\BeamServiceProvider::registerCentralConnectionAlias()},
+        // which this package requires, so {@see Models\User}'s pin is covered exactly as before.
+        // The ruling: the tier that DECLARES a pin owns making it resolvable, and core declares one
+        // of its own (`CentralActivityLog`) that no amount of registration HERE could ever reach —
+        // five Herd hosts install beam-core without beam-accounts and threw on it. Read the move's
+        // full argument off core's docblock rather than re-deriving it.
 
         // OOTB directory-ACL grant model: permission-cascade is model-free, so supply the
         // default grant model unless the host has bound its own. Lazily consumed by the
@@ -295,57 +299,6 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         if ($this->app->runningInConsole()) {
             $this->commands([LoginAsCommand::class]);
         }
-    }
-
-    /**
-     * Make `central` resolve at a host that never defined it, by registering it as a copy of the
-     * host's DEFAULT connection.
-     *
-     * {@see \Splicewire\Beam\Accounts\Models\User} pins `protected $connection = 'central'` — a
-     * justified pin (`@central-floor auth`: credentials must resolve before any tenant schema is
-     * selected), but a LITERAL connection name is the one expression of a pin that cannot degrade.
-     * At a host with no `central` block, merely RESOLVING the model throws
-     * `InvalidArgumentException: Database connection [central] not configured.` — which was 10 of the
-     * estate's 12 Herd hosts and all four starters when this was measured (2026-08-22). The runbook's
-     * `references/multitenancy.md` opens *"Single-tenant sites skip this entirely — their defaults are
-     * central/global"*; without this alias that sentence is aspirational rather than true.
-     *
-     * Deliberately an ALIAS registered by the package, not a host-side duplicated connection block
-     * (the standwell / splicewire-app precedent): Laravel has no connection aliasing, so every
-     * hand-copied block drifts independently from the default it is supposed to mirror, and adopting
-     * it means a 10-root retrofit plus a permanent scaffold obligation in four starters. Also
-     * deliberately NOT a `getConnectionName()` override reading config — that converts the pin from a
-     * property into a method, and `CentralPinJustificationAudit`'s `FORM_PROPERTY` stops matching it,
-     * manufacturing the exact "a pin that does not look like a pin" failure the audit was built for.
-     *
-     * A multi-tenant broker that defines its own `central` block wins and is untouched. A
-     * single-tenant host changes nothing and `central === default` silently. Runs in `register()`
-     * (not boot) so the alias is in place before any provider's boot phase can resolve a model.
-     *
-     * Two no-op guards, both for hosts where a copy would be a lie rather than an alias: a host whose
-     * `database.default` IS `central` has nothing to copy FROM (the missing block is the default block
-     * — a real misconfiguration, and its own error message is more useful than ours), and a host whose
-     * default connection has no config block at all is broken independently of this package.
-     */
-    protected function registerCentralConnectionAlias(): void
-    {
-        if (config('database.connections.central') !== null) {
-            return;
-        }
-
-        $default = config('database.default');
-
-        if ($default === null || $default === 'central') {
-            return;
-        }
-
-        $block = config("database.connections.{$default}");
-
-        if (! is_array($block)) {
-            return;
-        }
-
-        config(['database.connections.central' => $block]);
     }
 
     /**
