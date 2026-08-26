@@ -64,8 +64,16 @@ it('declares login-as as a write op on the users resource', function () {
         // swap the model routinely, so a hardcoded class would resolve {id} against the wrong table
         // — which is exactly how this first failed.
         ->and($op->model)->not->toBe(Splicewire\Beam\Accounts\Models\User::class)
-        // No `ability:` on purpose: a signed link is anonymous, and `ability` cannot express that.
-        ->and($op->ability)->toBeNull();
+        // Both credentials are DECLARED (api-surface-coherence ticket 95). `ability:` states the
+        // operator half; `signed:` states that a valid URL signature admits on its own, which is what
+        // an anonymous signed-link holder holds and what `ability:` structurally cannot express. Before
+        // that slot existed this op shipped `ability: null` and hand-rolled the whole gate.
+        ->and($op->ability)->toBe('loginAs')
+        ->and($op->signed)->toBeTrue()
+        // Free once `signed:` is declared: `expires`/`signature` become framework parameters, so
+        // `input: false` binds without 422ing the very link the op exists to serve.
+        ->and($op->input)->toBeFalse()
+        ->and($op->frameworkParameters())->toBe(['expires', 'signature']);
 });
 
 it('refuses to run when the demo affordances are off, whatever the policy says', function () {

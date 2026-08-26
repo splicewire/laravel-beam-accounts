@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\URL;
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
@@ -19,6 +20,22 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 function seedDemo(): void
 {
     app(DemoTeamSeeder::class)->run();
+}
+
+/**
+ * The signed link the affordance actually ships — `splicewire:beam:accounts:login-as` mints exactly
+ * this URL.
+ *
+ * These tests used to hit the bare route, because the retired hand-rolled gate returned early in
+ * `local`/`testing`. That carve-out is gone (api-surface-coherence ticket 95): authorization is now
+ * DECLARED on the operation (`ability: 'loginAs'` + `signed: true`) and a framework gate has no
+ * environment branch — which also means an `APP_ENV=local` host no longer lets an unauthenticated
+ * request assume any identity by id. So the suite exercises the credential the affordance really
+ * uses, rather than a bypass no production caller ever holds.
+ */
+function signedLoginAs(int|string $id, int $minutes = 30): string
+{
+    return URL::temporarySignedRoute('users.op.login-as', now()->addMinutes($minutes), ['id' => $id]);
 }
 
 it('derives the demo roster from the Role enum plus a solo subject', function () {
@@ -73,7 +90,7 @@ it('logs in as a demo subject through the operation route', function () {
 
     $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
 
-    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertRedirect('/');
+    $this->get(signedLoginAs($owner->getKey()))->assertRedirect('/');
 
     expect(auth()->check())->toBeTrue();
     expect(auth()->user()->email)->toBe(BeamDemo::email(Role::Owner->value));
@@ -84,7 +101,41 @@ it('404s an id that resolves to no user', function () {
 
     // The op resolves {id} against the user model, so an unknown SUBJECT is no longer the failure
     // mode — an unresolvable id is, and findOrFail is what answers it.
-    $this->get('/users/999999/op/login-as')->assertNotFound();
+    $this->get(signedLoginAs(999999))->assertNotFound();
+});
+
+it('refuses an UNSIGNED login-as from a caller the policy denies, in every environment', function () {
+    // The regression this pins is the one ticket 95 removed: the retired gate returned early in
+    // `local`/`testing`, so an unauthenticated GET could assume any identity by id on a local host.
+    // The declared gate has no environment branch, so the same request is now a 403.
+    seedDemo();
+
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+
+    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertForbidden();
+
+    expect(auth()->check())->toBeFalse();
+});
+
+it('refuses a signed link whose signature has been tampered with', function () {
+    seedDemo();
+
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+
+    $this->get(signedLoginAs($owner->getKey()).'0')->assertForbidden();
+});
+
+it('refuses a signed link after it has expired', function () {
+    // Replay is bounded by expiry and not otherwise prevented — this is the bound, asserted.
+    seedDemo();
+
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+
+    $url = signedLoginAs($owner->getKey(), minutes: 5);
+
+    $this->travelTo(now()->addMinutes(10));
+
+    $this->get($url)->assertForbidden();
 });
 
 it('403s the login-as operation when demo affordances are disabled', function () {
@@ -94,7 +145,7 @@ it('403s the login-as operation when demo affordances are disabled', function ()
 
     config()->set('beam.accounts.demo.enabled', false);
 
-    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertForbidden();
+    $this->get(signedLoginAs($owner->getKey()))->assertForbidden();
 });
 
 it('skips seeding when demo affordances are disabled', function () {
