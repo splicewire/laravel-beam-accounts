@@ -154,7 +154,6 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
                 'tenant/create_userables_table',
                 'tenant/create_guest_tokens_table',
                 'tenant/create_sign_offs_table',
-                'tenant/rename_userish_to_system_account',
             ],
 
             // TEAMS — teams/memberships/invitations/access-grants/share-links/view-requests.
