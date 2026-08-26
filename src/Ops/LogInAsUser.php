@@ -71,6 +71,23 @@ class LogInAsUser
             model: BeamAccounts::userModel(),
             handle: self::handle(...),
             output: AuthUserData::class,
+            // `input:` is DELIBERATELY LEFT UNDECLARED, and `false` — the answer the rest of the
+            // api-surface-coherence 68 sweep gave every op that reads no payload — is here a LIVE BUG.
+            //
+            // MEASURED. `rejectInput()` picks the axis it examines from the HTTP METHOD, and this op is
+            // mounted `GET users/{id}/op/login-as` despite being `OperationKind::Write`, so the axis it
+            // reads is the QUERY STRING. The signed-link affordance this op exists to serve is minted by
+            // `LoginAsCommand` with `URL::temporarySignedRoute()`, which appends `?expires=…&signature=…`.
+            // `OperationKind::frameworkParameters()` returns `[]` for every kind but `Task`, so those two
+            // reserved keys are `array_diff`'d as "unexpected input" and `input: false` would 422 every
+            // signed login-as link — the exact affordance, and by the exact mechanism the docblock above
+            // already records for `ability:` ("declaring it would 403 the signed link before the handler
+            // ever ran"). Two different slots, one underlying gap: beam has no notion of a validly-signed
+            // request as a credential, and no notion of Laravel's reserved signing parameters.
+            //
+            // So this op is the SECOND deliberate `null` (alongside `media.ingest`) counted against the
+            // `null` ⇒ `false` flip gate, and closing it means teaching `frameworkParameters()` about
+            // `expires`/`signature` — a beam-core change, not a declaration.
         );
     }
 
