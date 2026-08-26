@@ -5,6 +5,9 @@ namespace Splicewire\Beam\Accounts\Http\Controllers\Api\V1;
 use Illuminate\Http\Request;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Support\WebAuthn;
+use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
+use Splicewire\Beam\Accounts\Data\PasskeyRegisterInputData;
+use Splicewire\Beam\Accounts\Data\PasskeyRenameInputData;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyAuthenticator;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyChallengeStore;
 use Splicewire\Beam\Accounts\Passkeys\ResolvesPasskeyCeremonies;
@@ -23,6 +26,13 @@ use Webauthn\PublicKeyCredentialCreationOptions;
  * host's Passkey subclass) keeps beam-accounts from depending UP on the host while still receiving the host
  * model instance at runtime. Registration validates the attestation through the
  * guard-agnostic authenticator; no session is opened.
+ *
+ * The "raw WebAuthn payloads stay on `Request`" exception above is about the **container binding**, and it
+ * still holds — nothing here is injected as a typed Data parameter. It never meant the bodies go
+ * undeclared: `store` and `update` now name {@see PasskeyRegisterInputData} / {@see PasskeyRenameInputData}
+ * and hydrate them below their gates (api-surface-coherence ticket 64), so the document and the generated
+ * client carry the two fields a caller authors plus one opaque, spec-shaped `credential` object, instead of
+ * a rule-derived faker guess.
  */
 class PasskeyController extends Controller
 {
@@ -48,15 +58,14 @@ class PasskeyController extends Controller
      * Complete passkey registration: validate the attestation produced by the authenticator against the
      * challenge issued by the registration-options endpoint, and store it under a name the user chooses.
      */
+    #[RequestFromData(PasskeyRegisterInputData::class)]
     public function store(Request $request, PasskeyChallengeStore $store, PasskeyAuthenticator $authenticator): ResponseBody
     {
-        $validated = $request->validate([
-            'handle' => 'required|string',
-            'name' => 'required|string|max:255',
-            'credential' => 'required|array',
-        ]);
+        // Hydrated below any gate, never injected as a typed parameter — injection validates during
+        // container resolution and would put 422 ahead of authorization (ticket 27's measured trap).
+        $input = PasskeyRegisterInputData::validateAndCreate($request);
 
-        $options = $this->pullOptions($store, $validated['handle'], PublicKeyCredentialCreationOptions::class);
+        $options = $this->pullOptions($store, $input->handle, PublicKeyCredentialCreationOptions::class);
 
         if (! $options) {
             return ResponseBody::from(['message' => 'This passkey challenge has expired. Please try again.'])->invalid();
@@ -64,8 +73,8 @@ class PasskeyController extends Controller
 
         $passkey = $authenticator->register(
             $request->user(),
-            $validated['name'],
-            $this->credentialFromRequest($validated['credential']),
+            $input->name,
+            $this->credentialFromRequest($input->credential),
             $options,
         );
 
@@ -85,6 +94,7 @@ class PasskeyController extends Controller
     /** Rename a passkey
      *
      * Change the label on one of your own registered credentials. */
+    #[RequestFromData(PasskeyRenameInputData::class)]
     public function update(Request $request, Passkey $passkey): ResponseBody
     {
         // laravel/passkeys registers a global `{passkey}` binding that resolves by id but is NOT
@@ -92,11 +102,11 @@ class PasskeyController extends Controller
         // (a missing id 404s in the binding; an other-owned id 404s here, never leaking it).
         abort_unless((string) $passkey->user_id === (string) $request->user()->getAuthIdentifier(), 404);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-        ]);
+        // Below the ownership gate, so a caller who does not own the credential still gets 404 rather
+        // than a 422 that would confirm the id exists and leak the field vocabulary.
+        $input = PasskeyRenameInputData::validateAndCreate($request);
 
-        $passkey->update(['name' => $validated['name']]);
+        $passkey->update(['name' => $input->name]);
 
         return ResponseBody::from(['data' => $this->present($passkey->fresh())]);
     }
