@@ -88,14 +88,19 @@ enum Role: string
     }
 
     /**
-     * Schema-derived projection of the enum: the shape a JSON Schema `enum` (and a
-     * frame/option consumer) reads its cases from. This is the single declaration —
-     * a Data class' generated schema, a role-manifest endpoint, and the TS editor all
-     * read these rather than restating the vocabulary.
+     * The enum's VOCABULARY — its cases as both a bare value list and {value,label}
+     * pairs. This is the single declaration: a Data class' generated schema, a
+     * role-manifest endpoint, and the TS editor all read these rather than restating
+     * the cases.
+     *
+     * NOT named `schema()`: it returns neither a JSON Schema document nor anything a
+     * schema consumer can use as one — `{enum, options}` is a projection a schema is
+     * BUILT FROM. The old name put it in the same namespace as the 40-odd genuine
+     * schema producers in this family and read as a homonym of every one of them.
      *
      * @return array{enum: array<int, string>, options: array<int, array{value: string, label: string}>}
      */
-    public static function schema(): array
+    public static function vocabulary(): array
     {
         return [
             'enum' => self::values(),

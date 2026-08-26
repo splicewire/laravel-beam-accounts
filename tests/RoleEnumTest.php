@@ -17,7 +17,7 @@ it('treats every case as assignable (ownership transfer included)', function () 
 });
 
 it('derives its schema projection from the cases, hand-authoring nothing', function () {
-    expect(Role::schema())->toBe([
+    expect(Role::vocabulary())->toBe([
         'enum' => ['owner', 'admin', 'member'],
         'options' => [
             ['value' => 'owner', 'label' => 'Owner'],
