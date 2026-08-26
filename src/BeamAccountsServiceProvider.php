@@ -29,6 +29,7 @@ use Splicewire\Beam\Accounts\Concerns\WiresTeamsMigrations;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
+use Splicewire\Beam\Accounts\Doctor\BeamAccountsRetiredMigrationAudit;
 use Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
@@ -420,6 +421,15 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
             $this->app->make(BeamDoctorManifest::class)->register(
                 'splicewire/laravel-beam-accounts',
                 PublishGateCoverageAudit::class,
+            );
+
+            // The eight stubs `4272fbb` retired out of `teams/`. Publishing is a COPY, so every host
+            // installed before it still carries them — measured at `~/Herd/splicewire`, all eight.
+            // See {@see BeamAccountsRetiredMigrationAudit} for why the ALTER is declared only under
+            // `teams/` and never as a bare stem.
+            $this->app->make(BeamDoctorManifest::class)->register(
+                'splicewire/laravel-beam-accounts',
+                BeamAccountsRetiredMigrationAudit::class,
             );
         }
     }
