@@ -12,6 +12,8 @@ use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\Models\Permission;
+use Splicewire\Beam\Accounts\Models\Role;
 use Splicewire\Beam\Accounts\Tests\Fixtures\FixtureRealmGrantable;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\BeamServiceProvider;
@@ -19,6 +21,15 @@ use Splicewire\Beam\Facades\Beam;
 
 abstract class TestCase extends Orchestra
 {
+    /**
+     * Whether the test app configures `permission.models.*` onto this package's uuid-keyed pair.
+     *
+     * True models a real beam host; the ONE test class that measures what an *unconfigured* app
+     * resolves ({@see UuidKeyedPermissionModelsTest}) turns it off. See
+     * {@see defineEnvironment()} for why the default is on.
+     */
+    protected bool $bindBeamPermissionModels = true;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -72,6 +83,30 @@ abstract class TestCase extends Orchestra
         // ACC-01: the OOTB realm-root port binding under test — beam-ux's own binding is the same
         // shape (BeamUxEntry instead of the RealmRoot fixture), exercised in beam-ux's own suite.
         $config->set('beam.accounts.entitlements.realm_grantable', FixtureRealmGrantable::class);
+
+        // The host's one semantic config delta, mirrored here rather than left to a comment
+        // (beam-facade 138; the same shape api-surface-coherence 84 had to add for laravel-data).
+        //
+        // `createSpatieSchema()` now builds the uuid-keyed `roles`/`permissions` this package's own
+        // stub ships, and stock Spatie's Role/Permission generate no key — so `findOrCreate()` dies
+        // on NOT NULL, which is the entire reason `Models\Role`/`Models\Permission` exist (98). The
+        // provider deliberately does NOT default this config (98 again: three hosts — audiostud,
+        // numero, fable — run stock Spatie over an older bigIncrements publish, and defaulting it
+        // would push uuid strings at their live bigint keys). So the pair is a HOST-side wiring
+        // requirement, and a harness that ships the uuid schema without it is modelling a host that
+        // does not exist.
+        //
+        // Measured 2026-08-26, every `~/Herd/*` and starter carrying `config/permission.php`: every
+        // host on the uuid schema configures a uuid-capable Role — `~/Herd/beam`, `~/Herd/tower` and
+        // `~/Herd/satellite` extend THIS pair (`App\Models\Role extends BeamAccountsRole`),
+        // `~/Herd/splicewire` hand-rolls the same `HasUuids`, `~/Herd/splicewire-app` uses
+        // `Splicewire\Tower\Models\Role`. The three stock-Spatie hosts are exactly the three on the
+        // integer-keyed publish. There is no host with uuid tables and an unbound model — which is
+        // also the finding beam-facade 141 was opened for, since nothing enforces that pairing.
+        if ($this->bindBeamPermissionModels) {
+            $config->set('permission.models.role', Role::class);
+            $config->set('permission.models.permission', Permission::class);
+        }
 
         $config->set('session.driver', 'array');
 
@@ -198,10 +233,36 @@ abstract class TestCase extends Orchestra
         });
     }
 
+    /**
+     * The Spatie permission fixture, keyed the way this package's OWN
+     * `database/migrations/shared/create_permission_tables.php.stub` keys it (beam-facade 138).
+     *
+     * `roles.id` and `permissions.id` are **uuid**, unconditionally, because the stub declares them
+     * that way unconditionally — there is no host shape and no config flag under which this package
+     * creates an integer-keyed `roles`. Until 138 this helper built `$table->id()`, so all 230-odd
+     * tests ran against a schema the package never ships, and
+     * {@see \Splicewire\Beam\Accounts\Teams\TeamProvisioner::syncSpatieRole()} was green for its
+     * whole life without once meeting the NOT NULL that {@see \Splicewire\Beam\Accounts\Models\Role}
+     * exists to satisfy.
+     *
+     * `model_id` (spatie's `model_morph_key`) is the one column deliberately NOT converged, and that
+     * is the stub's own instruction rather than an exception to it: the stub's docblock says the
+     * morph key "MUST MATCH THE HOLDER'S KEY TYPE ... matching, not widening", and
+     * `create_users_table.php.stub` is a *quiet terminal* that leaves a pre-existing bigint-keyed
+     * host `users` alone. {@see createUsersSchema()} builds exactly that bigint-keyed holder, so a
+     * bigint `model_id` here IS the stub's shape for this fixture's population. Flip the holder and
+     * this column has to flip with it — which is why
+     * {@see \Splicewire\Beam\Accounts\Tests\PermissionFixtureMatchesShippedStubTest} names it as the
+     * single declared divergence instead of leaving it implicit.
+     *
+     * That test is the mechanical relation the hand-written/shipped pair had none of: it executes
+     * this very stub into a scratch schema and diffs the column types. Change either side alone and
+     * it goes red.
+     */
     protected function createSpatieSchema(): void
     {
         Schema::create('permissions', function (Blueprint $table): void {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name');
             $table->string('guard_name');
             $table->timestamps();
@@ -209,8 +270,8 @@ abstract class TestCase extends Orchestra
         });
 
         Schema::create('roles', function (Blueprint $table): void {
-            $table->id();
-            $table->unsignedBigInteger('team_id')->nullable();
+            $table->uuid('id')->primary();
+            $table->string('team_id')->nullable();
             $table->string('name');
             $table->string('guard_name');
             $table->timestamps();
@@ -218,26 +279,26 @@ abstract class TestCase extends Orchestra
         });
 
         Schema::create('model_has_permissions', function (Blueprint $table): void {
-            $table->unsignedBigInteger('permission_id');
+            $table->uuid('permission_id');
             $table->string('model_type');
             $table->unsignedBigInteger('model_id');
-            $table->unsignedBigInteger('team_id')->nullable();
+            $table->string('team_id')->nullable();
             $table->index(['model_id', 'model_type']);
             $table->primary(['team_id', 'permission_id', 'model_id', 'model_type']);
         });
 
         Schema::create('model_has_roles', function (Blueprint $table): void {
-            $table->unsignedBigInteger('role_id');
+            $table->uuid('role_id');
             $table->string('model_type');
             $table->unsignedBigInteger('model_id');
-            $table->unsignedBigInteger('team_id')->nullable();
+            $table->string('team_id')->nullable();
             $table->index(['model_id', 'model_type']);
             $table->primary(['team_id', 'role_id', 'model_id', 'model_type']);
         });
 
         Schema::create('role_has_permissions', function (Blueprint $table): void {
-            $table->unsignedBigInteger('permission_id');
-            $table->unsignedBigInteger('role_id');
+            $table->uuid('permission_id');
+            $table->uuid('role_id');
             $table->primary(['permission_id', 'role_id']);
         });
     }

@@ -2,8 +2,6 @@
 
 namespace Splicewire\Beam\Accounts\Tests;
 
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 use Spatie\Permission\Models\Role as SpatieRole;
@@ -15,20 +13,21 @@ use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
  * The uuid-keyed `Role`/`Permission` pair, and the binding this package deliberately does not make
  * (beam-facade tickets 79, 98).
  *
- * The base {@see TestCase} builds `roles`/`permissions` with `$table->id()` — INTEGER keys, which
- * contradict this package's own `create_permission_tables` stub and are why the existing suite has
- * never met the constraint the pair exists for. Rather than flip that helper (it would re-shape every
- * test in the package for one case's benefit), this file drops those two tables and rebuilds them the
- * way the shipped stub does, which is the only fixture on which the assertions below mean anything.
+ * 98 rebuilt `roles`/`permissions` uuid-keyed inside this file's own `setUp()`, because the base
+ * {@see TestCase} built them with `$table->id()`. 138 converged that helper onto the shipped stub,
+ * so the local rebuild is gone: these assertions now run on the SAME fixture as the other 230 tests,
+ * which is the point — a uuid-keyed `roles` is no longer a special case one test arranges for
+ * itself.
  */
 class UuidKeyedPermissionModelsTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->rebuildPermissionTablesUuidKeyed();
-    }
+    /**
+     * This class is the estate's model of an UNCONFIGURED host — the base harness binds the pair
+     * (see {@see TestCase::defineEnvironment()}), and the whole point of
+     * {@see test_the_provider_leaves_permission_models_untouched()} is to measure what a host
+     * resolves when nobody sets it. Binding it here would make that guard tautological.
+     */
+    protected bool $bindBeamPermissionModels = false;
 
     /**
      * The acceptance case, and it is {@see TeamProvisioner::syncSpatieRole()}'s exact call:
@@ -104,32 +103,5 @@ class UuidKeyedPermissionModelsTest extends TestCase
     {
         $this->assertNull((new Role)->getConnectionName());
         $this->assertNull((new Permission)->getConnectionName());
-    }
-
-    /**
-     * Rebuild `roles`/`permissions` the way `database/migrations/shared/create_permission_tables.php.stub`
-     * does — uuid primary keys — leaving the pivots alone, since nothing here joins them.
-     */
-    private function rebuildPermissionTablesUuidKeyed(): void
-    {
-        Schema::drop('roles');
-        Schema::drop('permissions');
-
-        Schema::create('permissions', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('name');
-            $table->string('guard_name');
-            $table->timestamps();
-            $table->unique(['name', 'guard_name']);
-        });
-
-        Schema::create('roles', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->uuid('team_id')->nullable();
-            $table->string('name');
-            $table->string('guard_name');
-            $table->timestamps();
-            $table->unique(['team_id', 'name', 'guard_name']);
-        });
     }
 }

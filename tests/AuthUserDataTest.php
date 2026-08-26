@@ -1,6 +1,5 @@
 <?php
 
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
@@ -47,7 +46,10 @@ it('reports isRoot for a central Root user', function () {
     $user = User::create(['name' => 'Root', 'email' => 'root@example.test']);
     // Root is assigned on the central (null) team — BeamAccounts::isRoot() flips there to check.
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
-    $role = Role::create(['name' => 'Root', 'guard_name' => 'web', 'team_id' => null]);
+    // Resolved from config, not `Spatie\Permission\Models\Role` directly — that is what
+    // TeamProvisioner::syncSpatieRole() does, and on the uuid-keyed fixture the stock model cannot
+    // mint a key at all (beam-facade 138).
+    $role = app(config('permission.models.role'))::create(['name' => 'Root', 'guard_name' => 'web', 'team_id' => null]);
     $user->assignRole($role);
 
     expect(AuthUserData::fromUser($user, null)->isRoot)->toBeTrue();

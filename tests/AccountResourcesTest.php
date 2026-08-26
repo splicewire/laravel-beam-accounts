@@ -5,7 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
-use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
@@ -224,7 +223,7 @@ it('projects a team into the admin list row', function () {
 
 it('projects a user into the admin list row', function () {
     [$owner] = ownerWithTeam();
-    SpatieRole::create(['name' => Role::Admin->value, 'guard_name' => 'web']);
+    app(config('permission.models.role'))::create(['name' => Role::Admin->value, 'guard_name' => 'web']);
     $owner->assignRole(Role::Admin->value);
 
     $row = UserData::project($owner->fresh());
@@ -285,7 +284,7 @@ it('a central Root principal sees every user', function () {
 
     // Root is assigned on the CENTRAL (null) team — the flip BeamAccounts::isRoot() exists to handle.
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
-    SpatieRole::create(['name' => 'Root', 'guard_name' => 'web']);
+    app(config('permission.models.role'))::create(['name' => 'Root', 'guard_name' => 'web']);
     $owner->assignRole('Root');
     Auth::login($owner->fresh());
 
