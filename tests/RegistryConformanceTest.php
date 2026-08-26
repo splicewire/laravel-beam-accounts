@@ -54,17 +54,18 @@ it('round-trips a scope handler through the port vocabulary and the contract ali
         ->and((string) $scopes->keys()[0])->toBe('beam.accounts.sharing.scopes.composition');
 });
 
-it('keeps registration ORDER, and a re-registration supersedes AND appends', function () {
+it('keeps registration ORDER, and a re-registration supersedes IN PLACE', function () {
     $scopes = app(ShareLinkScopes::class);
 
     $scopes->handle('alpha', fn () => 'a');
     $scopes->handle('beta', fn () => 'b');
     expect($scopes->prefixes())->toBe(['alpha', 'beta']);
 
-    // ⚠️ A PHP array assignment held `alpha`'s slot; superseding MOVES it to the end. PickOne here,
-    // so nothing enumerates for meaning — pinned so a later arity change cannot do it silently.
+    // ⚠️ A PHP array assignment held `alpha`'s slot, and registry-kernel 62 made supersession do the
+    // same — this assertion read `['beta', 'alpha']` while the kernel displaced-and-appended. PickOne
+    // here, so nothing enumerates for meaning — pinned so a later arity change cannot do it silently.
     $scopes->handle('alpha', fn () => 'a2');
-    expect($scopes->prefixes())->toBe(['beta', 'alpha'])
+    expect($scopes->prefixes())->toBe(['alpha', 'beta'])
         ->and(($scopes->resolve('alpha'))())->toBe('a2');
 });
 
