@@ -43,7 +43,15 @@ class StopImpersonating
             kind: OperationKind::Write,
             model: BeamAccounts::userModel(),
             handle: self::handle(...),
-            // ability: DELIBERATELY ABSENT — see the class docblock. Do not add one.
+            // DELIBERATELY UNGATED — see the class docblock. Do not put a token here.
+            //
+            // This used to be a comment beside an absent argument, which spelled a reviewed decision
+            // exactly the way an unreviewed omission is spelled. `ability: false` is the declared
+            // third state (particle-operation-surface ticket 03): the op now says "ungated, on
+            // purpose" in the declaration rather than only in prose, and it drops out of
+            // `UngatedOperationAudit`'s residue count instead of sitting in it forever as the one
+            // entry that must never be fixed.
+            ability: false,
         );
     }
 

@@ -32,12 +32,18 @@ beforeEach(function () {
 // in the impersonated session with no way back. The stop op must carry NO ability; its guard is the
 // session stash. audiostud had this right and the lift must not lose it.
 
-it('declares no ability on stop-impersonating, so a staff gate can never trap the operator', function () {
-    expect(StopImpersonating::operation()->ability)->toBeNull();
+it('declares stop-impersonating UNGATED, so a staff gate can never trap the operator', function () {
+    // `false`, not `null` (particle-operation-surface ticket 03). The two behave identically at the
+    // gate and mean opposite things in the declaration: `false` is this reviewed decision, `null` is
+    // "nobody has looked at it yet". Asserting `false` is what keeps a well-meaning "tighten the
+    // gates" sweep from reading this op as residue — the exact failure this test was written against.
+    expect(StopImpersonating::operation()->ability)->toBeFalse();
+    expect(StopImpersonating::operation()->gateUndeclared())->toBeFalse();
 });
 
 it('gates the START op on an ability, unlike stop', function () {
     expect(ImpersonateUser::operation()->ability)->not->toBeNull();
+    expect(ImpersonateUser::operation()->ability)->not->toBeFalse();
 });
 
 it('lets the impersonated session stop, even though it is no longer staff', function () {
