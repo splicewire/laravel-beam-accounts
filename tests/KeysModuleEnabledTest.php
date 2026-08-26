@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
+use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 
@@ -21,6 +22,8 @@ class KeysModuleEnabledTest extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            // popcorn's shared RegistryIndex singleton — see TestCase::getPackageProviders().
+            PopcornServiceProvider::class,
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             BeamAccountsServiceProvider::class,

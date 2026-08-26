@@ -321,14 +321,19 @@ it('registers tokens/invitations/members/teams/users onto the Frame registries w
     // Bind the real beam registry; the provider's boot registers into it directly.
     app()->singleton(ParticleResourceRegistry::class, fn () => new ParticleResourceRegistry);
 
-    // Re-run register()+boot() now that the registry is bindable in this test app. A fresh
-    // PackageServiceProvider instance must be register()ed before boot() — register() is where
-    // configurePackage() initializes the provider's $package property boot() reads. Re-running
-    // register() here is harmless/idempotent (same tolerance the estate already documents for a
-    // provider that boots twice, e.g. BeamDoctorManifest::register()'s idempotent replace).
+    // Re-run the ONE boot link this test is about, now that the registry is bindable in this test
+    // app — the same reflection shape the two `bootFrameResources` tests below already use.
+    //
+    // ⚠️ It used to re-run the whole `register()`+`boot()` on a fresh provider instance, on the
+    // stated tolerance that "a provider that boots twice is harmless". That stopped being true with
+    // registry-kernel 38: `packageBooted()` now calls `RegistryIndex::describe()`, which is
+    // deliberately NOT re-entrant (a second describe of one root raises `DuplicateRegistryKey` —
+    // two owners, one root, correctly refused). Narrowing to the link under test is the fix; the
+    // kernel's refusal is not something to weaken for a test that never meant to boot twice.
     $provider = new BeamAccountsServiceProvider(app());
-    $provider->register();
-    $provider->boot();
+    $boot = new ReflectionMethod($provider, 'bootFrameResources');
+    $boot->setAccessible(true);
+    $boot->invoke($provider);
 
     $registry = app(ParticleResourceRegistry::class);
 

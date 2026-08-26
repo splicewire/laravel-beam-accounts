@@ -9,6 +9,7 @@ use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Rushing\Popcorn\Concerns\ChainsTraitMethods;
 use Rushing\Popcorn\Contracts\ChainsTraitMethods as ChainsTraitMethodsContract;
+use Rushing\Popcorn\Registries\RegistryIndex;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Splicewire\Beam\Accounts\Concerns\WiresApiGuard;
@@ -266,7 +267,11 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // baseline with per-principal grants/denies (`plan-baseline ∪ grants − denies`). Both are pure
         // — no plan model — so a host's bound EntitlementResolver composes them over its own plan/grant
         // discovery. Singletons so the resolved config is read once per request.
-        $this->app->singleton(BundleRegistry::class, fn () => new BundleRegistry);
+        // A `ConfigRegistry` since registry-kernel 38: its storage IS
+        // `config('beam.accounts.entitlements.bundles')`, read through on every read, so a bundle
+        // declared after this binding resolves is still visible. Container-constructed so the
+        // config Repository is injected.
+        $this->app->singleton(BundleRegistry::class);
         $this->app->singleton(EntitlementComposer::class);
 
         // The account-shell provider seam (ticket 08): the package projects the SHAPE
@@ -383,6 +388,15 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // trait — and the sequence does not rest on where a `use` statement sits, which `pint`'s
         // `ordered_traits` fixer resorts alphabetically.
         $this->chainTraitMethods('boot');
+
+        // The two registries this package owns, described from the OWNER's own boot (registry-kernel
+        // ticket 38 / 08 D7 — a registry describes itself, nobody describes on another's behalf) and
+        // AFTER the boot chain, so anything the chain registers is already in place. Declaring and
+        // indexing are two acts: until this runs the index holds nothing, and `popcorn:registries`
+        // cannot route `beam.accounts.*`.
+        $index = $this->app->make(RegistryIndex::class);
+        $index->describe($this->app->make(ShareLinkScopes::class), by: self::class);
+        $index->describe($this->app->make(BundleRegistry::class), by: self::class);
 
         // Self-register into beam-core's install manifest (order 5: users/permission_tables are
         // foundational — publish early, ahead of the default-order-100 packages that FK into them)

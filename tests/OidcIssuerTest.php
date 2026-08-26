@@ -7,6 +7,7 @@ use Firebase\JWT\Key;
 use Illuminate\Contracts\Console\Kernel;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
+use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
@@ -25,6 +26,8 @@ class OidcIssuerTest extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            // popcorn's shared RegistryIndex singleton — see TestCase::getPackageProviders().
+            PopcornServiceProvider::class,
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             BeamAccountsServiceProvider::class,

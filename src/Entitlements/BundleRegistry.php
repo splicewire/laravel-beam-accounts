@@ -2,6 +2,14 @@
 
 namespace Splicewire\Beam\Accounts\Entitlements;
 
+use Rushing\Popcorn\Laravel\Registries\ConfigRegistry;
+use Rushing\Popcorn\Registries\IsRegistry;
+use Rushing\Popcorn\Registries\Key;
+use Rushing\Popcorn\Registries\OnDuplicate;
+use Rushing\Popcorn\Registries\Optionality;
+use Rushing\Popcorn\Registries\RegistryArity;
+use Rushing\Popcorn\Registries\RegistryKey;
+
 /**
  * Frame OS ticket 09 (ADR-0013 §3/§5): the declarative named-bundle registry.
  *
@@ -17,30 +25,59 @@ namespace Splicewire\Beam\Accounts\Entitlements;
  *
  * Inert by default: with no `bundles` config every bundle resolves to the empty set, so an unconfigured host
  * holds nothing (the null-default discipline, ADR-0009).
+ *
+ * ## On the popcorn kernel (registry-kernel ticket 38)
+ *
+ * This is archetype **b** in the true sense the sweep's amendment A7 asks for: the config array is not a
+ * seed that some private array then owns — it **is** the storage, and nothing else ever writes. So the
+ * class becomes a {@see ConfigRegistry} subclass and the array stays exactly where it was.
+ *
+ * That also retires a latent snapshot bug the sweep's amendment A8 names. The old constructor read
+ * `config(...)` once; bound as a singleton, it froze the bundle map at first resolution, ahead of any host
+ * or test that appended a bundle later. `ConfigRegistry` reads through to the repository on every read, so
+ * a late-declared bundle is simply visible.
+ *
+ * ⚠️ **`keys()` was RENAMED to {@see keysFor()}.** The kernel's contract spells `keys(): array` — *every
+ * key in this registry* — and this class had spent that name on *the entitlement keys OF one bundle*, which
+ * is `resolve()`. PHP cannot hold both, so the port's own accessor takes the name that says what it does.
+ * `keysForMany()`, `has()` and `names()` are unchanged.
  */
-class BundleRegistry
+#[IsRegistry(
+    root: 'beam.accounts.entitlements.bundles',
+    of: 'named entitlement-key bundles a plan maps to',
+    arity: RegistryArity::PickOne,
+    entryType: 'list<string>',
+    onDuplicate: OnDuplicate::Supersede,
+    optionality: Optionality::Optional,
+    note: 'A bundle is a NAMED SET, so the read picks one bundle and the union across several is the '
+        .'caller\'s fold (`keysForMany()`), not the registry\'s arity.',
+)]
+class BundleRegistry extends ConfigRegistry
 {
-    /**
-     * @param  array<string, list<string>>  $bundles  name → entitlement keys. Defaults to the host config.
-     */
-    public function __construct(private array $bundles = [])
+    protected function configKey(): string
     {
-        if ($bundles === []) {
-            $this->bundles = (array) config('beam.accounts.entitlements.bundles', []);
-        }
+        return 'beam.accounts.entitlements.bundles';
     }
 
     /**
      * The deduped entitlement-key set a named bundle declares. An unknown bundle → the empty set (a plan may
      * map to a tier that declares no bundle yet).
      *
+     * Guarded on {@see Key::tryParse()} because a bundle name reaches here from a host's plan model as
+     * often as from its config: a name outside the key grammar used to answer `[]` and would now throw
+     * `InvalidRegistryKey`. Undeclared is undeclared, whatever the spelling.
+     *
      * @return list<string>
      */
-    public function keys(string $bundle): array
+    public function keysFor(string $bundle): array
     {
+        if (Key::tryParse($bundle) === null) {
+            return [];
+        }
+
         return array_values(array_unique(array_map(
             'strval',
-            (array) ($this->bundles[$bundle] ?? [])
+            (array) ($this->tryResolve($bundle) ?? [])
         )));
     }
 
@@ -55,21 +92,29 @@ class BundleRegistry
     {
         $keys = [];
         foreach ($bundles as $bundle) {
-            $keys = [...$keys, ...$this->keys($bundle)];
+            $keys = [...$keys, ...$this->keysFor($bundle)];
         }
 
         return array_values(array_unique($keys));
     }
 
     /** Whether a bundle name is declared. */
-    public function has(string $bundle): bool
+    public function has(RegistryKey|string $key): bool
     {
-        return array_key_exists($bundle, $this->bundles);
+        if (is_string($key) && Key::tryParse($key) === null) {
+            return false;
+        }
+
+        return parent::has($key);
     }
 
-    /** @return list<string> every declared bundle name */
+    /**
+     * @return list<string> every declared bundle name, as the host spelled it — `relativeKeys()` rather
+     *                      than `keys()`, because keys go relative in and absolute out (ticket 20 D2) and
+     *                      a caller-facing list wants the caller's spelling.
+     */
     public function names(): array
     {
-        return array_keys($this->bundles);
+        return $this->store()->relativeKeys();
     }
 }

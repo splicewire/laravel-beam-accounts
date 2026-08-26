@@ -8,6 +8,7 @@ use Laravel\Fortify\Features;
 use Laravel\Fortify\FortifyServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
+use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
@@ -30,6 +31,12 @@ abstract class TestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            // popcorn, FIRST — it binds the shared `RegistryIndex` singleton. Testbench does not
+            // auto-discover, and requiring the package does not fix it: without this line every
+            // `make(RegistryIndex::class)` builds a THROWAWAY, so every `describe()` lands on an
+            // index nothing else can see and the suite stays green over nothing (registry-kernel
+            // 27 D3). {@see RegistryConformanceTest} carries the tripwire.
+            PopcornServiceProvider::class,
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             FortifyServiceProvider::class,

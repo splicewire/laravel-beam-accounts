@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
+use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Contracts\MembershipContract;
@@ -33,6 +34,8 @@ class ConfigGateTest extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            // popcorn's shared RegistryIndex singleton — see TestCase::getPackageProviders().
+            PopcornServiceProvider::class,
             PermissionServiceProvider::class,
             PermissionCascadeServiceProvider::class,
             // NOTE: no FortifyServiceProvider — a host consuming only the primitive

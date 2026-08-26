@@ -29,19 +29,19 @@ class EntitlementBundleTest extends TestCase
     {
         $registry = $this->app->make(BundleRegistry::class);
 
-        $this->assertSame(['own-a-song', 'publish'], $registry->keys('own-a-song'));
+        $this->assertSame(['own-a-song', 'publish'], $registry->keysFor('own-a-song'));
         $this->assertSame(
             ['own-a-song', 'go-songwriter', 'publish', 'generate'],
-            $registry->keys('go-songwriter')
+            $registry->keysFor('go-songwriter')
         );
-        $this->assertSame(['author-ux', 'workbench.enter'], $registry->keys('staff'));
+        $this->assertSame(['author-ux', 'workbench.enter'], $registry->keysFor('staff'));
     }
 
     public function test_an_unknown_bundle_resolves_to_the_empty_set(): void
     {
         $registry = $this->app->make(BundleRegistry::class);
 
-        $this->assertSame([], $registry->keys('no-such-bundle'));
+        $this->assertSame([], $registry->keysFor('no-such-bundle'));
         $this->assertFalse($registry->has('no-such-bundle'));
         $this->assertTrue($registry->has('staff'));
     }
@@ -50,7 +50,7 @@ class EntitlementBundleTest extends TestCase
     {
         $registry = $this->app->make(BundleRegistry::class);
 
-        $this->assertSame(['a', 'b'], $registry->keys('dupey'));
+        $this->assertSame(['a', 'b'], $registry->keysFor('dupey'));
     }
 
     public function test_keys_for_many_unions_and_dedupes_across_bundles(): void

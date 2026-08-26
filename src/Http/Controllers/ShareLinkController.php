@@ -24,7 +24,7 @@ class ShareLinkController
 
         // Resolve the target FIRST — a handler may 404 (e.g. the resource was deleted), in
         // which case no use is counted. Only a genuine resolution redeems.
-        $response = $scopes->resolve($link, $request);
+        $response = $scopes->dispatch($link, $request);
 
         $links->redeem($link);
 
