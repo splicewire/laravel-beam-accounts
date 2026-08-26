@@ -31,6 +31,7 @@ use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsRetiredMigrationAudit;
+use Splicewire\Beam\Accounts\Doctor\PermissionModelPairingAudit;
 use Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
@@ -444,6 +445,19 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
             $this->app->make(BeamDoctorManifest::class)->register(
                 'splicewire/laravel-beam-accounts',
                 BeamAccountsRetiredMigrationAudit::class,
+            );
+
+            // The uuid permission schema and the model that can key it are one decision, and this
+            // package ships both halves while binding neither — deliberately (ticket 98). Nothing in
+            // the estate stated that pairing, checked it, or failed on it until this audit
+            // (beam-facade 141). Note the shape it catches that no check below this tier can: the
+            // hosts on the INTEGER schema are self-consistent and working, and the stale-snapshot
+            // repair AGENTS.md prescribes for them is precisely what breaks them.
+            $this->app->bind(PermissionModelPairingAudit::class, fn () => PermissionModelPairingAudit::forApp());
+
+            $this->app->make(BeamDoctorManifest::class)->register(
+                'splicewire/laravel-beam-accounts',
+                PermissionModelPairingAudit::class,
             );
         }
     }

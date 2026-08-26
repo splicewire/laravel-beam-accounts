@@ -62,6 +62,29 @@ return [
     // Name given to the personal team provisioned on registration. {name} is the user's name.
     'personal_team_name' => "{name}'s Team",
 
+    // The permission schema this host is committed to — the declared half of a pairing this package
+    // ships both sides of and binds NEITHER.
+    //
+    // `create_permission_tables.php.stub` keys `roles`/`permissions` by uuid, and `Models\Role` /
+    // `Models\Permission` are the six-line `HasUuids` subclasses that make Eloquent generate one. The
+    // package does not default `config('permission.models.role')` to them (beam-facade ticket 98) —
+    // that would push uuid strings at the live bigint keys of the hosts still on the integer schema.
+    // So the pairing is a HOST decision, and `PermissionModelPairingAudit` is what stops it from being
+    // an unstated one: publish the uuid migration without rebinding the models and
+    // `TeamProvisioner::syncSpatieRole()` returns a 500 on signup.
+    //
+    // `key_type` is not a switch — nothing reads it at runtime. It is a DECLARATION the doctor reads,
+    // and it exists because the estate's stale-snapshot repair (republish the package's stub) is the
+    // act that breaks an integer host, and `spatie/laravel-permission` ships a stub with the identical
+    // basename, so the estate's basename match cannot tell a working Spatie publish from a stale
+    // beam-accounts one. Set it to 'int' to say "this host is deliberately pinned to the integer
+    // schema, do not republish"; set it to 'uuid' to assert the shipped shape; leave it null and the
+    // audit reports what it finds. A value that contradicts the published migration is itself a
+    // finding — a stale declaration is worse than none.
+    'permissions' => [
+        'key_type' => env('ACCOUNT_PERMISSION_KEY_TYPE'),
+    ],
+
     // ⚠️ There is no `data.auth_user` slot any more (particle-contribution-seam 18). It held ONE
     // class-string, so two packages could never both add props to the auth projection — which is
     // why a commerce concept and an embed concept had to meet in the top host instead of shipping
