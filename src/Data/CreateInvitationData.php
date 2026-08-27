@@ -5,9 +5,9 @@ namespace Splicewire\Beam\Accounts\Data;
 use Spatie\LaravelData\Attributes\Validation\Email;
 use Spatie\LaravelData\Attributes\Validation\In;
 use Spatie\LaravelData\Attributes\Validation\Required;
-use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Data\Data;
 
 /**
  * The `editData` escape hatch for the Invitations resource (Frame OS ticket 20 — promoted from

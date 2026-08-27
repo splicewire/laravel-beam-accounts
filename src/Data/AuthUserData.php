@@ -4,9 +4,9 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Data\Data;
 
 /**
  * The pure IDENTITY-CORE auth projection — what `/me`, login, passkey-login, and profile-update

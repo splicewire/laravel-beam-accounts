@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
-use Spatie\LaravelData\Data;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
+use Splicewire\Beam\Data\Data;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**

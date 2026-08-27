@@ -4,9 +4,9 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
-use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
+use Splicewire\Beam\Data\Data;
 
 /**
  * The team-members LIST row (Frame OS ticket 20 — promoted from tower's
