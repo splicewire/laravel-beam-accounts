@@ -312,6 +312,10 @@ it('grants reach on every registered realm even when no realm root has been prov
 it('mints a signed link per demo subject, and following one authenticates the session', function () {
     seedDemo();
 
+    // DEMO MODE ON. `beam.accounts.demo.login_links` ships false, so this line is not scaffolding —
+    // it is the only reason any link exists to follow.
+    config()->set('beam.accounts.demo.login_links', true);
+
     $links = app(DemoLoginLinks::class)->all();
 
     expect(array_column($links, 'key'))->toBe(BeamDemo::keys());
@@ -333,6 +337,8 @@ it('mints a signed link per demo subject, and following one authenticates the se
 });
 
 it('publishes no demo links when the demo affordances are off, and none for an unseeded host', function () {
+    config()->set('beam.accounts.demo.login_links', true);
+
     // Unseeded: the roster exists, the users do not. Buttons that cannot work are omitted rather
     // than emitted with a null url.
     expect(app(DemoLoginLinks::class)->all())->toBe([]);
@@ -342,4 +348,93 @@ it('publishes no demo links when the demo affordances are off, and none for an u
 
     expect(app(DemoLoginLinks::class)->all())->toBe([]);
     expect(app(DemoLoginLinks::class)->for(Role::Owner->value))->toBeNull();
+});
+
+/*
+ * ── 172, exposure half: demo mode is a HOST-configurable gate that fails closed ─────────────────
+ *
+ * A published link is a bearer credential rendered into an anonymous page, so the switch that
+ * publishes it defaults OFF and only a strict true opens it. These cases pin the DEFAULT and the
+ * MISSING-KEY case, not merely the explicit `false` — the explicit false is the easy half, and it is
+ * the absent key that a fresh host actually has.
+ *
+ * Gate posture: unchanged — no `Gate::before` anywhere in this package's src/ or tests/, so every
+ * case below runs deny-by-default with the gate CLOSED. None of them installs one.
+ */
+
+it('publishes nothing at a fully-seeded host when the demo-mode key is ABSENT ENTIRELY', function () {
+    seedDemo();
+
+    // Not `false` — GONE. `config()->set(..., false)` would prove only that a host who wrote the
+    // word false gets nothing; a fresh install has never heard of the key, and that is the case
+    // that has to fail closed. `enabled()` is true here (the harness is not production), so the
+    // ONLY thing standing between a guest and four bearer credentials is this key's absence.
+    // Rebuilt without the key rather than `offsetUnset`/`set(null)` — the Config repository's
+    // offsetUnset writes a null, which is a DIFFERENT state from absent and would have let this
+    // test pass without ever exercising the missing-key path.
+    $demo = config('beam.accounts.demo');
+    unset($demo['login_links']);
+    config()->set('beam.accounts.demo', $demo);
+
+    expect(array_key_exists('login_links', config('beam.accounts.demo')))->toBeFalse();
+    expect(config()->has('beam.accounts.demo.login_links'))->toBeFalse();
+
+    expect(BeamDemo::enabled())->toBeTrue();
+    expect(BeamDemo::publishesLoginLinks())->toBeFalse();
+    expect(app(DemoLoginLinks::class)->all())->toBe([]);
+});
+
+it('ships demo mode OFF by default, so the package config alone publishes nothing', function () {
+    seedDemo();
+
+    // The merged package default, untouched by any test — `login_links => env(...) ?? false`.
+    expect(config('beam.accounts.demo.login_links'))->toBeFalse();
+    expect(app(DemoLoginLinks::class)->all())->toBe([]);
+});
+
+it('fails closed on a misspelled or junk demo-mode value, and opens only on a strict true', function () {
+    seedDemo();
+
+    // Anything that is not an affirmative reads as OFF. `(bool)` would make every one of these ON,
+    // which is the wrong direction for a switch that publishes credentials.
+    foreach ([null, '', ' ', 'ture', 'enabled', 'demo', 'off', 'no', 'false', '0', 0, []] as $junk) {
+        config()->set('beam.accounts.demo.login_links', $junk);
+
+        expect(BeamDemo::publishesLoginLinks())->toBeFalse();
+        expect(app(DemoLoginLinks::class)->all())->toBe([]);
+    }
+
+    foreach ([true, 1, 'true', 'TRUE ', '1', 'on', 'yes'] as $affirmative) {
+        config()->set('beam.accounts.demo.login_links', $affirmative);
+
+        expect(BeamDemo::publishesLoginLinks())->toBeTrue();
+        expect(app(DemoLoginLinks::class)->all())->not->toBe([]);
+    }
+});
+
+it('keeps demo mode subordinate to the demo affordances themselves', function () {
+    seedDemo();
+
+    // A host that turned the SUBJECTS off cannot get the links back through the narrower key.
+    config()->set('beam.accounts.demo.enabled', false);
+    config()->set('beam.accounts.demo.login_links', true);
+
+    expect(BeamDemo::publishesLoginLinks())->toBeFalse();
+    expect(app(DemoLoginLinks::class)->all())->toBe([]);
+});
+
+it('still mints a single link for the CLI door with demo mode off, and that link still works', function () {
+    seedDemo();
+
+    // `for()` is the operator door — `splicewire:beam:accounts:login-as`, reached by someone holding
+    // a shell, which outranks anything the link grants. Gating it on demo mode would have broken
+    // login-as at every host in the estate to close a hole that is not on this door.
+    expect(BeamDemo::publishesLoginLinks())->toBeFalse();
+
+    $url = app(DemoLoginLinks::class)->for(Role::Owner->value);
+
+    expect($url)->not->toBeNull();
+
+    $this->get($url)->assertRedirect('/');
+    expect(auth()->check())->toBeTrue();
 });

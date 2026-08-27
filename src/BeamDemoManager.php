@@ -89,6 +89,58 @@ class BeamDemoManager
     }
 
     /**
+     * May this host PUBLISH signed login-as links into a page a guest can load — i.e. is it in
+     * "demo mode"? Reads `beam.accounts.demo.login_links`, which ships **false** and is the one
+     * key a host flips to get one-click demo sign-in.
+     *
+     * ## Why this is a second key and not {@see self::enabled()}
+     *
+     * `enabled()` answers "do the demo SUBJECTS exist here" — it gates seeding, the
+     * `splicewire:beam:accounts:login-as` command, and the operation's own environment check. Its
+     * null default is *on everywhere but production*, which is right for those: they are reached
+     * by someone who already holds a shell or a session.
+     *
+     * Publishing is a different question with a different blast radius. A minted link is a
+     * **bearer credential** — whoever loads the anonymous login page becomes that demo subject
+     * with nothing typed, bounded only by the link's expiry. A default of "on in every
+     * non-production environment" would hand that to every preview deploy, staging box and shared
+     * dev host in the estate the moment it installed the package. So this key is the narrower one,
+     * it defaults OFF, and it is read at the point the links are minted for a page
+     * ({@see \Splicewire\Beam\Accounts\Actions\DemoLoginLinks::all()}) rather than in whatever
+     * component renders them — a gate that lives only in the frontend is a gate anyone can walk
+     * around by reading the page's props.
+     *
+     * ## Fail closed, deliberately
+     *
+     * Only a *strict* true — `true`, `1`, `'true'`, `'1'`, `'on'`, `'yes'` (Laravel's `env()`
+     * already folds the first four) — turns this on. An absent key, a null, an empty string, and
+     * anything misspelled (`'ture'`, `'enabled'`, `'demo'`) all read as OFF. `(bool)` would make a
+     * typo mean ON, which is the wrong way for a credential-publishing switch to fail.
+     *
+     * `enabled()` must ALSO hold: a host that turned the demo subjects off has turned the links
+     * off, and cannot re-enable them through this key alone.
+     */
+    public function publishesLoginLinks(): bool
+    {
+        if (! $this->enabled()) {
+            return false;
+        }
+
+        $flag = config('beam.accounts.demo.login_links');
+
+        if (is_bool($flag)) {
+            return $flag;
+        }
+
+        if (is_int($flag)) {
+            return $flag === 1;
+        }
+
+        return is_string($flag)
+            && in_array(strtolower(trim($flag)), ['true', '1', 'on', 'yes'], true);
+    }
+
+    /**
      * @return array<int, string>
      */
     public function keys(): array

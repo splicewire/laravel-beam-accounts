@@ -9,7 +9,7 @@ use Splicewire\Beam\Accounts\BeamDemoManager;
  * The BeamDemo facade — the short static front door to the demo-subject roster.
  *
  * It holds NO logic: every method it appears to have resolves through `__callStatic` to the
- * container-bound {@see BeamDemoManager}. The surface is CLOSED at the ten methods below.
+ * container-bound {@see BeamDemoManager}. The surface is CLOSED at the eleven methods below.
  *
  * A separate facade from {@see BeamAccounts} on purpose. The demo affordances are off in
  * production, and a front door that is sometimes closed does not belong on the package's production
@@ -28,6 +28,7 @@ use Splicewire\Beam\Accounts\BeamDemoManager;
  * @method static array<string, array{role: \Splicewire\Beam\Accounts\Enums\Role, shared: bool}> subjects()
  * @method static bool isOperator(string $key)
  * @method static bool enabled()
+ * @method static bool publishesLoginLinks()
  * @method static array<int, string> keys()
  * @method static bool has(string $key)
  * @method static \Splicewire\Beam\Accounts\Enums\Role roleFor(string $key)

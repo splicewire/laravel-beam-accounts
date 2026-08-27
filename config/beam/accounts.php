@@ -102,6 +102,21 @@ return [
         // must be signed (the artisan command mints them), so it opens no hole.
         'enabled' => env('ACCOUNT_DEMO_ENABLED'),
 
+        // DEMO MODE — may this host publish signed login-as links into a page a guest can load?
+        // Ships FALSE, and is the one key a host flips to get one-click demo sign-in on its login
+        // screen (beam-facade ticket 172). Separate from `enabled` above, and narrower, because a
+        // published link is a BEARER CREDENTIAL: anyone who can load the anonymous login page
+        // becomes that demo subject with nothing typed, bounded only by the link's expiry.
+        // `enabled`'s null default is "on everywhere but production", which is right for seeding
+        // and for the artisan command (both reached by someone who already holds a shell) and
+        // wrong for an anonymous page — it would arm every preview and shared dev host in the
+        // estate on install. Read at the MINT point
+        // ({@see \Splicewire\Beam\Accounts\Actions\DemoLoginLinks::all()}), never only in the
+        // component that renders the links, so a non-demo host emits nothing into its props at
+        // all. Fails CLOSED: absent, null, empty or misspelled all mean off; only a strict
+        // true/1/'true'/'1'/'on'/'yes' turns it on, and `enabled` must hold as well.
+        'login_links' => env('ACCOUNT_DEMO_LOGIN_LINKS', false),
+
         // The config GATE for the DemoTeamSeeder's registration in the beam-seed manifest
         // (splicewire:beam:seed). The seeder registers unconditionally from the provider, but
         // this key decides whether it actually runs — so a production `beam:seed` never fabricates

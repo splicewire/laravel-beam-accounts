@@ -44,10 +44,27 @@ use Splicewire\Beam\Accounts\Ops\LogInAsUser;
  *
  * A link minted here is a bearer credential for becoming that user, rendered into an anonymous page.
  * Anyone who can load the login screen can become any demo subject without typing anything — which
- * is exactly what "one-click demo sign-in" means, and is why {@see BeamDemo::enabled()} gates the
- * whole surface and is false in production. Do not call this from a page that is reachable in an
- * environment where the demo subjects are real people's accounts. The bound on a leaked link is its
- * expiry, and nothing else; {@see LoginAsCommand} shares that bound.
+ * is exactly what "one-click demo sign-in" means. The bound on a leaked link is its expiry, and
+ * nothing else; {@see LoginAsCommand} shares that bound.
+ *
+ * ## Two doors, two gates — and why {@see BeamDemo::enabled()} was not enough
+ *
+ * `enabled()` is false in production and, unset, TRUE in every other environment. As the only gate
+ * it would arm the anonymous-page affordance on every preview deploy, staging box and shared dev
+ * host the moment the package installed — nobody having asked for it. So the two doors are gated
+ * separately:
+ *
+ * - {@see self::for()} — mint ONE link, for a caller that has already established it may
+ *   ({@see LoginAsCommand}: a shell is a far stronger credential than the link it prints). Gated on
+ *   `enabled()`, as before.
+ * - {@see self::all()} — publish the WHOLE roster as links into a page's props. Gated on
+ *   {@see BeamDemo::publishesLoginLinks()} ⇒ `beam.accounts.demo.login_links`, which ships **false**
+ *   and fails closed on anything but a strict true. This is "demo mode", and a host turns it on.
+ *
+ * The gate sits HERE, at the mint, and not in the component that renders the buttons. A frontend
+ * gate is one a visitor walks around by reading the page's props, and props carrying live signed
+ * URLs are as good as the buttons. A host that is not in demo mode emits an empty array — there is
+ * no link in the served HTML to find.
  */
 class DemoLoginLinks
 {
@@ -65,6 +82,11 @@ class DemoLoginLinks
      * `null` rather than a throw: an unseeded host is the ordinary state of a fresh install, and the
      * login page must render without its demo buttons rather than 500. The CLI, which CAN say
      * something useful about it, distinguishes the two cases itself.
+     *
+     * Gated on {@see BeamDemo::enabled()} only, NOT on demo mode: this is the single-link door for a
+     * caller that has already established its entitlement out of band. {@see LoginAsCommand} is that
+     * caller, and a shell on the host outranks anything a demo link grants. Anything publishing to a
+     * page goes through {@see self::all()}, which carries the demo-mode gate.
      */
     public function for(string $subject, int $minutes = self::DEFAULT_MINUTES): ?string
     {
@@ -98,11 +120,15 @@ class DemoLoginLinks
      * `label` comes from {@see BeamDemo::name()}; a host wanting its own wording maps over the
      * result rather than rebuilding it, so the URL half stays in one place.
      *
+     * **Empty unless the host is in demo mode** ({@see BeamDemo::publishesLoginLinks()}). That check
+     * is first and unconditional, so a non-demo host does not merely hide the buttons — it never
+     * mints the credentials, and the served page carries no login-as URL to scrape.
+     *
      * @return array<int, array{key: string, label: string, url: string}>
      */
     public function all(int $minutes = self::DEFAULT_MINUTES): array
     {
-        if (! BeamDemo::enabled()) {
+        if (! BeamDemo::publishesLoginLinks()) {
             return [];
         }
 
