@@ -53,8 +53,28 @@ function bootChain(): array
     );
 }
 
-it('resolves the boot chain in the order the hand-written block used', function () {
-    expect(bootChain())->toBe(HISTORICAL_BOOT_ORDER);
+/**
+ * Links added AFTER the conversion, in the order they were added. A new concern appends here with its
+ * reason; it never edits {@see HISTORICAL_BOOT_ORDER}, which is a record of what the hand-written block
+ * did and stops being evidence the moment it is treated as a live list.
+ */
+const APPENDED_BOOT_ORDER = [
+    // beam-facade 159 — the `to_roles:` / `to_teams:` recipient kinds and the AccountsDirectory
+    // binding. Last on purpose and order-independent by construction: it writes two config leaves and
+    // one container binding, reads nothing any earlier link produced, and nothing later reads it
+    // (RecipientKindRegistry reads through to the config repository at SEND time, not at boot).
+    'bootNotifyRecipients',
+];
+
+it('resolves the boot chain in the order the hand-written block used, with later links appended', function () {
+    expect(bootChain())->toBe([...HISTORICAL_BOOT_ORDER, ...APPENDED_BOOT_ORDER]);
+});
+
+it('keeps the historical block intact as a PREFIX rather than reshuffling it', function () {
+    // The order assertion above would also pass if a later link were interleaved into the middle and
+    // the constant edited to match. This one says the sixteen hand-sequenced links still run first,
+    // in their hand-sequenced order, whatever has been appended since.
+    expect(array_slice(bootChain(), 0, count(HISTORICAL_BOOT_ORDER)))->toBe(HISTORICAL_BOOT_ORDER);
 });
 
 it('runs bootRouteMacro before bootRoutes, which calls the macro it defines', function () {
@@ -75,7 +95,7 @@ it('keeps bootAuthoringGates OUT of the chain', function () {
 it('is not empty', function () {
     // Guards the dead-seam shape: a rename that unhooked every link would leave the order assertion
     // comparing two empty arrays, and a provider that boots clean wiring nothing.
-    expect(bootChain())->toHaveCount(16);
+    expect(bootChain())->toHaveCount(count(HISTORICAL_BOOT_ORDER) + count(APPENDED_BOOT_ORDER));
 });
 
 it('declares the contract so a detector can find it', function () {

@@ -11,6 +11,7 @@ use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
 use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
+use Spatie\Sluggable\SluggableServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Models\Permission;
 use Splicewire\Beam\Accounts\Models\Role;
@@ -57,6 +58,17 @@ abstract class TestCase extends Orchestra
             // Its absence went unnoticed because no test exercised an injected input DTO — the
             // Api\V1\ProfileController has taken one since HTTP-07 with no coverage behind it.
             LaravelDataServiceProvider::class,
+            // spatie/laravel-sluggable, for `Team`'s HasSlug (beam-facade 159). Testbench does not
+            // auto-discover, and that package's provider registers the `actions.generate_slug` map
+            // HasSlug resolves through — without it every Team::create() dies "No action class is
+            // configured for key `generate_slug`", which is beam-facade 137's symptom one package over.
+            //
+            // The provider is a v4 class; v3 has no action registry and HasSlug needs no provider
+            // there. The composer require stays `^3.5|^4.0` to match `splicewire/laravel-beam` and not
+            // force an upgrade on the 3 estate roots still resolving v3 (measured 2026-08-27: 39 roots
+            // on 4.0.3, 3 on 3.x), so this line is a statement about the DEV lock, not about the
+            // package's floor. A v3 dev lock fatals here by name, which is the right kind of loud.
+            SluggableServiceProvider::class,
             // beam-core, so its BeamSeedManifest singleton binds — beam-accounts registers its
             // DemoTeamSeeder into it (bootSeed). beam-accounts hard-deps beam-core in composition.
             BeamServiceProvider::class,
@@ -148,6 +160,11 @@ abstract class TestCase extends Orchestra
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->string('name');
+            // The shape a host has AFTER `shared/add_slug_to_teams_table` — NOT NULL and globally
+            // unique, which is what the model's HasSlug is written against (beam-facade 159). The
+            // three-step nullable/backfill/constrain path that gets a POPULATED host here is exercised
+            // by TeamSlugMigrationTest against the real stub, not modelled by this fixture.
+            $table->string('slug')->unique();
             $table->boolean('personal_team')->default(false);
             $table->timestamps();
         });

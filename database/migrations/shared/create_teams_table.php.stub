@@ -31,6 +31,15 @@ return new class extends Migration
                 // became convergent it is a hard `migrate` failure there rather than a silent one.
                 $table->uuid('user_id')->index();
                 $table->string('name');
+                // NULLABLE here and constrained NOT NULL by `add_slug_to_teams_table` — deliberately,
+                // and not a two-step that could have been one. A NOT NULL column with no default
+                // cannot be added to a POPULATED table, and this guard is convergent: on a host whose
+                // `beam_teams` already holds rows, declaring it NOT NULL here makes the guard raise
+                // `required-addition` and the host stops migrating with no way forward
+                // (`SchemaConflict::REQUIRED_ADDITION`; the estate's NOT-NULL hazard, beam-facade 27).
+                // Nullable converges everywhere, the ALTER backfills and constrains, and greenfield
+                // and populated hosts walk the same two files.
+                $table->string('slug')->nullable();
                 $table->boolean('personal_team')->default(false)->index();
                 $table->timestamps();
             })

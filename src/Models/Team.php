@@ -6,6 +6,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\SlugOptions;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
@@ -18,6 +20,8 @@ use Splicewire\Beam\Facades\Beam;
  */
 class Team extends Model implements TeamContract
 {
+    use HasSlug;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -32,6 +36,54 @@ class Team extends Model implements TeamContract
     public function getTable(): string
     {
         return Beam::table('teams');
+    }
+
+    /**
+     * The team's stable, globally-unique public name — what a `to_teams:` selector in an
+     * `x-beam-notify` keyword actually names (beam-facade 100 D5, built by 159).
+     *
+     * A slug rather than the key, because that selector is authored by hand into a JSON Schema that
+     * travels between hosts, where an auto-increment id means nothing. Globally unique rather than
+     * unique-per-owner for the same reason: the selector carries no owner, so the name has to be
+     * sufficient on its own. spatie's uniqueness suffix (`-1`, `-2`) resolves collisions.
+     *
+     * **Not regenerated on update.** Renaming a team must not silently repoint every schema that
+     * notifies it — the slug is an address, and an address that follows a display name is not one.
+     * A deliberate re-address is an explicit write to the column.
+     *
+     * Personal teams derive from the OWNER, not from the name: `personalTeamName()` renders
+     * "{name}'s Team" for everybody, so a name-derived slug would collide for every user sharing a
+     * first name and degrade into `adas-team-7`. The owner handle is both unique-ish and meaningful.
+     */
+    public function getSlugOptions(): SlugOptions
+    {
+        return SlugOptions::create()
+            ->generateSlugsFrom(fn (self $team): string => $team->slugSource())
+            ->saveSlugsTo('slug')
+            ->doNotGenerateSlugsOnUpdate();
+    }
+
+    /**
+     * What the slug is derived from — the owner's handle for a personal team, the team's own name
+     * otherwise.
+     *
+     * Reads the owner through the relation rather than off a loaded model, because the slug is
+     * generated on the `creating` event, before anything has had a chance to load one. A team whose
+     * owner cannot be read falls back to the name, which is always present.
+     */
+    protected function slugSource(): string
+    {
+        if (! $this->personal_team) {
+            return (string) $this->name;
+        }
+
+        $owner = $this->owner()->first();
+
+        $handle = $owner?->getAttribute('email') !== null
+            ? strstr((string) $owner->getAttribute('email'), '@', true)
+            : $owner?->getAttribute('name');
+
+        return (string) ($handle ?: $this->name);
     }
 
     public function owner(): BelongsTo

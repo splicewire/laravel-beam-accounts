@@ -20,6 +20,7 @@ use Splicewire\Beam\Accounts\Concerns\WiresFrameResources;
 use Splicewire\Beam\Accounts\Concerns\WiresKeys;
 use Splicewire\Beam\Accounts\Concerns\WiresMeResource;
 use Splicewire\Beam\Accounts\Concerns\WiresMiddleware;
+use Splicewire\Beam\Accounts\Concerns\WiresNotifyRecipients;
 use Splicewire\Beam\Accounts\Concerns\WiresOidc;
 use Splicewire\Beam\Accounts\Concerns\WiresOperatorShell;
 use Splicewire\Beam\Accounts\Concerns\WiresRouteMacro;
@@ -74,6 +75,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
     use WiresKeys;
     use WiresMeResource;
     use WiresMiddleware;
+    use WiresNotifyRecipients;
     use WiresOidc;
     use WiresOperatorShell;
     use WiresRouteMacro;
@@ -159,6 +161,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
             // TEAMS — teams/memberships/invitations/access-grants/share-links/view-requests.
             'migrations' => [
                 'shared/create_teams_table',
+                // The slug ALTER sits immediately after its own create and BEFORE the child tables,
+                // because it constrains the column that create declares nullable — three steps the
+                // create cannot take on a populated table (beam-facade 159; see the stub's docblock).
+                'shared/add_slug_to_teams_table',
                 'shared/create_memberships_table',
                 'shared/add_current_team_id_to_users_table',
                 'shared/create_invitations_table',
