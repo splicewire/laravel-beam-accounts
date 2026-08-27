@@ -3,8 +3,7 @@
 namespace Splicewire\Beam\Accounts\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\URL;
-use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Actions\DemoLoginLinks;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 
 /**
@@ -17,6 +16,11 @@ class LoginAsCommand extends Command
     protected $signature = 'splicewire:beam:accounts:login-as {subject : owner|admin|member|solo} {--minutes=30 : How long the signed link stays valid}';
 
     protected $description = 'Print a signed browser login link for a demo subject (dev/preview only).';
+
+    public function __construct(protected DemoLoginLinks $links)
+    {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -36,25 +40,20 @@ class LoginAsCommand extends Command
 
         $minutes = (int) $this->option('minutes');
 
-        // Resolve the subject KEY to the demo user's id: the link now targets the particle operation
-        // `users/{id}/op/login-as`, which resolves `{id}` against the user model like every other op.
-        // The key stays the CLI's argument — it is the nicer thing to type — and the mapping to a
-        // user happens here, once, instead of on every request the old bespoke route served.
-        $user = BeamAccounts::userModel()::query()
-            ->where('email', BeamDemo::email($subject))
-            ->first();
+        // The minting itself is {@see DemoLoginLinks}, not a body here — beam-facade 172 gave it a
+        // second caller (the login page's one-click demo buttons, which cannot build a signed URL
+        // client-side because the signature needs APP_KEY), and two copies of "subject key ⇒ signed
+        // route" is exactly how the two affordances would drift apart again.
+        //
+        // The subject KEY stays the CLI's argument — it is the nicer thing to type — and the mapping
+        // to a user happens once, there, rather than on every request the old bespoke route served.
+        $url = $this->links->for($subject, $minutes);
 
-        if ($user === null) {
+        if ($url === null) {
             $this->error("Demo subject [{$subject}] has no user yet. Seed it first (`db:seed --class=DemoTeamSeeder`).");
 
             return self::FAILURE;
         }
-
-        $url = URL::temporarySignedRoute(
-            'users.op.login-as',
-            now()->addMinutes($minutes),
-            ['id' => $user->getKey()],
-        );
 
         $this->info("Signed login link for demo {$subject} ({$minutes} min):");
         $this->line($url);

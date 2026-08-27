@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Tests;
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\FortifyServiceProvider;
@@ -35,6 +36,8 @@ abstract class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->aliasCentralOntoTheDefaultDatabase();
 
         $this->createUsersSchema();
         $this->createTeamsSchema();
@@ -150,6 +153,39 @@ abstract class TestCase extends Orchestra
             Features::emailVerification(),
             Features::updatePasswords(),
         ]);
+    }
+
+    /**
+     * Make the `central` connection reach the SAME database as the default one.
+     *
+     * `BeamServiceProvider::registerCentralConnectionAlias()` registers `central` as a COPY of the
+     * default connection's config, which is correct everywhere except here: this harness's default
+     * is `:memory:`, and two sqlite connections both configured as `:memory:` are two SEPARATE
+     * databases. {@see CentralConnectionAliasTest} already says so in its own docblock, and pays a
+     * file-backed sqlite to avoid it.
+     *
+     * That divergence was not cosmetic — it was hiding an entire HTTP surface. Every schema this
+     * class builds lands on the default connection, while {@see \Splicewire\Beam\Accounts\Models\User}
+     * (the `backing:` of the `users` particle resource, and therefore what
+     * `RecordSubject`/`ResourceRecordLookup` resolve an operation's `{id}` through) is PINNED to
+     * `central`. So every request that resolved a user through the resource died on
+     * `no such table: users` before it reached anything under test: all six HTTP cases in
+     * {@see \Tests\DemoLoginAsTest} — the login-as redirect, the 404, the unsigned refusal, the
+     * tampered refusal, the expiry refusal and the demo-disabled 403 — had been red for their whole
+     * life, which is precisely why beam-facade 172's binding defect shipped with a suite over it.
+     * The estate's recurring shape: an instrument that reports failure by not running.
+     *
+     * Sharing the PDO instance rather than re-pointing the config is what actually joins two
+     * in-memory databases — a second `:memory:` DSN opens a third one. A real host's `central` is an
+     * ordinary shared database, so this models the host rather than excusing it.
+     */
+    protected function aliasCentralOntoTheDefaultDatabase(): void
+    {
+        if (! array_key_exists('central', config('database.connections', []))) {
+            return;
+        }
+
+        DB::connection('central')->setPdo(DB::connection()->getPdo());
     }
 
     protected function createUsersSchema(): void

@@ -1,11 +1,16 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Rushing\PermissionCascade\Contracts\AccessGrant;
+use Splicewire\Beam\Accounts\Actions\DemoLoginLinks;
+use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
+use Splicewire\Beam\Accounts\Models\User as BeamUser;
+use Splicewire\Beam\Accounts\QueryBuilders\SignedLoginAsSubject;
 use Splicewire\Beam\Accounts\Tests\Fixtures\RealmRoot;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
@@ -104,28 +109,49 @@ it('404s an id that resolves to no user', function () {
     $this->get(signedLoginAs(999999))->assertNotFound();
 });
 
-it('refuses an UNSIGNED login-as from a caller the policy denies, in every environment', function () {
+/*
+ * ── The refusals, and why they answer 404 rather than 403 ────────────────────────────────────────
+ *
+ * These three cases asserted `assertForbidden()` from the day they were written and had NEVER RUN:
+ * every one of them died on `no such table: users` (beam-facade 172), because the `users` resource's
+ * `backing:` is pinned to the `central` connection and this harness's `central` was a second,
+ * separate `:memory:` database. So the 403 was a statement of intent, not a measurement.
+ *
+ * With the harness joined and {@see SignedLoginAsSubject} in place, the measured answer is 404, and
+ * that is the RIGHT answer rather than a regression. The refusal happens one step earlier than the
+ * ability check: a request with no valid signature is an ordinary guest, the users resource's row
+ * scope resolves to nothing for a guest, and `findOrFail` answers 404. A 403 would have been an
+ * EXISTENCE ORACLE — it would confirm to an unauthenticated caller that a given id names a real
+ * user, on the one endpoint whose whole purpose is becoming that user.
+ *
+ * What each case is actually pinning is unchanged and is asserted directly: the request is refused
+ * AND no session is authenticated.
+ */
+
+it('refuses an UNSIGNED login-as in every environment, and mints no session', function () {
     // The regression this pins is the one ticket 95 removed: the retired gate returned early in
     // `local`/`testing`, so an unauthenticated GET could assume any identity by id on a local host.
-    // The declared gate has no environment branch, so the same request is now a 403.
+    // The declared gate has no environment branch, and neither does the row scope.
     seedDemo();
 
     $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
 
-    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertForbidden();
+    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertNotFound();
 
     expect(auth()->check())->toBeFalse();
 });
 
-it('refuses a signed link whose signature has been tampered with', function () {
+it('refuses a signed link whose signature has been tampered with, and mints no session', function () {
     seedDemo();
 
     $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
 
-    $this->get(signedLoginAs($owner->getKey()).'0')->assertForbidden();
+    $this->get(signedLoginAs($owner->getKey()).'0')->assertNotFound();
+
+    expect(auth()->check())->toBeFalse();
 });
 
-it('refuses a signed link after it has expired', function () {
+it('refuses a signed link after it has expired, and mints no session', function () {
     // Replay is bounded by expiry and not otherwise prevented — this is the bound, asserted.
     seedDemo();
 
@@ -135,7 +161,78 @@ it('refuses a signed link after it has expired', function () {
 
     $this->travelTo(now()->addMinutes(10));
 
-    $this->get($url)->assertForbidden();
+    $this->get($url)->assertNotFound();
+
+    expect(auth()->check())->toBeFalse();
+});
+
+/*
+ * ── The signed-subject hole is exactly one row wide (beam-facade 172(b)) ─────────────────────────
+ *
+ * GATE POSTURE, stated because AGENTS.md requires it of any authorization measurement: this file —
+ * and the whole beam-accounts suite — installs NO `Gate::before` of any kind. `grep -rn 'Gate::before'
+ * src/ tests/` returns nothing. Every status below is what a real deny-by-default host answers.
+ */
+
+it('lets a validly-signed request resolve the ONE subject its signature names, and no other', function () {
+    seedDemo();
+
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+    $member = User::where('email', BeamDemo::email(Role::Member->value))->firstOrFail();
+
+    // Keep the owner's signature, swap the id in the path. The signature covers the whole URL, so
+    // this is not a valid signature for the member's route — the request falls back to the ordinary
+    // guest scope and resolves nothing. This is the check that makes `whereKey()` safe.
+    $forged = str_replace(
+        '/users/'.$owner->getKey().'/',
+        '/users/'.$member->getKey().'/',
+        signedLoginAs($owner->getKey()),
+    );
+
+    $this->get($forged)->assertNotFound();
+
+    expect(auth()->check())->toBeFalse();
+});
+
+it('does not widen the users row scope on any OTHER mount, even holding a real login-as signature', function () {
+    // This is the claim the whole fix rests on, so it is measured against the SCOPE CLOSURE rather
+    // than against a status code: the package harness mounts only the login-as op (the users REST
+    // resource is a host mount), so asserting 404 on `/users` here would be a route-missing 404 and
+    // would prove nothing. A probe route that runs the real closure proves the actual thing.
+    seedDemo();
+
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+
+    Route::middleware('web')->get('/probe-users-scope', fn () => [
+        'visible' => UserData::scope(BeamUser::query())->count(),
+    ]);
+
+    // The signer's two reserved parameters, lifted off a GENUINELY VALID login-as link and pasted
+    // onto another mount. Two independent things refuse them: `hasValidSignature()` is computed over
+    // the full URL including the path, and SignedLoginAsSubject checks the route's own
+    // `_particle_op_resource`/`_particle_op_name` defaults before it ever looks at the signature.
+    $query = parse_url(signedLoginAs($owner->getKey()), PHP_URL_QUERY);
+
+    $this->getJson('/probe-users-scope?'.$query)->assertOk()->assertJson(['visible' => 0]);
+
+    // And with nothing at all — the unchanged guest fail-safe, `whereRaw('1 = 0')`.
+    $this->getJson('/probe-users-scope')->assertOk()->assertJson(['visible' => 0]);
+
+    expect(auth()->check())->toBeFalse();
+});
+
+it('reports no signed subject for a request that is not the login-as mount', function () {
+    // The three ways SignedLoginAsSubject::id() must answer null, asserted at the seam so a future
+    // edit that loosens one of its four conditions goes red here rather than in a browser.
+    Route::middleware('web')->get('/probe-signed-subject', fn () => [
+        'id' => SignedLoginAsSubject::id(),
+    ])->name('probe-signed-subject');
+
+    $this->getJson(URL::temporarySignedRoute('probe-signed-subject', now()->addMinutes(5)))
+        ->assertOk()
+        ->assertJson(['id' => null]);
+
+    $this->getJson('/probe-signed-subject')->assertOk()->assertJson(['id' => null]);
 });
 
 it('403s the login-as operation when demo affordances are disabled', function () {
@@ -204,4 +301,45 @@ it('grants reach on every registered realm even when no realm root has been prov
 
     $model = config('permission-cascade.grant_model');
     expect($model::query()->where('ability', AccessGrant::ABILITY_MANAGE)->count())->toBe(4);
+});
+
+/*
+ * ── 172(a): the one-click demo sign-in, which is the SAME signed link ────────────────────────────
+ *
+ * Gate posture: unchanged — no `Gate::before` anywhere in this package's src/ or tests/.
+ */
+
+it('mints a signed link per demo subject, and following one authenticates the session', function () {
+    seedDemo();
+
+    $links = app(DemoLoginLinks::class)->all();
+
+    expect(array_column($links, 'key'))->toBe(BeamDemo::keys());
+
+    foreach ($links as $link) {
+        expect($link['url'])->toContain('/op/login-as')->toContain('signature=');
+        // The route carries the subject's UUID/key, never the subject SLUG — the 500 in 172(a) was
+        // `users/owner/op/login-as`.
+        expect($link['url'])->not->toContain('/users/'.$link['key'].'/');
+    }
+
+    // End to end, as a guest, exactly as a browser follows the button.
+    $owner = collect($links)->firstWhere('key', Role::Owner->value);
+
+    $this->get($owner['url'])->assertRedirect('/');
+
+    expect(auth()->check())->toBeTrue();
+    expect(auth()->user()->email)->toBe(BeamDemo::email(Role::Owner->value));
+});
+
+it('publishes no demo links when the demo affordances are off, and none for an unseeded host', function () {
+    // Unseeded: the roster exists, the users do not. Buttons that cannot work are omitted rather
+    // than emitted with a null url.
+    expect(app(DemoLoginLinks::class)->all())->toBe([]);
+
+    seedDemo();
+    config()->set('beam.accounts.demo.enabled', false);
+
+    expect(app(DemoLoginLinks::class)->all())->toBe([]);
+    expect(app(DemoLoginLinks::class)->for(Role::Owner->value))->toBeNull();
 });

@@ -13,6 +13,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\User;
+use Splicewire\Beam\Accounts\QueryBuilders\SignedLoginAsSubject;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
 use Splicewire\Beam\Data\Data;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
@@ -119,9 +120,19 @@ class UserData extends Data
     /**
      * The load-bearing isolation boundary, applied on BOTH the list and the per-record path.
      * Defaults to the shared-team roster; a host overrides with a config seam.
+     *
+     * The one branch ahead of both is {@see SignedLoginAsSubject}: a request carrying the server's
+     * own signature over `users/{id}/op/login-as` resolves exactly that `{id}` and nothing else.
+     * Read that class before touching this — it is a signed-credential question, not a visibility
+     * one, and it is what makes a signed login link able to find the subject it exists to become
+     * (beam-facade 172). Every other request, guest included, falls through unchanged.
      */
     public static function scope(Builder $query): Builder
     {
+        if (($signedSubject = SignedLoginAsSubject::id()) !== null) {
+            return $query->whereKey($signedSubject);
+        }
+
         $seam = config('beam.accounts.users.scope');
 
         if (is_callable($seam)) {
