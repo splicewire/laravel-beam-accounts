@@ -8,6 +8,7 @@ use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Ops\LogInAsUser;
+use Splicewire\Beam\Facades\Particle;
 
 /**
  * One concern of {@see BeamAccountsServiceProvider}, contributed to its `boot` chain by the trait that
@@ -44,7 +45,7 @@ trait WiresDemo
         // and its route share one demo gate — when demo is off neither exists, which is what the
         // retired bespoke route did too.
         Route::middleware('web')->group(function () {
-            Route::particleOps('users', 'users', [LogInAsUser::operation()], ['method' => 'get']);
+            Particle::ops('users', 'users', [LogInAsUser::operation()], ['method' => 'get']);
         });
     }
 }

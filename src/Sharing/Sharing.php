@@ -12,6 +12,7 @@ use Splicewire\Beam\Accounts\Data\ShareLinkData;
 use Splicewire\Beam\Accounts\Data\ViewRequestData;
 use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Models\ViewRequest;
+use Splicewire\Beam\Facades\Particle;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
@@ -109,7 +110,7 @@ class Sharing
         }
 
         Route::middleware($middleware)->prefix($groupPrefix)->group(function () use ($urlKey, $resourceKey, $ops) {
-            Route::particleOps($urlKey, $resourceKey, $ops);
+            Particle::ops($urlKey, $resourceKey, $ops);
         });
     }
 
@@ -135,8 +136,8 @@ class Sharing
         ]);
 
         // Revoke stays a write op (minter-gated) — reads are declarative, writes imperative (as attachTo).
-        // `Route::particleOps` (HTTP-02) registers the inline op AND mounts it (was: an imperative
-        // `$registry->register(...)` + a bare `Route::particleOp(...)`).
+        // `Particle::ops()` registers the inline op AND mounts it (was: an imperative
+        // `$registry->register(...)` + a bare op mount).
         $revokeOp = new ParticleOperation(
             resource: 'share-links', name: 'revoke', kind: OperationKind::Write, model: ShareLink::class,
             ability: 'manageShareLinks',
@@ -148,10 +149,10 @@ class Sharing
         );
 
         Route::middleware($middleware)->prefix($groupPrefix)->group(function () use ($revokeOp) {
-            Route::particleResource('share-links', 'share-links', ['only' => ['index']]);
-            Route::particleResource('access-grants', 'access-grants', ['only' => ['index']]);
-            Route::particleResource('view-requests', 'view-requests', ['only' => ['index']]);
-            Route::particleOps('share-links', 'share-links', [$revokeOp]);
+            Particle::mount('share-links', 'share-links')->only(['index']);
+            Particle::mount('access-grants', 'access-grants')->only(['index']);
+            Particle::mount('view-requests', 'view-requests')->only(['index']);
+            Particle::ops('share-links', 'share-links', [$revokeOp]);
         });
     }
 
