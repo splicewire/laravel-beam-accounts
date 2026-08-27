@@ -19,6 +19,7 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\FixtureRealmGrantable;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\BeamServiceProvider;
 use Splicewire\Beam\Facades\Beam;
+use Splicewire\Beam\Notifications\BeamNotificationsServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -73,6 +74,17 @@ abstract class TestCase extends Orchestra
             // DemoTeamSeeder into it (bootSeed). beam-accounts hard-deps beam-core in composition.
             BeamServiceProvider::class,
             BeamAccountsServiceProvider::class,
+            // beam-notifications, so this package's `to_roles:` / `to_teams:` recipient kinds are
+            // exercised against the real notify package rather than against half of themselves
+            // (beam-facade 159). It is a `require-dev` and a `suggest`, never a `require` — 100 D4
+            // ruled the coupling stays soft, because a hard require drags stancl/tenancy into two
+            // single-tenant sites and doubles the estate's uuid-permission danger set.
+            //
+            // Order matters and is the reason this is a provider entry rather than a late
+            // `app()->register()`: `mergeConfigFrom` is a shallow top-level merge, so the notify
+            // package's config must be merged during the register pass, before this package's boot
+            // chain appends its two kinds to it.
+            BeamNotificationsServiceProvider::class,
         ];
     }
 

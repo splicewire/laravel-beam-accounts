@@ -55,12 +55,13 @@ it('APPENDS rather than assigning, so beam-notifications own `to` kind survives'
     // keyword with roles and teams and no `to:` at all, and nothing would say so until a schema that
     // mails a literal address stopped mailing it.
     //
-    // Stated against the concern rather than against a booted notify package, because the notify
-    // package is not in this harness — and putting it there would prove the wrong thing anyway: its
-    // config merge happens at REGISTER time, so any ordering a test could construct by registering it
-    // late is an ordering no host has (see WiresNotifyRecipients on why the append lives in boot).
-    config()->set('beam.notifications.recipient_kinds', ['to' => AddressRecipientKind::class]);
+    // The notify package boots in this harness (see TestCase), so this reads the real composition:
+    // its `to` kind merged at register time, this package's two appended in boot.
+    expect(config('beam.notifications.recipient_kinds.to'))->toBe(AddressRecipientKind::class)
+        ->and(config('beam.notifications.recipient_kinds'))->toHaveKeys(['to', 'to_roles', 'to_teams']);
 
+    // …and the append survives a re-run, which is what says it is an append and not an assignment
+    // that happens to be running last.
     (fn () => $this->bootNotifyRecipients())->call(app()->getProvider(BeamAccountsServiceProvider::class));
 
     expect(config('beam.notifications.recipient_kinds'))->toHaveKeys(['to', 'to_roles', 'to_teams']);
