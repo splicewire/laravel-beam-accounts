@@ -5,7 +5,7 @@ namespace Splicewire\Beam\Accounts\Tests;
 use Schemastud\DataSchemas\Contracts\ProvidesJsonSchema;
 use Schemastud\DataSchemas\LaravelDataSchemasServiceProvider;
 use Splicewire\Beam\Accounts\Data\UserData;
-use Splicewire\Beam\Data\Data as BeamData;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The reparent did the thing it was for.

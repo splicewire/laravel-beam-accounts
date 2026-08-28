@@ -5,7 +5,7 @@ namespace Splicewire\Beam\Accounts\Data;
 use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The passwordless passkey sign-in body — the assertion half of the WebAuthn get ceremony
@@ -17,7 +17,7 @@ use Splicewire\Beam\Data\Data;
  * what is accepted (`boolean` accepts the absent case) and stops the wire carrying an
  * undocumented, behaviour-changing field.
  */
-class PasskeyLoginInputData extends Data
+class PasskeyLoginInputData extends BeamData
 {
     /**
      * @param  array<string, mixed>  $credential

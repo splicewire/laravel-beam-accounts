@@ -3,7 +3,7 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Support\Validation\ValidationContext;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The reset-link request body (auth-cluster spec asset 11 §3.3).
@@ -12,7 +12,7 @@ use Splicewire\Beam\Data\Data;
  * the rule is local. Enumeration-safety is enforced by the controller's identical-response contract,
  * not here.
  */
-class ForgotPasswordInputData extends Data
+class ForgotPasswordInputData extends BeamData
 {
     public function __construct(
         public string $email,

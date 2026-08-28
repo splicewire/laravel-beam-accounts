@@ -5,7 +5,7 @@ namespace Splicewire\Beam\Accounts\Data;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The self-service profile-edit body — name + email (auth-cluster spec asset 11 §3.5).
@@ -15,7 +15,7 @@ use Splicewire\Beam\Data\Data;
  * {@see ProfileValidationRules}: `profileRules($userId)` is the one rule source, and its email rule is
  * unique-ignore-self. The ignore-self id is context-dependent (the authenticated user).
  */
-class ProfileUpdateInputData extends Data
+class ProfileUpdateInputData extends BeamData
 {
     public function __construct(
         public string $name,

@@ -4,7 +4,7 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The account-deletion confirmation body — the acting user's current password, re-entered.
@@ -14,7 +14,7 @@ use Splicewire\Beam\Data\Data;
  * settings surface is exactly the one a client most needs a typed contract for, and leaving it as a
  * FormRequest kept it out of the generation chain entirely.
  */
-class ProfileDeleteInputData extends Data
+class ProfileDeleteInputData extends BeamData
 {
     use PasswordValidationRules;
 

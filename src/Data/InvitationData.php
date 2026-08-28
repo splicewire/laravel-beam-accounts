@@ -13,7 +13,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**
@@ -49,7 +49,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     editable: false,
 )]
 #[TypeScript]
-class InvitationData extends Data
+class InvitationData extends BeamData
 {
     public function __construct(
         #[NotInList]

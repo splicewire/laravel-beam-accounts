@@ -6,7 +6,7 @@ use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The self-service password-change body — current password plus the new one.
@@ -27,7 +27,7 @@ use Splicewire\Beam\Data\Data;
  * seam between the two; renaming either side would have been a breaking change for no gain.
  */
 #[MapInputName(SnakeCaseMapper::class)]
-class PasswordUpdateInputData extends Data
+class PasswordUpdateInputData extends BeamData
 {
     use PasswordValidationRules;
 

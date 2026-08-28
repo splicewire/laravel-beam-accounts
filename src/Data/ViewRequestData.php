@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Splicewire\Beam\Accounts\Models\ViewRequest;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**
@@ -15,7 +15,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * status, as a declarative particle resource. Owner-side (incoming) requests stay per-resource.
  */
 #[ParticleResource(key: 'view-requests', backing: ViewRequest::class, filterable: false)]
-class ViewRequestData extends Data
+class ViewRequestData extends BeamData
 {
     public function __construct(
         // Attachment point only — see AccessGrantData. `created_at` rather than `decidedAt`

@@ -4,7 +4,7 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The reset-confirmation body — token + email + new password (auth-cluster spec asset 11 §3.3).
@@ -14,7 +14,7 @@ use Splicewire\Beam\Data\Data;
  * carries over verbatim: `passwordRules()` becomes the InputData's own rule for the `password` field, so
  * the SPA reset can't drift from the engine's Fortify reset.
  */
-class ResetPasswordInputData extends Data
+class ResetPasswordInputData extends BeamData
 {
     public function __construct(
         public string $token,

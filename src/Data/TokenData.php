@@ -12,7 +12,7 @@ use Schemastud\Frame\Attributes\NotInList;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Models\PersonalAccessToken;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**
@@ -49,7 +49,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     deletable: true,
 )]
 #[TypeScript]
-class TokenData extends Data
+class TokenData extends BeamData
 {
     public function __construct(
         #[NotInList]

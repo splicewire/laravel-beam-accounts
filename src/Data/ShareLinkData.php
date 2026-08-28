@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Splicewire\Beam\Accounts\Models\ShareLink;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**
@@ -16,7 +16,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * revoke is a `share-links.revoke` operation (minter-gated).
  */
 #[ParticleResource(key: 'share-links', backing: ShareLink::class, filterable: false)]
-class ShareLinkData extends Data
+class ShareLinkData extends BeamData
 {
     public function __construct(
         // Attachment point only — see AccessGrantData for why the sort key names `created_at`

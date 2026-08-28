@@ -15,7 +15,7 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\User;
 use Splicewire\Beam\Accounts\QueryBuilders\SignedLoginAsSubject;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**
@@ -86,7 +86,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     deletable: false,
 )]
 #[TypeScript]
-class UserData extends Data
+class UserData extends BeamData
 {
     public function __construct(
         #[NotInList]

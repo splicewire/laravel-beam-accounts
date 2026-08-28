@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
 /**
@@ -17,7 +17,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * binds a different grant_model registers its own read resource.
  */
 #[ParticleResource(key: 'access-grants', backing: AccessGrant::class, filterable: false)]
-class AccessGrantData extends Data
+class AccessGrantData extends BeamData
 {
     public function __construct(
         // The default sort rides `id` only as an attachment point — `#[Sortable]` targets a

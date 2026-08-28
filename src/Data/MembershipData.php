@@ -6,7 +6,7 @@ use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The team-members LIST row (Frame OS ticket 20 — promoted from tower's
@@ -23,7 +23,7 @@ use Splicewire\Beam\Data\Data;
  * `creatable: false` + `deletable: false`, so create/edit/delete all 405.
  */
 #[TypeScript]
-class MembershipData extends Data
+class MembershipData extends BeamData
 {
     public function __construct(
         #[NotInList]

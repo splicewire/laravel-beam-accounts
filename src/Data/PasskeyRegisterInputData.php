@@ -4,7 +4,7 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The passkey-registration body — the attestation half of the WebAuthn create ceremony
@@ -21,7 +21,7 @@ use Splicewire\Beam\Data\Data;
  * is never handed this class by the container, which is 27's gate-order rule (an injected DTO validates
  * during resolution and puts 422 ahead of `authorize`).
  */
-class PasskeyRegisterInputData extends Data
+class PasskeyRegisterInputData extends BeamData
 {
     /**
      * @param  array<string, mixed>  $credential

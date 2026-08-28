@@ -3,7 +3,7 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Support\Validation\ValidationContext;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The first-party SPA password-grant login body (auth-cluster spec asset 11 §3.1).
@@ -12,7 +12,7 @@ use Splicewire\Beam\Data\Data;
  * become this InputData's own `rules()`, run on resolution under beam's OnlyRequests strategy. No
  * shared policy applies (email + password + remember is login-specific), so the rules stay local.
  */
-class LoginInputData extends Data
+class LoginInputData extends BeamData
 {
     public function __construct(
         public string $email,

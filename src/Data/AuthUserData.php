@@ -6,7 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The pure IDENTITY-CORE auth projection — what `/me`, login, passkey-login, and profile-update
@@ -34,7 +34,7 @@ use Splicewire\Beam\Data\Data;
  * distinction the old `[]` Null default could not make.
  */
 #[TypeScript]
-class AuthUserData extends Data
+class AuthUserData extends BeamData
 {
     public function __construct(
         public string $id,

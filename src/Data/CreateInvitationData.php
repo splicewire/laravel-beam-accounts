@@ -7,7 +7,7 @@ use Spatie\LaravelData\Attributes\Validation\In;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Enums\Role;
-use Splicewire\Beam\Data\Data;
+use Splicewire\Beam\Data\BeamData;
 
 /**
  * The `editData` escape hatch for the Invitations resource (Frame OS ticket 20 — promoted from
@@ -17,7 +17,7 @@ use Splicewire\Beam\Data\Data;
  * second list). The resource's `prepare` enforces the owner/admin authorization on top.
  */
 #[TypeScript]
-class CreateInvitationData extends Data
+class CreateInvitationData extends BeamData
 {
     public function __construct(
         #[Required, Email]
