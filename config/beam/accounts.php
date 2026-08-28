@@ -300,8 +300,17 @@ return [
     // shows the acting principal themselves plus everyone they share a team with; a CENTRAL Root
     // principal sees all; an unauthenticated caller sees nothing. Bind this when your seats don't
     // live on beam's memberships table. There is no `model` key — the user model already has one
-    // seam, the top-level `user_model` above; the resource's ATTRIBUTE literal is overridden by
-    // subclassing the DTO (attributes cannot read config).
+    // seam, the top-level `user_model` above, and as of 2026-08-28 the resource HONOURS it: `UserData`
+    // declares `backing: ConfiguredUserBacking::class`, which reads `BeamAccounts::userModel()` when
+    // the container resolves it at request time.
+    //
+    // This comment used to end "the resource's ATTRIBUTE literal is overridden by subclassing the DTO
+    // (attributes cannot read config)". Attributes still cannot read config — but a ResourceBacking
+    // CLASS-STRING is a constant expression, and the resolver app()-resolves it late, so the read
+    // happens after config is loaded. Subclassing the DTO still works and still supersedes, it is just
+    // no longer required to run a bespoke user model. Five of six installing hosts never applied that
+    // workaround, so `users` had been backing beam's own Models\User while `me` and Laravel's auth
+    // backed the host's App\Models\User — unrelated classes at four of them.
     'users' => [
         'scope' => null,
     ],

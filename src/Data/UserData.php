@@ -12,7 +12,7 @@ use Schemastud\Frame\Attributes\NotInList;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
-use Splicewire\Beam\Accounts\Models\User;
+use Splicewire\Beam\Accounts\Particle\Backing\ConfiguredUserBacking;
 use Splicewire\Beam\Accounts\QueryBuilders\SignedLoginAsSubject;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
 use Splicewire\Beam\Data\BeamData;
@@ -63,16 +63,32 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * visibility rule differs binds `beam.accounts.users.scope`, an `(Builder, ?Authenticatable):
  * Builder` callable.
  *
- * NOTE the `model:` attribute is the package default {@see User}. Unlike every other resource here,
- * hosts ROUTINELY subclass this model as their own `App\Models\User`, so the seam is load-bearing
- * rather than theoretical — but PHP attributes cannot read config, so a host running a bespoke user
- * model subclasses this DTO and re-declares the attribute with its own class (the escape hatch
- * {@see TokenData} documents). The runtime model seam `BeamAccounts::userModel()` already resolves the host
- * class everywhere else in the package; only the attribute's literal needs the subclass.
+ * ⚠️ **The `backing:` slot no longer freezes a class-string — it names
+ * {@see ConfiguredUserBacking}, which reads `BeamAccounts::userModel()` at REQUEST time.** Fixed
+ * 2026-08-28 (particle-operation-surface 14).
+ *
+ * This paragraph used to read: *"PHP attributes cannot read config, so a host running a bespoke user
+ * model subclasses this DTO and re-declares the attribute with its own class… only the attribute's
+ * literal needs the subclass."* The limitation was real and correctly described; the conclusion — that
+ * a host must subclass this DTO — was a workaround that **five of six installing hosts did not apply**,
+ * so `users` backed `Models\User` while `me` and Laravel's own auth backed `App\Models\User`:
+ *
+ * - `~/Herd/{audiostud, fable, numero, schemastud}` — `App\Models\User extends Authenticatable`, an
+ *   **entirely unrelated class**;
+ * - `~/Herd/splicewire-app` — `extends BeamUser`, so the frozen parent queried the right table with the
+ *   wrong casts, global scopes, relations and policy binding;
+ * - `~/Herd/splicewire` — the only host that took the escape hatch (`app/Data/UserData.php`), and it
+ *   still works: a host re-declaring `key: 'users'` supersedes this declaration exactly as before.
+ *
+ * The attribute limitation is unchanged — arguments are still constant expressions. What changed is that
+ * a `ResourceBacking` class-string IS a constant expression, and `BackingResolver` `app()`-resolves it at
+ * request time, so the config read happens late enough to be right. Subclassing this DTO remains
+ * available (the escape hatch {@see TokenData} documents) but is no longer required to run a bespoke
+ * user model.
  */
 #[ParticleResource(
     key: 'users',
-    backing: User::class,
+    backing: ConfiguredUserBacking::class,
     label: 'Users',
     group: 'Settings',
     icon: 'users',
