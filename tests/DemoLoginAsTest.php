@@ -438,3 +438,61 @@ it('still mints a single link for the CLI door with demo mode off, and that link
     $this->get($url)->assertRedirect('/');
     expect(auth()->check())->toBeTrue();
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The TTL — api-surface-coherence 99. `URL::signedRoute()` mints no `expires`, and
+// `hasValidSignature()` enforces one only when it is present, so an expiry-less link admits
+// forever. Every mint goes through DemoLoginLinks, and DemoLoginLinks always carries one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('always mints an expiring link, on both doors', function () {
+    seedDemo();
+    config()->set('beam.accounts.demo.login_links', true);
+
+    $urls = array_column(app(DemoLoginLinks::class)->all(), 'url');
+    $urls[] = app(DemoLoginLinks::class)->for(Role::Owner->value);
+
+    expect($urls)->not->toBeEmpty();
+
+    foreach ($urls as $url) {
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        expect($query)->toHaveKey('expires');
+        expect((int) $query['expires'])->toBeGreaterThan(now()->timestamp);
+    }
+});
+
+it('takes its TTL from the host config key, and falls back to the shorter default on junk', function () {
+    seedDemo();
+
+    $expiresOf = function (?string $url): int {
+        parse_str((string) parse_url((string) $url, PHP_URL_QUERY), $query);
+
+        return (int) ($query['expires'] ?? 0);
+    };
+
+    // The shipped default.
+    expect($expiresOf(app(DemoLoginLinks::class)->for(Role::Owner->value)))
+        ->toBe(now()->addMinutes(DemoLoginLinks::DEFAULT_MINUTES)->timestamp);
+
+    // A host raising the window for a support-escalation link.
+    config()->set('beam.accounts.demo.login_link_minutes', 120);
+    expect($expiresOf(app(DemoLoginLinks::class)->for(Role::Owner->value)))
+        ->toBe(now()->addMinutes(120)->timestamp);
+
+    // An explicit caller argument still wins over the host's key.
+    expect($expiresOf(app(DemoLoginLinks::class)->for(Role::Owner->value, 5)))
+        ->toBe(now()->addMinutes(5)->timestamp);
+
+    // A misconfigured TTL must not 500 the login page, and must land on the SHORTER window.
+    foreach ([null, 0, -10, '', 'thirty', [], false] as $junk) {
+        config()->set('beam.accounts.demo.login_link_minutes', $junk);
+
+        expect($expiresOf(app(DemoLoginLinks::class)->for(Role::Owner->value)))
+            ->toBe(now()->addMinutes(DemoLoginLinks::DEFAULT_MINUTES)->timestamp);
+    }
+});
+
+it('ships the TTL key in the package config', function () {
+    expect(config('beam.accounts.demo.login_link_minutes'))->toBe(DemoLoginLinks::DEFAULT_MINUTES);
+});

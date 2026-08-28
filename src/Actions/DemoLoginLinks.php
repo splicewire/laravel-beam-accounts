@@ -69,11 +69,48 @@ use Splicewire\Beam\Accounts\Ops\LogInAsUser;
 class DemoLoginLinks
 {
     /**
-     * How long a minted link stays valid, in minutes. Short enough that a link scraped out of a
-     * cached page stops working, long enough to survive an agent or a human reading the page and
+     * The FLOOR default for how long a minted link stays valid, in minutes — used when the host
+     * states nothing and when what it states is unusable. Short enough that a link scraped out of
+     * a cached page stops working, long enough to survive an agent or a human reading the page and
      * then clicking.
+     *
+     * The host-facing dial is `beam.accounts.demo.login_link_minutes`, resolved by
+     * {@see self::minutes()}; this constant is what that key defaults to and falls back to.
      */
     public const DEFAULT_MINUTES = 30;
+
+    /**
+     * The TTL to mint with — the ONE place the expiry's value is decided.
+     *
+     * ## Why an expiry is not optional here (api-surface-coherence 99)
+     *
+     * {@see LogInAsUser} declares `signed: true`, and the controller admits a validly-signed
+     * request BEFORE the ability check — so for an anonymous holder the link IS the whole
+     * credential. Beam mints and stores nothing, so there is no per-link revocation; the only
+     * bound on a leaked link is its expiry, and Laravel's `hasValidSignature()` enforces `expires`
+     * only when the URL carries one. `URL::signedRoute()` does not add one, so a link minted with
+     * it admits **forever**. That is the defect 99 was filed for, found at four host copies of
+     * this class's {@see self::all()}. Nothing outside this class mints a login-as URL.
+     *
+     * Precedence: an explicit `$minutes` argument (a caller that knows its own window) beats the
+     * host's config key, which beats {@see self::DEFAULT_MINUTES}. A config value that is not a
+     * positive integer falls back rather than throwing — a misconfigured TTL must not take the
+     * login page down, and falling back lands on the SHORTER, safer window.
+     */
+    protected function minutes(?int $minutes = null): int
+    {
+        if ($minutes !== null && $minutes > 0) {
+            return $minutes;
+        }
+
+        $configured = config('beam.accounts.demo.login_link_minutes');
+
+        if (is_numeric($configured) && (int) $configured > 0) {
+            return (int) $configured;
+        }
+
+        return self::DEFAULT_MINUTES;
+    }
 
     /**
      * The signed login-as URL for one demo subject, or `null` when the subject has no provisioned
@@ -88,7 +125,7 @@ class DemoLoginLinks
      * caller, and a shell on the host outranks anything a demo link grants. Anything publishing to a
      * page goes through {@see self::all()}, which carries the demo-mode gate.
      */
-    public function for(string $subject, int $minutes = self::DEFAULT_MINUTES): ?string
+    public function for(string $subject, ?int $minutes = null): ?string
     {
         if (! BeamDemo::enabled() || ! BeamDemo::has($subject)) {
             return null;
@@ -104,7 +141,7 @@ class DemoLoginLinks
 
         return URL::temporarySignedRoute(
             'users.op.login-as',
-            now()->addMinutes($minutes),
+            now()->addMinutes($this->minutes($minutes)),
             ['id' => $user->getKey()],
         );
     }
@@ -126,7 +163,7 @@ class DemoLoginLinks
      *
      * @return array<int, array{key: string, label: string, url: string}>
      */
-    public function all(int $minutes = self::DEFAULT_MINUTES): array
+    public function all(?int $minutes = null): array
     {
         if (! BeamDemo::publishesLoginLinks()) {
             return [];
