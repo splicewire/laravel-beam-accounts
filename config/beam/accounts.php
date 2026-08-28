@@ -35,7 +35,7 @@ return [
     //
     //  - publish_auth_migrations — users/permission_tables/passkeys/PAT-create/PAT-provenance/the
     //    tenant identity estate.
-    //  - publish_migrations — the teams/memberships/invitations/access-grants/share-links/
+    //  - publish_migrations — the teams/memberships/invitations/access-grants/
     //    view-requests estate (shared/ — identical schema on every connection; see
     //    shared/create_teams_table.php.stub's docblock). A host running its own separate team
     //    system turns this off so these tables are never published, matching splicewire-app.
@@ -237,14 +237,6 @@ return [
         // publish-only stub estate — this is host-generated secret material, never shipped by
         // the package and never checked in.
         'signing_key_path' => env('ACCOUNT_OIDC_SIGNING_KEY_PATH', storage_path('app/private/oidc-signing-key.pem')),
-    ],
-
-    // Reusable capability links (ADR-0009, tracer 05): the ShareLink primitive + ShareLinks
-    // action are always callable from PHP; this flag gates the HOST-FACING affordance (the
-    // satellite's /s/{token} resolver + copy-link UI, tracer 06). Mirrors the `keys`/`api`
-    // seams — prepared, opt-in.
-    'share_links' => [
-        'enabled' => env('ACCOUNT_SHARE_LINKS_ENABLED', true),
     ],
 
     // Declarative named ENTITLEMENT BUNDLES (Frame OS ticket 09, ADR-0013 §3/§5). A bundle is a

@@ -37,7 +37,6 @@ const HISTORICAL_BOOT_ORDER = [
     'bootDemo',
     'bootKeys',
     'bootOidc',
-    'bootShareLinks',
     'bootFrameResources',
     'bootMeResource',
     'bootSeed',

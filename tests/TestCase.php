@@ -236,18 +236,6 @@ abstract class TestCase extends Orchestra
             $table->unique(['team_id', 'email']);
         });
 
-        Schema::create(Beam::table('share_links'), function (Blueprint $table): void {
-            $table->id();
-            $table->string('token')->unique();
-            $table->string('scope')->index();
-            $table->string('created_by')->nullable();
-            $table->timestamp('expires_at')->nullable();
-            $table->timestamp('revoked_at')->nullable();
-            $table->unsignedInteger('use_count')->default(0);
-            $table->unsignedInteger('max_uses')->nullable();
-            $table->timestamps();
-        });
-
         Schema::create(Beam::table('access_grants'), function (Blueprint $table): void {
             $table->id();
             $table->string('grantable_type');

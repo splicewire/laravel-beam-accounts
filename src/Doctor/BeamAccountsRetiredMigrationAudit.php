@@ -10,15 +10,15 @@ use Splicewire\Beam\Doctor\RetiredMigrationAudit;
  * inferred: a retired stub's defining property is that it is *absent*, and absence is indistinguishable
  * from "never existed" or "belongs to another package".
  *
- * All eight declarations come out of one commit, `4272fbb` ("reclassifies the old host-placed `teams/`
- * directory ... into `shared/`"): seven tables were re-tiered `teams/` → `shared/` because a login's
- * team pointer has to exist wherever the login's own row does, and the eighth — the separate
+ * All seven declarations come out of one commit, `4272fbb` ("reclassifies the old host-placed `teams/`
+ * directory ... into `shared/`"): six tables were re-tiered `teams/` → `shared/` because a login's
+ * team pointer has to exist wherever the login's own row does, and the seventh — the separate
  * `add_lifecycle_to_invitations_table` ALTER — was squashed into `shared/create_invitations_table`
  * pre-prod. `teams/create_visibilities_table` did NOT move and is deliberately absent from this list.
  *
  * Publishing is a COPY, so the package cannot reach back: a host installed before `4272fbb` still holds
  * the whole `teams/` set. Measured 2026-08-26 across 21 Herd hosts — `~/Herd/splicewire` carries all
- * eight, and the retired copies are currently the ONLY creators of those tables there, which is exactly
+ * of them, and the retired copies are currently the ONLY creators of those tables there, which is exactly
  * why this reports and never repairs. The hazard when the `shared/` set is also published is the one
  * beam's docblock records: the stale copy sorts EARLIER, creates the table in the pre-re-tier shape, and
  * the surviving convergent stub then has to converge onto a shape it never declared.
@@ -46,7 +46,6 @@ class BeamAccountsRetiredMigrationAudit extends RetiredMigrationAudit
         'teams/add_current_team_id_to_users_table' => 'shared/add_current_team_id_to_users_table',
         'teams/create_invitations_table' => 'shared/create_invitations_table',
         'teams/create_access_grants_table' => 'shared/create_access_grants_table',
-        'teams/create_share_links_table' => 'shared/create_share_links_table',
         'teams/create_view_requests_table' => 'shared/create_view_requests_table',
 
         // Squashed INTO the create rather than re-tiered alongside it — the successor names the file

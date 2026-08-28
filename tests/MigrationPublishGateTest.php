@@ -39,7 +39,6 @@ it('excludes the teams estate when publish_migrations is off', function () {
         'shared/add_current_team_id_to_users_table',
         'shared/create_invitations_table',
         'shared/create_access_grants_table',
-        'shared/create_share_links_table',
         'shared/create_view_requests_table',
     ] as $teamsFile) {
         expect($declared)->not->toContain($teamsFile);
@@ -88,7 +87,7 @@ it('declares both estates by default', function () {
     expect($declared)->toContain('create_personal_access_tokens_table');
     expect(array_search('create_personal_access_tokens_table', $declared, true))
         ->toBeLessThan(array_search('add_provenance_and_archived_to_personal_access_tokens_table', $declared, true));
-    expect($declared)->toHaveCount(17);
+    expect($declared)->toHaveCount(16);
 });
 
 /**

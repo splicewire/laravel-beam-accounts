@@ -4,7 +4,6 @@ use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Splicewire\Beam\Accounts\Data\AccessGrantData;
 use Splicewire\Beam\Accounts\Data\InvitationData;
-use Splicewire\Beam\Accounts\Data\ShareLinkData;
 use Splicewire\Beam\Accounts\Data\TeamData;
 use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Data\UserData;
@@ -17,12 +16,11 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * The doctrine is explicit that the default order is single-sourced either way — "a
  * `filterable: false` resource still reads the SAME `#[Sortable(default: true)]`" — so a resource
  * that declares none is relying on whatever order the database happens to return. Every one of
- * these seven was in that state until this guard went in.
+ * these six was in that state until this guard went in.
  */
 $resources = [
     AccessGrantData::class,
     InvitationData::class,
-    ShareLinkData::class,
     TeamData::class,
     TokenData::class,
     UserData::class,

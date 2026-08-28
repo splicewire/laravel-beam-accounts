@@ -64,8 +64,7 @@ use Splicewire\Beam\Particle\ParticleOperation;
  * {@see UserData}'s docblock calls that seam load-bearing rather than theoretical. An attribute
  * literal would hardcode the package model AND its connection, so the op would resolve `{id}`
  * against the wrong table on every host that swaps the model. Registering imperatively lets `model:`
- * come from `BeamAccounts::userModel()` at registration time — the same reason
- * `Sharing::ledgerResources()` builds its revoke op as a runtime object in this package.
+ * come from `BeamAccounts::userModel()` at registration time.
  */
 class LogInAsUser
 {

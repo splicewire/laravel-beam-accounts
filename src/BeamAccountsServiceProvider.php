@@ -26,7 +26,6 @@ use Splicewire\Beam\Accounts\Concerns\WiresOperatorShell;
 use Splicewire\Beam\Accounts\Concerns\WiresRouteMacro;
 use Splicewire\Beam\Accounts\Concerns\WiresRoutes;
 use Splicewire\Beam\Accounts\Concerns\WiresSeed;
-use Splicewire\Beam\Accounts\Concerns\WiresShareLinks;
 use Splicewire\Beam\Accounts\Concerns\WiresTeamsMigrations;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
@@ -41,7 +40,6 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
 use Splicewire\Beam\Accounts\Oidc\SigningKey;
-use Splicewire\Beam\Accounts\Sharing\ShareLinkScopes;
 use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
@@ -81,7 +79,6 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
     use WiresRouteMacro;
     use WiresRoutes;
     use WiresSeed;
-    use WiresShareLinks;
     use WiresTeamsMigrations;
 
     public function configurePackage(Package $package): void
@@ -104,7 +101,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // estate. On by default; a host would only turn this off if it owns its own auth schema
         // entirely (mirrors the old bootMigrations() split).
         //
-        // TEAMS estate — teams/memberships/invitations/access-grants/share-links/view-requests,
+        // TEAMS estate — teams/memberships/invitations/access-grants/view-requests,
         // now reclassified into shared/ (was its own host-placed `teams/` directory; see
         // shared/create_teams_table.php.stub's docblock for why). A host that runs its own
         // separate team system (splicewire-app) turns this off so these tables are never
@@ -158,7 +155,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
                 'tenant/create_sign_offs_table',
             ],
 
-            // TEAMS — teams/memberships/invitations/access-grants/share-links/view-requests.
+            // TEAMS — teams/memberships/invitations/access-grants/view-requests.
             'migrations' => [
                 'shared/create_teams_table',
                 // The slug ALTER sits immediately after its own create and BEFORE the child tables,
@@ -169,7 +166,6 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
                 'shared/add_current_team_id_to_users_table',
                 'shared/create_invitations_table',
                 'shared/create_access_grants_table',
-                'shared/create_share_links_table',
                 'shared/create_view_requests_table',
                 'shared/create_impersonation_events_table',
             ],
@@ -266,10 +262,6 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         $this->app->singleton(BeamAccountsManager::class);
         $this->app->singleton(BeamDemoManager::class);
 
-        // The share-link scope-handler registry (tracer 06) — a singleton so a host registers
-        // its handlers (in boot) on the same instance the /s/{token} resolver reads.
-        $this->app->singleton(ShareLinkScopes::class);
-
         $this->app->singleton(TeamProvisioner::class);
 
         // The declarative entitlement-bundle layer (Frame OS ticket 09): the BundleRegistry reads the
@@ -348,13 +340,12 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // `ordered_traits` fixer resorts alphabetically.
         $this->chainTraitMethods('boot');
 
-        // The two registries this package owns, described from the OWNER's own boot (registry-kernel
+        // The registry this package owns, described from the OWNER's own boot (registry-kernel
         // ticket 38 / 08 D7 — a registry describes itself, nobody describes on another's behalf) and
         // AFTER the boot chain, so anything the chain registers is already in place. Declaring and
         // indexing are two acts: until this runs the index holds nothing, and `popcorn:registries`
         // cannot route `beam.accounts.*`.
         $index = $this->app->make(RegistryIndex::class);
-        $index->describe($this->app->make(ShareLinkScopes::class), by: self::class);
         $index->describe($this->app->make(BundleRegistry::class), by: self::class);
 
         // Self-register into beam-core's install manifest (order 5: users/permission_tables are

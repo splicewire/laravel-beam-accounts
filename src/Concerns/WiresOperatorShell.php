@@ -27,7 +27,7 @@ trait WiresOperatorShell
      * NOT the windowed `/os` desktop (retired; `@splicewire/beam-ux/shell`'s `DefaultOsDesktop` still
      * exists for a host that wants that shape, it just isn't what this route mounts).
      *
-     * Two independent overrides, mirroring `bootDemo()`/`bootShareLinks()`'s idiom:
+     * Two independent overrides, mirroring `bootDemo()`'s idiom:
      *  - `config('beam.accounts.operator_shell.enabled', true)` — a host turns this off and defines its
      *    own `/operator` entirely.
      *  - `Route::has('operator.home')` — a host that already named its own route `operator.home` (e.g.

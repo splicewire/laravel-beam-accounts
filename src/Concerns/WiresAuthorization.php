@@ -10,7 +10,6 @@ use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
-use Splicewire\Beam\Accounts\Models\ShareLink;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Realm\RealmRegistry;
 
@@ -51,14 +50,6 @@ trait WiresAuthorization
             if (Gate::getPolicyFor($model) === null) {
                 Gate::policy($model, UserPolicy::class);
             }
-        });
-
-        // A share link is managed (revoked) by its minter (ADR-0009, tracer 05). Not
-        // team-scoped like invitations — the check is minter-ownership, compared as strings
-        // since created_by is a cross-host string key.
-        Gate::define('manageShareLinks', function ($user, ShareLink $link) {
-            return $link->created_by !== null
-                && (string) $link->created_by === (string) $user->getAuthIdentifier();
         });
 
         $this->bootAuthoringGates();
