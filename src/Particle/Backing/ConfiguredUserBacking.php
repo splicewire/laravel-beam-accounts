@@ -34,12 +34,22 @@ use Splicewire\Beam\Particle\Backing\EloquentBacking;
  *
  * ## What was actually wrong
  *
- * Measured 2026-08-28. {@see \Splicewire\Beam\Accounts\BeamAccountsManager::userModel()} falls back
+ * Measured 2026-08-28, and this is the single home for that census — the config comment, `UserData` and
+ * the test point here rather than restating it, because it is a dated reading of a moving estate and
+ * would otherwise go stale in four places at once.
+ *
+ * {@see \Splicewire\Beam\Accounts\BeamAccountsManager::userModel()} falls back
  * `beam.accounts.user_model` → `auth.providers.users.model` → `Models\User`. Every host leaves the first
- * null, so the second decides, and it is `App\Models\User` — which **extends `BeamUser` at
- * `~/Herd/splicewire-app`** (so the frozen parent class-string queried the right table with the wrong
- * casts, scopes and relations) and **extends plain `Authenticatable` at `~/Herd/audiostud` and
- * `~/Herd/splicewire`**, where it is an entirely unrelated class.
+ * null, so the second decides, and it resolves to `App\Models\User`. Of the **six** hosts installing this
+ * package, **five** were affected:
+ *
+ * - `~/Herd/{audiostud, fable, numero, schemastud}` — `App\Models\User extends Authenticatable`, an
+ *   entirely **unrelated class**;
+ * - `~/Herd/splicewire-app` — `extends BeamUser`, a **subclass**, so the frozen parent queried the right
+ *   table with the wrong casts, scopes, relations and policy binding;
+ * - `~/Herd/splicewire` — **not affected**: the one host that took the documented escape hatch
+ *   (`app/Data/UserData.php` re-declares `key: 'users'`). It keeps working — `OnDuplicate::Supersede`
+ *   means a host re-declaration still wins.
  *
  * The failure is IDENTITY, not disclosure: the table is the same, but the concrete class is what decides
  * casts, global scopes, eager-loadable relations and policy binding.

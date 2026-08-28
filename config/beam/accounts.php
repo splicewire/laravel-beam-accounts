@@ -117,6 +117,20 @@ return [
         // true/1/'true'/'1'/'on'/'yes' turns it on, and `enabled` must hold as well.
         'login_links' => env('ACCOUNT_DEMO_LOGIN_LINKS', false),
 
+        // How long a minted login-as link stays valid, in MINUTES. This is the ONLY bound on a
+        // leaked link: the operation admits an anonymous holder on a valid signature alone, and a
+        // signature carries no per-link revocation (rotating APP_KEY invalidates every link at
+        // once, which is not a control anybody reaches for). Laravel's `hasValidSignature()`
+        // enforces `expires` only when it is PRESENT, so a link minted without one admits forever
+        // — which is why every mint goes through
+        // {@see \Splicewire\Beam\Accounts\Actions\DemoLoginLinks} and never `URL::signedRoute()`
+        // directly (api-surface-coherence ticket 99). Short enough that a link scraped out of a
+        // cached page or a chat log stops working; long enough to survive a human or an agent
+        // reading the page and then clicking. A host wanting a longer support-escalation window
+        // raises it here rather than at a call site. Non-numeric or <= 0 falls back to
+        // DemoLoginLinks::DEFAULT_MINUTES.
+        'login_link_minutes' => env('ACCOUNT_DEMO_LOGIN_LINK_MINUTES', 30),
+
         // The config GATE for the DemoTeamSeeder's registration in the beam-seed manifest
         // (splicewire:beam:seed). The seeder registers unconditionally from the provider, but
         // this key decides whether it actually runs — so a production `beam:seed` never fabricates
@@ -299,18 +313,11 @@ return [
     // applied to BOTH the list and the per-record read, so the two can never disagree. The default
     // shows the acting principal themselves plus everyone they share a team with; a CENTRAL Root
     // principal sees all; an unauthenticated caller sees nothing. Bind this when your seats don't
-    // live on beam's memberships table. There is no `model` key — the user model already has one
-    // seam, the top-level `user_model` above, and as of 2026-08-28 the resource HONOURS it: `UserData`
-    // declares `backing: ConfiguredUserBacking::class`, which reads `BeamAccounts::userModel()` when
-    // the container resolves it at request time.
-    //
-    // This comment used to end "the resource's ATTRIBUTE literal is overridden by subclassing the DTO
-    // (attributes cannot read config)". Attributes still cannot read config — but a ResourceBacking
-    // CLASS-STRING is a constant expression, and the resolver app()-resolves it late, so the read
-    // happens after config is loaded. Subclassing the DTO still works and still supersedes, it is just
-    // no longer required to run a bespoke user model. Five of six installing hosts never applied that
-    // workaround, so `users` had been backing beam's own Models\User while `me` and Laravel's auth
-    // backed the host's App\Models\User — unrelated classes at four of them.
+    // live on beam's memberships table. There is no `model` key, and you do not need one: the resource
+    // honours the top-level `user_model` above. `UserData` declares
+    // `backing: ConfiguredUserBacking::class`, which reads it when the container resolves the backing at
+    // request time. Subclassing the DTO to re-declare the attribute still works and still supersedes,
+    // but is no longer required to run a bespoke user model.
     'users' => [
         'scope' => null,
     ],

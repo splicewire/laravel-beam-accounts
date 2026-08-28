@@ -15,27 +15,12 @@ use Splicewire\Beam\Particle\ParticleResourceRegistry;
  *
  * `#[ParticleResource]` takes `backing:`, and an attribute argument must be a **constant expression** —
  * so `UserData` hardcoded `Splicewire\Beam\Accounts\Models\User::class` while the imperative `me`
- * resource (`WiresMeResource:68`) read `BeamAccounts::userModel()`. `userModel()` resolves
- * `auth.providers.users.model` (every host leaves `beam.accounts.user_model` null), which is
- * `App\Models\User`.
- *
- * Measured 2026-08-28 across the SIX hosts that install this package — five were affected:
- *
- * - `~/Herd/{audiostud, fable, numero, schemastud}` — `App\Models\User extends Authenticatable`, an
- *   entirely UNRELATED class;
- * - `~/Herd/splicewire-app` — `extends BeamUser`, a SUBCLASS, so the frozen parent queried the right
- *   table with the wrong casts, scopes, relations and policy binding;
- * - `~/Herd/splicewire` — NOT affected: the only host that took the documented escape hatch
- *   (`app/Data/UserData.php` re-declares `key: 'users'` and supersedes). It still works after this fix.
- *
- * ⚠️ An earlier draft of this docblock named the unrelated-class set as "audiostud and splicewire" —
- * wrong in BOTH directions, from sampling three hosts and generalising. `splicewire` is the one host
- * that was already correct, and `fable`, `numero` and `schemastud` were never checked. Left recorded
- * because the estate's own rule is that a sweep must show its inclusion actually included.
+ * resource (`WiresMeResource:68`) read `BeamAccounts::userModel()`. The host census and the reasoning
+ * live on {@see ConfiguredUserBacking}; this file asserts the behaviour.
  *
  * ⚠️ This suite's own harness reproduces the defect exactly: `tests/Fixtures/User extends
  * Authenticatable`, not `Models\User`, and `TestCase:107` points `auth.providers.users.model` at it — so
- * these assertions run against the same shape the four unrelated-class hosts have.
+ * these assertions run against the same shape the affected hosts have, rather than a contrived one.
  *
  * The failure is identity, not disclosure — the table is the same, but the concrete class decides
  * casts, global scopes, relations and policy binding.
