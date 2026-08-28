@@ -316,8 +316,12 @@ return [
     // live on beam's memberships table. There is no `model` key, and you do not need one: the resource
     // honours the top-level `user_model` above. `UserData` declares
     // `backing: ConfiguredUserBacking::class`, which reads it when the container resolves the backing at
-    // request time. Subclassing the DTO to re-declare the attribute still works and still supersedes,
-    // but is no longer required to run a bespoke user model.
+    // request time, so you do not need to override the DTO at all. And do not reach for the old escape
+    // hatch as a fallback: a host subclass that re-declares `key: 'users'` and is LISTED in
+    // `beam.core.resources.classes` is registered before beam's own attributed classes and is displaced
+    // by them — measured 2026-08-28 at `~/Herd/splicewire`, whose override loses today. Only a
+    // re-registration from the host's own provider `boot()` lands after beam's and wins. `UserData`'s
+    // docblock carries the measurement and both routes.
     'users' => [
         'scope' => null,
     ],

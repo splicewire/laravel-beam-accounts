@@ -40,16 +40,20 @@ use Splicewire\Beam\Particle\Backing\EloquentBacking;
  *
  * {@see \Splicewire\Beam\Accounts\BeamAccountsManager::userModel()} falls back
  * `beam.accounts.user_model` → `auth.providers.users.model` → `Models\User`. Every host leaves the first
- * null, so the second decides, and it resolves to `App\Models\User`. Of the **six** hosts installing this
- * package, **five** were affected:
+ * null, so the second decides, and it resolves to `App\Models\User`. All **six** hosts installing this
+ * package were affected — the sixth by a different mechanism, and it was first written up here as the
+ * exception:
  *
  * - `~/Herd/{audiostud, fable, numero, schemastud}` — `App\Models\User extends Authenticatable`, an
  *   entirely **unrelated class**;
  * - `~/Herd/splicewire-app` — `extends BeamUser`, a **subclass**, so the frozen parent queried the right
  *   table with the wrong casts, scopes, relations and policy binding;
- * - `~/Herd/splicewire` — **not affected**: the one host that took the documented escape hatch
- *   (`app/Data/UserData.php` re-declares `key: 'users'`). It keeps working — `OnDuplicate::Supersede`
- *   means a host re-declaration still wins.
+ * - `~/Herd/splicewire` — the one host that took the documented escape hatch (`app/Data/UserData.php`
+ *   re-declares `key: 'users'`), and it is affected too, because that hatch does not hold. Booting the
+ *   host on 2026-08-28 resolves `users` to beam's own `Data\UserData`, with `App\Data\UserData` sitting
+ *   in `superseded('users')` — displaced, not winning. The list route registers FIRST and loses; only a
+ *   host provider's own `boot()` lands after beam's. {@see \Splicewire\Beam\Accounts\Data\UserData}
+ *   carries the measurement and the two-route asymmetry.
  *
  * The failure is IDENTITY, not disclosure: the table is the same, but the concrete class is what decides
  * casts, global scopes, eager-loadable relations and policy binding.

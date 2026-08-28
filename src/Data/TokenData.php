@@ -37,6 +37,18 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * NOTE the `model:` attribute is the package default {@see PersonalAccessToken};
  * a host binding a bespoke PAT model subclasses this DTO and re-declares the attribute (attributes
  * cannot read config). The runtime scope IS config-resolved, so a subclass only overrides the model.
+ *
+ * ⚠️ That subclass only takes effect if the host registers it from its OWN provider's `boot()`, which
+ * runs after beam's. Listing it in `beam.core.resources.classes` does NOT work: that list is registered
+ * FIRST by `Splicewire\Beam\BeamServiceProvider::discoverResources()`, and beam's own attributed classes
+ * are registered after it and displace it under `OnDuplicate::Supersede`. Measured 2026-08-28 on the
+ * `users` resource at `~/Herd/splicewire`, whose listed override is displaced;
+ * {@see \Splicewire\Beam\Accounts\Data\UserData} carries that measurement.
+ *
+ * The working route has a live witness on THIS resource: `~/Herd/splicewire-app` re-registers `tokens`
+ * imperatively from `App\Providers\ParticleServiceProvider`, and on the same date it resolves to that
+ * host's `TokenResourceData` with this DTO sitting in `superseded('tokens')`. Provider `boot()` wins;
+ * the config list does not.
  */
 #[ParticleResource(
     key: 'tokens',

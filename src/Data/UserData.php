@@ -69,8 +69,28 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * `BeamAccounts::userModel()` resolves everywhere else in the package. That backing carries the
  * measurement and the reasoning; read it there rather than here.
  *
- * Subclassing this DTO to re-declare the attribute remains available (the escape hatch {@see TokenData}
- * documents) and still supersedes, but is no longer required to run a bespoke user model.
+ * ⚠️ Subclassing this DTO to re-declare the attribute is NOT a reliable override, and WHICH of the two
+ * host routes you take decides the outcome. Measured 2026-08-28 by booting `~/Herd/splicewire`:
+ *
+ *     users data:     Splicewire\Beam\Accounts\Data\UserData
+ *     superseded:     1
+ *     displaced data: App\Data\UserData   backing: App\Models\User
+ *
+ * The host's re-declaration is the DISPLACED entry — it loses. `OnDuplicate::Supersede` means the LAST
+ * writer wins, and `Splicewire\Beam\BeamServiceProvider::discoverResources()` registers the explicit
+ * `beam.core.resources.classes` list FIRST, then the cached Frame manifest (or, in dev, the live scan)
+ * carrying beam's own attributed classes — which land second and displace it. So the two routes are
+ * asymmetric:
+ *
+ * - listed in `beam.core.resources.classes` → registered first → **loses**. This is what
+ *   `~/Herd/splicewire` does (`config/beam/core.php` names `\App\Data\UserData::class`), so that host's
+ *   override is currently displaced.
+ * - hand-registered from the host's OWN provider `boot()` → runs after beam's boot → **wins**. That is
+ *   the case {@see \Splicewire\Beam\Particle\ParticleResourceRegistry::attach()} argues, and its
+ *   reasoning is correct for that route only.
+ *
+ * Neither route is needed to run a bespoke user model — that is exactly what the `backing:` slot above
+ * now resolves, at request time, from config.
  */
 #[ParticleResource(
     key: 'users',
