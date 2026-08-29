@@ -80,7 +80,8 @@ class BeamAccountsManager
      * DOMAIN-NEUTRAL default: the authenticated user's current-or-personal team. A host whose
      * "active team" is a different notion — tower's per-request TENANT — binds a resolver
      * `beam.accounts.teams.resolver` (a `(): ?object` callable returning the scope object whose
-     * `getKey()` is the `team_id`/`tenant_id` the invitations/memberships belong to). Unset falls
+     * `getKey()` is the value stored in the spatie team column — always named `team_id`, holding
+     * the tenant key at a tenanted host — that the invitations/memberships belong to). Unset falls
      * back to the current user's team.
      */
     public function currentTeam(): ?object
@@ -102,7 +103,10 @@ class BeamAccountsManager
      * The central-Root check, flip-safe (admin-redesign ticket 02, Q1 — the `centralUserIsRoot()`
      * null-team footgun).
      *
-     * Roles are team-scoped by `tenant_id` (spatie teams). In tenant context the current
+     * Roles are team-scoped by spatie teams. The column is `team_id` everywhere in this estate
+     * (`rushing/laravel-permission-cascade` forces `permission.column_names.team_foreign_key` to
+     * it at boot); at a tenanted host the VALUE that column holds is the tenant key, which is why
+     * this used to be miswritten as `tenant_id` — see beam-facade 168. In tenant context the current
      * permissions team is the tenant, so a bare `hasRole('Root')` sees only the *tenant* role and
      * misses Root — which is assigned on the central (null) team. Any operator-gating that can run
      * while a tenant team is set must flip to the null team, check, and restore. This is the one
