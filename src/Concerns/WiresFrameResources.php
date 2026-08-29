@@ -4,11 +4,7 @@ namespace Splicewire\Beam\Accounts\Concerns;
 
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
-use Splicewire\Beam\Accounts\Data\InvitationData;
 use Splicewire\Beam\Accounts\Data\MembershipData;
-use Splicewire\Beam\Accounts\Data\TeamData;
-use Splicewire\Beam\Accounts\Data\TokenData;
-use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\ParticleResource;
@@ -70,9 +66,18 @@ trait WiresFrameResources
 
         $registry = $this->app->make(ParticleResourceRegistry::class);
 
-        foreach ([TokenData::class, InvitationData::class, TeamData::class, UserData::class] as $dataClass) {
-            $registry->register(AttributedParticleDiscovery::resourceFromAttribute($dataClass));
-        }
+        // Every `#[ParticleResource]` / `#[ParticleOp]` / `#[ParticleRelative]` under this package's own
+        // `src/Data`, discovered rather than hand-listed.
+        //
+        // ⚠️ This was `foreach ([TokenData, InvitationData, TeamData, UserData] …)`, and the list was
+        // already two short: `AccessGrantData` and `ViewRequestData` are declared in the same directory
+        // and reached the registry only from `Sharing::ledgerResources()`, which a host has to call.
+        // A hand-list cannot report what its author forgot; a directory can only report what is there.
+        //
+        // Registration is idempotent by key (last wins), so `Sharing`'s own explicit `discover([...])`
+        // stays valid and a host that lists these classes during a migration window gets the same result.
+        $this->app->make(AttributedParticleDiscovery::class)
+            ->discover(paths: [__DIR__.'/../Data']);
 
         // Members — backed by the team pivot rather than a plain model, so it is declared
         // imperatively (the attribute has nowhere to put a backing class). Mirrors tower's
