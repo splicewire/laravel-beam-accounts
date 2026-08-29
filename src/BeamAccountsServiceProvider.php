@@ -187,8 +187,33 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
      */
     public static function publishesEstateNamed(string $estate): bool
     {
-        return (bool) config("beam.accounts.publish_{$estate}", true)
-            && (bool) config("beam.accounts.register_{$estate}", true);
+        return self::closedGateKeysFor($estate) === [];
+    }
+
+    /**
+     * Which config key(s) are actually holding this estate's gate shut.
+     *
+     * ⚠️ The gate is the AND of TWO keys — the modern `publish_*` and the legacy `register_*` spelling
+     * kept for hosts that set it before beam-docs-satellite ticket 25 renamed it — so naming only the
+     * modern one in a finding sends the reader to a key that is `true` at their host. That happened:
+     * `beam-facade` 155 spent a section establishing that the flagship's `publish_migrations` is `true`
+     * and `register_migrations` is what is false, because the FAIL text named the wrong key and an
+     * agent grepping it found nothing. A finding that misnames its own subject is worse than no
+     * finding, so the audit reads this rather than assuming.
+     *
+     * @return list<string> fully-qualified config keys, empty when the estate publishes
+     */
+    public static function closedGateKeysFor(string $estate): array
+    {
+        $closed = [];
+
+        foreach (["publish_{$estate}", "register_{$estate}"] as $suffix) {
+            if (! (bool) config("beam.accounts.{$suffix}", true)) {
+                $closed[] = "beam.accounts.{$suffix}";
+            }
+        }
+
+        return $closed;
     }
 
     /**

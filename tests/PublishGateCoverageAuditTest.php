@@ -98,3 +98,44 @@ it('honours the deprecated register_* key when deciding whether to check', funct
 
     expect($fails)->toHaveCount(1);
 });
+
+/**
+ * ⚠️ The finding used to name `publish_*` unconditionally, while the gate is the AND of that and the
+ * legacy `register_*`. So a host held shut by the legacy key was told to look at a key that reads
+ * `true` there — and `beam-facade` 155 spent a whole section re-establishing that by hand, predicting
+ * in writing that "an agent acting on the FAIL text would grep `publish_migrations` at this host" and
+ * find nothing. A finding that misnames its own subject sends every reader to the wrong file.
+ */
+it('names the key that is actually off, not the modern spelling of it', function () {
+    config([
+        'beam.accounts.publish_auth_migrations' => true,   // on — must NOT be blamed
+        'beam.accounts.register_auth_migrations' => false, // the legacy key is what is shut
+    ]);
+
+    $fails = array_values(array_filter(runAudit(seedCommitted([])), fn ($f) => $f->status === DoctorStatus::Fail));
+
+    expect($fails)->toHaveCount(1)
+        ->and($fails[0]->detail)->toContain('`beam.accounts.register_auth_migrations` is off')
+        ->and($fails[0]->detail)->not->toContain('`beam.accounts.publish_auth_migrations` is off');
+});
+
+it('names both keys when a host has shut both, rather than picking one', function () {
+    config([
+        'beam.accounts.publish_auth_migrations' => false,
+        'beam.accounts.register_auth_migrations' => false,
+    ]);
+
+    $fails = array_values(array_filter(runAudit(seedCommitted([])), fn ($f) => $f->status === DoctorStatus::Fail));
+
+    expect($fails[0]->detail)->toContain('`beam.accounts.publish_auth_migrations` and `beam.accounts.register_auth_migrations`');
+});
+
+it('reports the same closed keys the gate itself consulted', function () {
+    // Identity between the predicate and the message: the audit must not re-derive "which key" by a
+    // second route that could drift from the one publishesEstateNamed() actually used.
+    config(['beam.accounts.register_migrations' => false]);
+
+    expect(BeamAccountsServiceProvider::publishesEstateNamed('migrations'))->toBeFalse()
+        ->and(BeamAccountsServiceProvider::closedGateKeysFor('migrations'))->toBe(['beam.accounts.register_migrations'])
+        ->and(BeamAccountsServiceProvider::closedGateKeysFor('auth_migrations'))->toBe([]);
+});

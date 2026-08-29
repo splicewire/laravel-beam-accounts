@@ -72,13 +72,20 @@ class PublishGateCoverageAudit implements DoctorAudit
                 continue;
             }
 
+            // Name the key that is ACTUALLY off. The gate is an AND of the modern `publish_*` and the
+            // legacy `register_*`, and naming the modern one unconditionally sent readers to a key
+            // that reads `true` at their host — see closedGateKeysFor()'s docblock.
+            $closed = BeamAccountsServiceProvider::closedGateKeysFor($estate);
+
             $findings[] = Finding::fail(self::CHECK, sprintf(
-                '`beam.accounts.publish_%s` is off, which asserts this host already has that estate '.
+                '%s is off, which asserts this host already has that estate '.
                 'committed — but %d of %d member(s) are absent from database/migrations/**: %s. '.
                 'Publishing is gated off, so nothing will ever create these tables and a fresh install '.
                 'will fail on the first migration that references them. Either commit the missing '.
                 'copies (publish once with the gate on, then commit the output) or turn the gate back on.',
-                $estate,
+                $closed === []
+                    ? sprintf('`beam.accounts.publish_%s`', $estate)
+                    : implode(' and ', array_map(static fn (string $k): string => "`{$k}`", $closed)),
                 count($missing),
                 count($stubs),
                 implode(', ', array_map('basename', $missing)),
