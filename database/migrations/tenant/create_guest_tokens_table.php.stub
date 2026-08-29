@@ -24,7 +24,27 @@ return new class extends Migration
                 $table->string('scope');
                 $table->string('role');
                 $table->jsonb('params')->nullable();
-                $table->string('landing_url');
+                // NULLABLE, and the reason is a capability one rather than tidiness (beam-facade 121).
+                //
+                // A `landing_url` is frozen at MINT time. That is answerable for a circuit link — the
+                // whole circuit is the destination, so `/intake/{circuit}` is the position — and it is
+                // NOT answerable for an entity-intake link, whose entire product promise is "drop the
+                // holder at the section their progress says is next". Position there is a PURE READ over
+                // the entity's accreted submissions (`Splicewire\Tower\Intake\CompletenessReport`), so it
+                // is necessarily computed at resolve time and necessarily different between two
+                // resolutions of the SAME link. A column that must be filled at mint forces the issuer to
+                // invent the answer before the question can be asked.
+                //
+                // NOT NULL was therefore a hard block, not an inconvenience: `GuestToken::create()`
+                // without one dies `SQLSTATE[23502] null value in column "landing_url" violates
+                // not-null constraint`, so an entity link could not be minted AT ALL. beam-facade tickets
+                // 89 and 120 and the popcorn registry-kernel map each independently ruled the column
+                // should go; ADR-0216 decision point 3 deliberately declined to strike it (it lives on
+                // the primitive that ADR KEEPS, and striking a slot on the survivor was not in the
+                // owner's instruction). Nullable is the strictly smaller act those rulings all permit:
+                // the circuit issuer keeps writing one, nothing is dropped, and the computed-position
+                // door becomes buildable.
+                $table->string('landing_url')->nullable();
                 $table->timestamp('expires_at')->nullable();
                 $table->timestamp('revoked_at')->nullable();
                 $table->unsignedInteger('use_count')->default(0);
