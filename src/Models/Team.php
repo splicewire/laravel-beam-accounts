@@ -126,7 +126,14 @@ class Team extends Model implements TeamContract
             ->where('user_id', $user->getKey())
             ->value('role');
 
-        return $value !== null ? Role::from($value) : null;
+        // `tryFrom` for the same reason, and at the same cost, as
+        // {@see \Splicewire\Beam\Accounts\Concerns\HasMembers::memberRole()} — read that note; it is
+        // the long-form one. Beam's own `memberships.role` is a plain string column too, so this
+        // reader is equally at the mercy of what a seeder wrote, and the signature was already
+        // `?Role` so containing here costs no interface change. `Membership::memberRole()` is the
+        // one sibling NOT converged: `MembershipContract:27` declares it `: Role`, so widening it is
+        // a published-interface change and deliberately out of this change's scope.
+        return $value !== null ? Role::tryFrom($value) : null;
     }
 
     public function assignMember(Authenticatable $user, Role $role): void
