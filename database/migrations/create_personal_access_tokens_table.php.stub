@@ -30,6 +30,25 @@ use Rushing\SchemaConvergence\ConvergentTable;
  * shape it is rather than an install-time stop. Note the id is not merely a primary key: a Sanctum
  * bearer string IS `{id}|{plaintext}` and `findToken()` looks the row up BY KEY, so the id is a
  * wire-format field and changing its type is a credential-format change, not a schema tidy.
+ *
+ * THE MORPH IS NOT THE HOST'S, AND THAT IS THE ONE PLACE THIS FILE DEPARTS FROM SANCTUM. Stock
+ * Sanctum declares `$table->morphs('tokenable')` — a bigint `tokenable_id`. A `tokenable` here is a
+ * User, and the User table is created by THIS PACKAGE's sibling stub
+ * `shared/create_users_table.php.stub`, which declares `$table->uuid('id')->primary()`. So on a fresh
+ * install of this estate the stock morph emits a column that can never hold the key the sibling stub
+ * just wrote, and the two package files contradict each other before any host has had a say. The
+ * "vendored verbatim" carve-out above covers the parts of this table Sanctum OWNS — its `id`, its
+ * token string, its ability payload — and does not reach a foreign key whose referent is a
+ * package-created table. `uuidMorphs` it is.
+ *
+ * Confirmed against the estate rather than reasoned alone: both hosts that actually have this table
+ * (`splicewire/splicewire-app` and `rushing/laravel-tower-starter`) report `tokenable_id = uuid`,
+ * having each diverged from the stock stub in this same direction independently.
+ *
+ * The residual case is a host whose `users` predates this package and is bigint-keyed — the same host
+ * the sibling stub's quiet terminal deliberately leaves alone. Such a host must commit its own create
+ * for this table too, exactly as a uuid-`id` host already does; the `matches()` terminal below then
+ * sees a shape it cannot converge and stays quiet, which is the behaviour that case already relied on.
  */
 return new class extends Migration
 {
@@ -44,7 +63,10 @@ return new class extends Migration
         ConvergentTable::named('personal_access_tokens')
             ->define(function (Blueprint $table) {
                 $table->id();
-                $table->morphs('tokenable');
+
+                // uuid, NOT Sanctum's stock `morphs()` — see the docblock. The referent is this
+                // package's own uuid-keyed `users`, so a bigint `tokenable_id` could never hold it.
+                $table->uuidMorphs('tokenable');
                 $table->text('name');
                 $table->string('token', 64)->unique();
                 $table->text('abilities')->nullable();
