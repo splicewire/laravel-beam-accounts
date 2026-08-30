@@ -152,6 +152,13 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
                 'add_provenance_and_archived_to_personal_access_tokens_table',
                 'tenant/create_userables_table',
                 'tenant/create_guest_tokens_table',
+                // The ALTER immediately after its own create, for the same reason
+                // `shared/add_slug_to_teams_table` sits after `shared/create_teams_table`. It exists
+                // because editing the create stub to `->nullable()` reaches ONLY a fresh database and
+                // `ConvergentTable::assert()` does not alter an existing column's nullability — so 17
+                // of 17 flagship tenant schemas were still `NOT NULL` against a publish that was
+                // already correct. See the stub's docblock.
+                'tenant/relax_guest_token_landing_url_nullability',
                 'tenant/create_sign_offs_table',
             ],
 

@@ -1,0 +1,89 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * TENANT-ONLY ALTER — drops `NOT NULL` from `guest_tokens.landing_url` on schemas that were
+ * already migrated before the create stub declared the column nullable.
+ *
+ * ## Why an ALTER exists at all, when the create stub is already correct
+ *
+ * `tenant/create_guest_tokens_table.php.stub:47` says `->nullable()` and has for some time. That
+ * edit reaches **only a fresh database**: a schema that already ran the create keeps whatever shape
+ * the create had on the day it ran, and no re-read of the stub can change that. Measured 2026-08-29
+ * at `~/Herd/splicewire-app`: **17 of 17 tenant schemas** report
+ * `information_schema.columns.is_nullable = 'NO'` for this column, while the published copy on the
+ * same disk (`database/migrations/tenant/2026_08_27_190054_create_guest_tokens_table.php:47`) is
+ * byte-identical to the nullable stub. The publish is current and the database is not, which is
+ * exactly the state a republish cannot see and cannot fix.
+ *
+ * The convergent guard cannot fix it either, and that is the load-bearing half.
+ * {@see \Rushing\SchemaConvergence\ConvergentTable::assert()} ADDS missing columns and **never
+ * alters an existing column's nullability** — a column that is present is a column it leaves alone.
+ * So `ConvergentTable::named('guest_tokens')` re-running against every one of those 17 schemas
+ * reports success and changes nothing. A real `ALTER` is the only instrument that reaches them.
+ *
+ * ## Why the column must be nullable (the capability argument, not tidiness)
+ *
+ * The long form is in the create stub's own docblock; in one line: `landing_url` is frozen at MINT
+ * time, an entity-intake link's landing position is a PURE READ computed at RESOLVE time
+ * ({@see \Splicewire\Tower\Intake\CompletenessReport}), and `NOT NULL` therefore made minting an
+ * entity link impossible — `SQLSTATE[23502]`, on the package's own primary path.
+ *
+ * ## Why the read-before-write guard, given Postgres `DROP NOT NULL` is already idempotent
+ *
+ * It is, so the guard buys nothing for idempotence and is not there for it. It is there because
+ * `->change()` is a **full column redefinition**, not a nullability delta: it restates type, length
+ * and default from this file's declaration and silently resets anything a host has legitimately
+ * changed about the column. Guarding on the column's actual nullability means the ALTER touches
+ * only the schemas that genuinely diverge, and is a true no-op — not merely a harmless one — on
+ * every schema created from the current stub. On sqlite and MySQL, where `->change()` is a table
+ * rebuild rather than a catalog flip, "no-op" is worth considerably more than "idempotent".
+ *
+ * The `hasTable` guard covers the other legitimate host state: a host whose `publish_auth_migrations`
+ * gate is off, or whose tenant estate predates this table, has nothing to alter and must not fatal.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (! Schema::hasTable('guest_tokens')) {
+            return;
+        }
+
+        if ($this->landingUrlIsAlreadyNullable()) {
+            return;
+        }
+
+        Schema::table('guest_tokens', function (Blueprint $table) {
+            $table->string('landing_url')->nullable()->change();
+        });
+    }
+
+    /**
+     * Deliberately IRREVERSIBLE rather than a `NOT NULL` restore.
+     *
+     * Re-imposing the constraint is not the inverse of dropping it: rows minted while the column was
+     * nullable hold `NULL`, and `SET NOT NULL` against them fails — a `down()` that works on a fresh
+     * schema and dies on a used one is worse than one that says nothing. The `up()` is the repair of
+     * a defect, not a reversible design choice.
+     */
+    public function down(): void
+    {
+        // no-op — see the docblock above.
+    }
+
+    private function landingUrlIsAlreadyNullable(): bool
+    {
+        foreach (Schema::getColumns('guest_tokens') as $column) {
+            if (($column['name'] ?? null) === 'landing_url') {
+                return (bool) ($column['nullable'] ?? false);
+            }
+        }
+
+        // Column absent entirely — the convergent create owns that case, not this ALTER.
+        return true;
+    }
+};

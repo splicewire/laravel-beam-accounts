@@ -62,6 +62,7 @@ it('excludes the auth estate when publish_auth_migrations is off', function () {
         'add_provenance_and_archived_to_personal_access_tokens_table',
         'tenant/create_userables_table',
         'tenant/create_guest_tokens_table',
+        'tenant/relax_guest_token_landing_url_nullability',
         'tenant/create_sign_offs_table',
         'tenant/rename_userish_to_system_account',
     ] as $authFile) {
@@ -87,7 +88,12 @@ it('declares both estates by default', function () {
     expect($declared)->toContain('create_personal_access_tokens_table');
     expect(array_search('create_personal_access_tokens_table', $declared, true))
         ->toBeLessThan(array_search('add_provenance_and_archived_to_personal_access_tokens_table', $declared, true));
-    expect($declared)->toHaveCount(16);
+    // And tenant/relax_guest_token_landing_url_nullability, the ALTER that reaches schemas already
+    // migrated when the create stub still declared `landing_url` NOT NULL. It must follow its own
+    // create for the same stamping reason as the PAT pair above.
+    expect(array_search('tenant/create_guest_tokens_table', $declared, true))
+        ->toBeLessThan(array_search('tenant/relax_guest_token_landing_url_nullability', $declared, true));
+    expect($declared)->toHaveCount(17);
 });
 
 /**
