@@ -1,10 +1,8 @@
 <?php
 
 use Illuminate\Config\Repository;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
@@ -37,15 +35,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * Frame HTTP transport (beam-core's generic handler, tested there).
  */
 beforeEach(function () {
-    // The invitation-lifecycle columns the promoted resource reads (see the
-    // add_lifecycle_to_invitations_table migration); the base harness builds the pre-lifecycle table.
-    Schema::table(Beam::table('invitations'), function (Blueprint $table): void {
-        $table->unsignedBigInteger('invited_by')->nullable();
-        $table->timestamp('accepted_at')->nullable();
-    });
-
     // The shipped `personal_access_tokens` shape, defined once on the harness and pinned to the two
-    // stubs that produce it by PersonalAccessTokenFixtureMatchesShippedStubTest. It used to be
+    // stubs that produce it by FixtureSchemaMatchesShippedStubsTest. It used to be
     // hand-built here, with nothing tying it to either stub in either direction.
     $this->createPersonalAccessTokensSchema();
 });

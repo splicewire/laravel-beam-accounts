@@ -197,6 +197,11 @@ abstract class TestCase extends Orchestra
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
+            // The stub's UNCONDITIONAL retrofit — it sits OUTSIDE `create_users_table`'s convergent
+            // guard precisely so it lands on a pre-existing bigint-keyed host `users` too, which is
+            // the holder this fixture models. `User::$fillable` has carried it since the squash and
+            // the fixture never grew the column.
+            $table->string('google_id')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -232,6 +237,15 @@ abstract class TestCase extends Orchestra
             $table->string('email');
             $table->string('role')->default('member');
             $table->string('token')->unique();
+            // The lifecycle pair `InvitationData` writes on every invite/revoke. The separate
+            // `add_lifecycle_to_invitations_table` ALTER was squashed INTO the create stub, so a host
+            // has had both columns from its first migrate — while this fixture still built the
+            // pre-lifecycle table and `AccountResourcesTest` patched them on in its own beforeEach.
+            // bigint `invited_by`, matching this harness's bigint-keyed `users` holder (the stub says
+            // uuid because its holder is uuid) — a declared divergence in
+            // {@see FixtureSchemaMatchesShippedStubsTest}.
+            $table->unsignedBigInteger('invited_by')->nullable();
+            $table->timestamp('accepted_at')->nullable();
             $table->timestamps();
             $table->unique(['team_id', 'email']);
         });
@@ -305,7 +319,7 @@ abstract class TestCase extends Orchestra
      * host `users` alone. {@see createUsersSchema()} builds exactly that bigint-keyed holder, so a
      * bigint `model_id` here IS the stub's shape for this fixture's population. Flip the holder and
      * this column has to flip with it — which is why
-     * {@see \Splicewire\Beam\Accounts\Tests\PermissionFixtureMatchesShippedStubTest} names it as the
+     * {@see \Splicewire\Beam\Accounts\Tests\FixtureSchemaMatchesShippedStubsTest} names it as a
      * single declared divergence instead of leaving it implicit.
      *
      * That test is the mechanical relation the hand-written/shipped pair had none of: it executes
@@ -375,7 +389,7 @@ abstract class TestCase extends Orchestra
      * `uuidMorphs` because the holder it assumes is `shared/create_users_table.php.stub`'s uuid
      * `users`, while {@see createUsersSchema()} builds the bigint-keyed `users` that stub's quiet
      * terminal deliberately leaves alone. Flip the holder and this column has to flip with it —
-     * which is why {@see PersonalAccessTokenFixtureMatchesShippedStubTest} names it as the single
+     * which is why {@see FixtureSchemaMatchesShippedStubsTest} names it as a
      * declared divergence instead of leaving it implicit. Converging it to uuid here would break
      * the bigint-holder population this harness exists to model.
      *

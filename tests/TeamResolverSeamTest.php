@@ -60,10 +60,6 @@ beforeEach(function () {
         $table->unique(['host_team_id', 'user_id']);
     });
 
-    Schema::table(Beam::table('invitations'), function (Blueprint $table): void {
-        $table->timestamp('accepted_at')->nullable();
-    });
-
     $this->hostTeam = HostTeam::create(['id' => 'host-team-1', 'name' => 'Host Team']);
 
     // The resolver call counter. Every case asserts on it: a passing assertion about
