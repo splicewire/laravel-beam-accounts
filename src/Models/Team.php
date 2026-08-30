@@ -130,9 +130,10 @@ class Team extends Model implements TeamContract
         // {@see \Splicewire\Beam\Accounts\Concerns\HasMembers::memberRole()} — read that note; it is
         // the long-form one. Beam's own `memberships.role` is a plain string column too, so this
         // reader is equally at the mercy of what a seeder wrote, and the signature was already
-        // `?Role` so containing here costs no interface change. `Membership::memberRole()` is the
-        // one sibling NOT converged: `MembershipContract:27` declares it `: Role`, so widening it is
-        // a published-interface change and deliberately out of this change's scope.
+        // `?Role` so containing here costs no interface change. `Membership::memberRole()` was the
+        // one sibling left unconverged — `MembershipContract` declared it `: Role`, so widening it
+        // was a published-interface change and out of that change's scope. It is converged now; the
+        // contract reads `?Role`, which implementers accept unchanged by return-type covariance.
         return $value !== null ? Role::tryFrom($value) : null;
     }
 

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
+use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Tests\Fixtures\HostTeam;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Facades\Beam;
@@ -178,4 +179,49 @@ it('records the contract disagreement tryFrom buys', function () {
         ->and($this->hostTeam->memberRole($this->service))->toBeNull()
         ->and($this->beamTeam->hasMember($this->service))->toBeTrue()
         ->and($this->beamTeam->memberRole($this->service))->toBeNull();
+});
+
+/*
+ * The THIRD stored-value reader, converged last (review finding 2).
+ *
+ * `Membership::memberRole()` read the same `service` string the two cases above read, through
+ * `Role::from()`, and therefore threw `ValueError` where its two siblings returned null. It was left
+ * behind on purpose — `MembershipContract` declared `: Role`, so converging it meant widening a
+ * published interface — and the widening is safe: PHP return-type covariance lets any implementer keep
+ * declaring `: Role`, and a sweep of the package roots, the `~/Herd` app dirs and the
+ * starters on 2026-08-30 found no caller of this method anywhere outside this package's own tests.
+ *
+ * ⚠️ Null means something NARROWER here than on `TeamContract::memberRole()`, and that is the whole
+ * reason this reader is safer to widen than that one was. `TeamContract` is asked about a user who may
+ * not be on the team, so its null is overloaded ("not a member" vs "unparseable role") — the
+ * disagreement the case above pins. `MembershipContract` is asked OF a seat you are already holding,
+ * so null can only mean "the stored string is outside the enum", and `isActive()` — still `true` — is
+ * untouched as the answer to whether the seat is live.
+ *
+ * This case fails against the pre-fix tree with `ValueError: "service" is not a valid backing value
+ * for enum Role`, not with a wrong return value.
+ */
+it('contains an unparseable role on Membership too, rather than fatalling', function () {
+    $membership = Membership::query()
+        ->where('team_id', $this->beamTeam->getKey())
+        ->where('user_id', $this->service->getKey())
+        ->firstOrFail();
+
+    // Positive control first, so the case cannot pass by returning null for everything.
+    $ownerMembership = Membership::query()
+        ->where('team_id', $this->beamTeam->getKey())
+        ->where('user_id', $this->owner->getKey())
+        ->firstOrFail();
+
+    expect($ownerMembership->memberRole())->toBe(Role::Owner)
+        ->and($ownerMembership->memberUser()->getKey())->toBe($this->owner->getKey());
+
+    // The stored value really is outside the enum — the premise, asserted rather than assumed.
+    expect($membership->role)->toBe('service')
+        ->and(Role::tryFrom($membership->role))->toBeNull();
+
+    expect($membership->memberRole())->toBeNull()
+        // And null is NOT a statement about the seat: it is live, and `memberUser()` still resolves.
+        ->and($membership->isActive())->toBeTrue()
+        ->and($membership->memberUser()->getKey())->toBe($this->service->getKey());
 });
