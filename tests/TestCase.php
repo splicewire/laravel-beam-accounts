@@ -188,19 +188,38 @@ abstract class TestCase extends Orchestra
         DB::connection('central')->setPdo(DB::connection()->getPdo());
     }
 
+    /**
+     * The `users` holder, shaped exactly as `shared/create_users_table.php.stub` shapes it — uuid
+     * key, NOT NULL `name` and `password`, plus the `google_id` its unconditional retrofit adds.
+     *
+     * It built a bigint-keyed holder with nullable `name`/`password` until 2026-08-30, on a stated
+     * census — `~/Herd/audiostud`, `~/Herd/fable`, `~/Herd/numero` — that was simply not what those
+     * hosts have: all three publish `$table->uuid('id')->primary()`, and so does every other
+     * `~/Herd` root installing this package. What those three ARE integer-keyed on is
+     * `roles.id`/`permissions.id`, pinned in their own `config/beam/accounts.php`, which says in-file
+     * that the pin covers those two columns ONLY. The fixture was the inverse of the estate.
+     *
+     * The stub IS a quiet terminal — it genuinely leaves a pre-existing bigint `users` alone — but
+     * that is a statement about `users` and nothing else. Run the stubs onto a hand-built bigint
+     * holder and every morph and foreign key pointing at `users` still comes out uuid, because the
+     * shipped code reads the holder's key type nowhere. So a bigint fixture did not model "the
+     * bigint host"; it modelled a host running a repair this package does not ship.
+     *
+     * {@see \Splicewire\Beam\Accounts\Tests\FixtureSchemaMatchesShippedStubsTest} now compares this
+     * table to the stub with no exemptions.
+     */
     protected function createUsersSchema(): void
     {
         Schema::create('users', function (Blueprint $table): void {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->unsignedBigInteger('current_team_id')->nullable();
-            $table->string('name')->nullable();
+            $table->string('name');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password')->nullable();
-            // The stub's UNCONDITIONAL retrofit — it sits OUTSIDE `create_users_table`'s convergent
-            // guard precisely so it lands on a pre-existing bigint-keyed host `users` too, which is
-            // the holder this fixture models. `User::$fillable` has carried it since the squash and
-            // the fixture never grew the column.
+            $table->string('password');
+            // From `create_users_table`'s UNCONDITIONAL retrofit, which sits outside the convergent
+            // guard so it lands even on a host whose `users` predates this package. Every estate
+            // host has it; `User::$fillable` has carried it since the squash.
             $table->string('google_id')->nullable();
             $table->rememberToken();
             $table->timestamps();
@@ -211,7 +230,7 @@ abstract class TestCase extends Orchestra
     {
         Schema::create(Beam::table('teams'), function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('user_id');
+            $table->uuid('user_id');
             $table->string('name');
             // The shape a host has AFTER `shared/add_slug_to_teams_table` — NOT NULL and globally
             // unique, which is what the model's HasSlug is written against (beam-facade 159). The
@@ -225,7 +244,7 @@ abstract class TestCase extends Orchestra
         Schema::create(Beam::table('memberships'), function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('team_id');
-            $table->unsignedBigInteger('user_id');
+            $table->uuid('user_id');
             $table->string('role')->default('member');
             $table->timestamps();
             $table->unique(['team_id', 'user_id']);
@@ -241,10 +260,7 @@ abstract class TestCase extends Orchestra
             // `add_lifecycle_to_invitations_table` ALTER was squashed INTO the create stub, so a host
             // has had both columns from its first migrate — while this fixture still built the
             // pre-lifecycle table and `AccountResourcesTest` patched them on in its own beforeEach.
-            // bigint `invited_by`, matching this harness's bigint-keyed `users` holder (the stub says
-            // uuid because its holder is uuid) — a declared divergence in
-            // {@see FixtureSchemaMatchesShippedStubsTest}.
-            $table->unsignedBigInteger('invited_by')->nullable();
+            $table->uuid('invited_by')->nullable();
             $table->timestamp('accepted_at')->nullable();
             $table->timestamps();
             $table->unique(['team_id', 'email']);
@@ -285,7 +301,7 @@ abstract class TestCase extends Orchestra
         // A HasVisibility fixture to share (steward via HasUserId).
         Schema::create('shareables', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('user_id')->nullable();
+            $table->uuid('user_id')->nullable();
             $table->string('visibility')->nullable();
             $table->timestamps();
         });
@@ -312,15 +328,12 @@ abstract class TestCase extends Orchestra
      * whole life without once meeting the NOT NULL that {@see \Splicewire\Beam\Accounts\Models\Role}
      * exists to satisfy.
      *
-     * `model_id` (spatie's `model_morph_key`) is the one column deliberately NOT converged, and that
-     * is the stub's own instruction rather than an exception to it: the stub's docblock says the
-     * morph key "MUST MATCH THE HOLDER'S KEY TYPE ... matching, not widening", and
-     * `create_users_table.php.stub` is a *quiet terminal* that leaves a pre-existing bigint-keyed
-     * host `users` alone. {@see createUsersSchema()} builds exactly that bigint-keyed holder, so a
-     * bigint `model_id` here IS the stub's shape for this fixture's population. Flip the holder and
-     * this column has to flip with it — which is why
-     * {@see \Splicewire\Beam\Accounts\Tests\FixtureSchemaMatchesShippedStubsTest} names it as a
-     * single declared divergence instead of leaving it implicit.
+     * `model_id` (spatie's `model_morph_key`) is **uuid**, for the same reason and by the same
+     * mechanism: the stub writes `$table->uuid($columnNames['model_morph_key'])` unconditionally, at
+     * both pivot sites, and reads nothing about the holder while doing it. It was bigint here until
+     * 2026-08-30, declared as a divergence justified by a pre-existing bigint-keyed host `users` —
+     * a population that does not exist (all nine `~/Herd` roots installing this package are
+     * uuid-keyed), and the very shape beam-facade 142 closed at the three hosts it named.
      *
      * That test is the mechanical relation the hand-written/shipped pair had none of: it executes
      * this very stub into a scratch schema and diffs the column types. Change either side alone and
@@ -348,7 +361,7 @@ abstract class TestCase extends Orchestra
         Schema::create('model_has_permissions', function (Blueprint $table): void {
             $table->uuid('permission_id');
             $table->string('model_type');
-            $table->unsignedBigInteger('model_id');
+            $table->uuid('model_id');
             $table->string('team_id')->nullable();
             $table->index(['model_id', 'model_type']);
             $table->primary(['team_id', 'permission_id', 'model_id', 'model_type']);
@@ -357,7 +370,7 @@ abstract class TestCase extends Orchestra
         Schema::create('model_has_roles', function (Blueprint $table): void {
             $table->uuid('role_id');
             $table->string('model_type');
-            $table->unsignedBigInteger('model_id');
+            $table->uuid('model_id');
             $table->string('team_id')->nullable();
             $table->index(['model_id', 'model_type']);
             $table->primary(['team_id', 'role_id', 'model_id', 'model_type']);
@@ -383,17 +396,11 @@ abstract class TestCase extends Orchestra
      * independence the deterministic minter is built for). This helper is the one that models the
      * shipped shape, so it is the one pinned to the stub.
      *
-     * `tokenable_id` is the single column deliberately NOT taken from the stub, and — exactly as
-     * with `model_id` in {@see createSpatieSchema()} — that is the stub's own instruction rather
-     * than an exception to it. A morph key must MATCH its holder's key type; the stub says
-     * `uuidMorphs` because the holder it assumes is `shared/create_users_table.php.stub`'s uuid
-     * `users`, while {@see createUsersSchema()} builds the bigint-keyed `users` that stub's quiet
-     * terminal deliberately leaves alone. Flip the holder and this column has to flip with it —
-     * which is why {@see FixtureSchemaMatchesShippedStubsTest} names it as a
-     * declared divergence instead of leaving it implicit. Converging it to uuid here would break
-     * the bigint-holder population this harness exists to model.
+     * EVERY column here is the stub's, `tokenable_id` included. It was bigint until 2026-08-30 on
+     * the claim that this harness models a bigint-keyed holder; running the stubs onto a hand-built
+     * bigint `users` proves they emit `uuidMorphs` regardless — the shipped code adapts to nothing.
      *
-     * Every OTHER column is the stub's, and that test executes the two stubs into a scratch schema
+     * Every column is the stub's, and that test executes the two stubs into a scratch schema
      * and diffs the column types both ways. Change either side alone and it goes red naming the
      * column.
      */
@@ -402,8 +409,7 @@ abstract class TestCase extends Orchestra
         Schema::create('personal_access_tokens', function (Blueprint $table): void {
             $table->id();
             $table->string('tokenable_type');
-            // bigint, matching this harness's bigint-keyed `users` holder — see the docblock.
-            $table->unsignedBigInteger('tokenable_id');
+            $table->uuid('tokenable_id');
             // `text`, not `string`: Sanctum's own column is a text and the stub keeps it. This read
             // `string` until nothing compared the two (beam-docs-satellite 26).
             $table->text('name');

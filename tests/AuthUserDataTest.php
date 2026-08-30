@@ -18,7 +18,7 @@ it('has no host-extension seam left on the DTO', function () {
 });
 
 it('projects the identity core for a central user', function () {
-    $user = User::create(['name' => 'Ada', 'email' => 'ada@example.test']);
+    $user = User::create(['name' => 'Ada', 'email' => 'ada@example.test', 'password' => 'secret']);
 
     $data = AuthUserData::fromUser($user, 'plain-text-token');
 
@@ -37,13 +37,13 @@ it('projects the identity core for a central user', function () {
 });
 
 it('mirrors a null access token', function () {
-    $user = User::create(['name' => 'Bo', 'email' => 'bo@example.test']);
+    $user = User::create(['name' => 'Bo', 'email' => 'bo@example.test', 'password' => 'secret']);
 
     expect(AuthUserData::fromUser($user)->accessToken)->toBeNull();
 });
 
 it('reports isRoot for a central Root user', function () {
-    $user = User::create(['name' => 'Root', 'email' => 'root@example.test']);
+    $user = User::create(['name' => 'Root', 'email' => 'root@example.test', 'password' => 'secret']);
     // Root is assigned on the central (null) team — BeamAccounts::isRoot() flips there to check.
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     // Resolved from config, not `Spatie\Permission\Models\Role` directly — that is what
@@ -56,7 +56,7 @@ it('reports isRoot for a central Root user', function () {
 });
 
 it('degrades cleanly standalone — contributed fields are ABSENT, not empty', function () {
-    $user = User::create(['name' => 'Solo', 'email' => 'solo@example.test']);
+    $user = User::create(['name' => 'Solo', 'email' => 'solo@example.test', 'password' => 'secret']);
 
     // `fromUser` is the identity core and nothing else: no contribution folds here, by design
     // (ticket 16 §A4 — four of its five callers mint a token and none is a particle read).
@@ -77,7 +77,7 @@ it('degrades cleanly standalone — contributed fields are ABSENT, not empty', f
 });
 
 it('projects the identity core for a tenant user', function () {
-    $user = User::create(['name' => 'Ty', 'email' => 'ty@example.test']);
+    $user = User::create(['name' => 'Ty', 'email' => 'ty@example.test', 'password' => 'secret']);
 
     // Stand up a tenant context: bind a fake tenant and flip tenancy()->initialized so the
     // tenant branch runs (roles/permissions live, tenants list empty, current tenant + demo set).

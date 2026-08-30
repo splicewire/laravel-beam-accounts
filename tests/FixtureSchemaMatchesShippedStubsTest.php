@@ -104,93 +104,53 @@ class FixtureSchemaMatchesShippedStubsTest extends TestCase
     /**
      * The columns the fixture deliberately does NOT take from the stub, each pinned on BOTH sides.
      *
-     * A declared divergence is data with a reason, never a silent skip — and never a one-sided
-     * exemption either. Each entry states the shape the STUB must have and the shape the FIXTURE
-     * must have, so converging either side is red just as diverging further is. Exempting only the
-     * fixture would let a stub quietly revert (which is exactly what `baaf6dd` did, invisibly).
+     * **EMPTY, and that is the finding.** This list held nine entries until 2026-08-30. Every one of
+     * them descended from a single claim in this docblock — that the fixture models a pre-existing
+     * bigint-keyed host `users`, "because it is the population the estate actually has:
+     * `~/Herd/audiostud`, `~/Herd/fable` and `~/Herd/numero`."
      *
-     * Every entry below descends from ONE fact: `shared/create_users_table.php.stub` is a **quiet
-     * terminal**. `users` is the one table this package ADOPTS rather than owns, so that stub
-     * converges what it can and writes nothing at all when it cannot — a pre-existing bigint-keyed
-     * host `users` (any `laravel new` derivative) is a legitimate shape, not an install-time stop.
-     * {@see TestCase::createUsersSchema()} builds exactly that holder, on purpose, because it is the
-     * population the estate actually has: `~/Herd/audiostud`, `~/Herd/fable` and `~/Herd/numero` are
-     * all on the integer-keyed publish.
+     * That population does not exist. All three of those hosts publish
+     * `$table->uuid('id')->primary()` in their own `0001_01_01_000000_create_users_table.php`, and so
+     * do the other six `~/Herd` roots that install this package (`beam`, `satellite`, `schemastud`,
+     * `splicewire`, plus `splicewire-app` and `tower`, whose `tenant_users` pivots take a
+     * `uuid('user_id')`). **Zero hosts in the estate have a bigint `users.id`.** What those three ARE
+     * integer-keyed on is `roles.id`/`permissions.id` — a different column, pinned in their own
+     * `config/beam/accounts.php`, which says in-file that the pin "covers `roles.id`/`permissions.id`
+     * ONLY". The docblock had read one host fact and attributed it to another table.
      *
-     * From that, every morph and foreign key pointing AT `users` must be bigint here too — the
-     * permission stub's own docblock states the rule: a `model_morph_key` "MUST MATCH THE HOLDER'S
-     * KEY TYPE ... matching, not widening." Flip the holder and all of these flip with it, which is
-     * why they are named rather than left implicit.
+     * The stubs were then run onto TWO throwaway connections — one greenfield, one seeded first with a
+     * hand-built bigint `users` holder (a `laravel new` derivative) — and the resulting schemas diffed.
+     * **They are identical on every column except `users.id` itself.** `create_permission_tables`
+     * writes `$table->uuid($columnNames['model_morph_key'])` unconditionally at both sites;
+     * `create_personal_access_tokens` writes `uuidMorphs`; `create_teams`, `create_memberships` and
+     * `create_invitations` all write uuid at their `users` foreign keys. Nothing in the shipped code
+     * reads the holder's key type — `config/beam/accounts.php` says so outright of `key_type`: it
+     * "is not a switch — nothing reads it at runtime."
+     *
+     * So the six morph/FK entries were not "the stub's instruction for this population". They were a
+     * repair the shipped code does not perform, encoded as fixture, for a population of zero — and two
+     * of them (`model_has_roles.model_id`, `model_has_permissions.model_id`) pinned the exact
+     * pre-beam-facade-142 defect shape that ticket closed on 2026-08-26. Converging them turned the
+     * fixture from the INVERSE of every real host into the shape every real host has, at a cost of one
+     * `HasUuids` on the test `User` and a `password` on 13 `User::create()` calls (the stub and every
+     * host declare `password` NOT NULL, so a passwordless insert was itself a shape no host has).
+     *
+     * The witness that a divergence is real, if one is ever added back: it must name a host on disk
+     * whose schema has that shape, checkable with `KeyTypeConformanceAudit` /
+     * `SchemaKeyIndex::keyTypeOfClass()`, which read live host schemas. A `why` that only argues from
+     * a stub docblock is how this list reached nine — the permission stub's own prose says a bigint
+     * host "needs this column to be bigint", and its code has never done that.
      *
      * @var array<string, array{stub: string, fixture: string, why: string}>
      */
-    private const DECLARED_DIVERGENCES = [
-        'users.id' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'integer not-null',
-            'why' => 'The quiet terminal itself. The stub keys a GREENFIELD `users` by uuid; this harness '
-                .'models the pre-existing bigint-keyed host table that stub deliberately leaves alone.',
-        ],
-        'users.name' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'varchar nullable',
-            'why' => 'Same quiet terminal: on this harness `users` is the HOST\'s table, so the stub\'s '
-                .'define() block is not a claim about its nullability. Only the stub\'s two unconditional '
-                .'retrofits — `google_id` here and `current_team_id` from add_current_team_id_to_users_table '
-                .'— land on a bigint host, and both ARE compared.',
-        ],
-        'users.password' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'varchar nullable',
-            'why' => 'As `users.name`. Passwordless holders (passkey, OIDC, demo login-as) are exercised '
-                .'across this suite, so the fixture is nullable by intent, not by drift.',
-        ],
-        'personal_access_tokens.tokenable_id' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'integer not-null',
-            'why' => 'The morph `baaf6dd` fixed. The stub says `uuidMorphs` because the holder it assumes is '
-                .'the stub-created uuid `users`; a bigint morph could never hold that key. The fixture\'s '
-                .'holder is bigint, so bigint here IS the stub\'s instruction for this population.',
-        ],
-        'model_has_roles.model_id' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'integer not-null',
-            'why' => 'Spatie\'s `model_morph_key`, matching this harness\'s bigint holder — the permission '
-                .'stub\'s docblock is the authority (beam-facade 138).',
-        ],
-        'model_has_permissions.model_id' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'integer not-null',
-            'why' => 'As `model_has_roles.model_id`.',
-        ],
-        'beam_teams.user_id' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'integer not-null',
-            'why' => 'The team OWNER — a foreign key at `users.id`, uuid in the stub for the same reason and '
-                .'bigint here for the same reason. `key-type.convention.md`: a table\'s key type, its '
-                .'foreign keys and its model must all say the same thing.',
-        ],
-        'beam_memberships.user_id' => [
-            'stub' => 'varchar not-null',
-            'fixture' => 'integer not-null',
-            'why' => 'As `beam_teams.user_id`. Note `team_id` is NOT here: it points at `beam_teams.id`, '
-                .'which really is `$table->id()` on both sides.',
-        ],
-        'beam_invitations.invited_by' => [
-            'stub' => 'varchar nullable',
-            'fixture' => 'integer nullable',
-            'why' => 'The inviting USER, so it follows the holder like the rest. `AccountResourcesTest` had '
-                .'been adding this column bigint in its own beforeEach; the harness now owns it, at the '
-                .'same width.',
-        ],
-    ];
+    private const DECLARED_DIVERGENCES = [];
 
     /**
      * A floor on how many columns the diff actually compared, so a collapse of the mechanism cannot
-     * report success by not running. 81 is what the stubs declare today across the 13 pairs, less the
-     * nine declared divergences; this catches a collapse, not a deliberate addition.
+     * report success by not running. 90 is what the stubs declare today across the 13 pairs, with no
+     * declared divergences left to subtract; this catches a collapse, not a deliberate addition.
      */
-    private const COMPARED_FLOOR = 81;
+    private const COMPARED_FLOOR = 90;
 
     /**
      * The base harness deliberately does not build `personal_access_tokens` (it is Sanctum's,
@@ -305,7 +265,12 @@ class FixtureSchemaMatchesShippedStubsTest extends TestCase
             );
         }
 
-        $this->assertCount(9, self::DECLARED_DIVERGENCES, 'The declared-divergence list has changed size.');
+        $this->assertCount(
+            0,
+            self::DECLARED_DIVERGENCES,
+            'The declared-divergence list is EMPTY on purpose — the fixture is the shipped shape. Adding '
+            .'an entry needs a host on disk that actually has it; see the constant\'s docblock.'
+        );
     }
 
     /**

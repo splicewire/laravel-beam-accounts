@@ -39,7 +39,7 @@ it('is read-only and unframed — writes stay on the existing PATCH /me', functi
 });
 
 it('projects the identity core through the declaration, mirroring the caller bearer', function () {
-    $user = User::create(['name' => 'Ada', 'email' => 'ada@example.test']);
+    $user = User::create(['name' => 'Ada', 'email' => 'ada@example.test', 'password' => 'secret']);
     $resource = app(ParticleResourceRegistry::class)->get(MeController::KEY);
 
     $data = ($resource->project)($user);
@@ -60,7 +60,7 @@ it('folds a contributed slice onto the projection, nested under its `as`', funct
         value: fn (Model $record, ReadContext $ctx, array $filters): FakeSliceData => new FakeSliceData('pro'),
     ));
 
-    $user = User::create(['name' => 'Bo', 'email' => 'bo@example.test']);
+    $user = User::create(['name' => 'Bo', 'email' => 'bo@example.test', 'password' => 'secret']);
     $resource = app(ParticleResourceRegistry::class)->get(MeController::KEY);
 
     $row = app(Splicewire\Beam\Particle\Contribution\ContributionProjector::class)
@@ -76,7 +76,7 @@ it('folds a contributed slice onto the projection, nested under its `as`', funct
 });
 
 it('omits the key entirely when nobody contributes — absent, not present-and-null', function () {
-    $user = User::create(['name' => 'Solo', 'email' => 'solo@example.test']);
+    $user = User::create(['name' => 'Solo', 'email' => 'solo@example.test', 'password' => 'secret']);
     $resource = app(ParticleResourceRegistry::class)->get(MeController::KEY);
 
     $row = app(Splicewire\Beam\Particle\Contribution\ContributionProjector::class)

@@ -21,8 +21,8 @@ it('does not default the visibility model — a host must opt in', function () {
 it('lets a host that opts in resolve tiers off the shipped Visibility model', function () {
     config(['permission-cascade.visibility_model' => Visibility::class]);
 
-    $owner = User::create(['name' => 'Owner', 'email' => 'owner@example.test']);
-    $actor = User::create(['name' => 'Actor', 'email' => 'actor@example.test']);
+    $owner = User::create(['name' => 'Owner', 'email' => 'owner@example.test', 'password' => 'secret']);
+    $actor = User::create(['name' => 'Actor', 'email' => 'actor@example.test', 'password' => 'secret']);
     $thing = Shareable::create(['user_id' => $owner->id]); // no column value — morph-only
 
     Visibility::create([

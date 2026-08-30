@@ -23,14 +23,14 @@ class DefaultEntitlementResolverTest extends TestCase
 {
     protected function team(): Team
     {
-        $owner = User::create(['name' => 'Team Owner', 'email' => uniqid('team-owner-').'@example.test']);
+        $owner = User::create(['name' => 'Team Owner', 'email' => uniqid('team-owner-').'@example.test', 'password' => 'secret']);
 
         return Team::create(['user_id' => $owner->id, 'name' => 'A Team', 'personal_team' => false]);
     }
 
     protected function memberOf(Team $team, Role $role): User
     {
-        $user = User::create(['name' => $role->value, 'email' => "{$role->value}@example.test"]);
+        $user = User::create(['name' => $role->value, 'email' => "{$role->value}@example.test", 'password' => 'secret']);
         Membership::create(['team_id' => $team->id, 'user_id' => $user->id, 'role' => $role->value]);
 
         return $user->fresh();
@@ -92,7 +92,7 @@ class DefaultEntitlementResolverTest extends TestCase
     public function test_a_stale_or_unrecognized_membership_role_degrades_to_ineligible_rather_than_throwing(): void
     {
         $team = $this->team();
-        $user = User::create(['name' => 'Stale', 'email' => 'stale@example.test']);
+        $user = User::create(['name' => 'Stale', 'email' => 'stale@example.test', 'password' => 'secret']);
         Membership::create(['team_id' => $team->id, 'user_id' => $user->id, 'role' => 'legacy-superuser']);
         $root = RealmRoot::create(['realm' => 'site']);
         app(AccessGrants::class)->share($root, $team, AccessGrant::ABILITY_MANAGE);
