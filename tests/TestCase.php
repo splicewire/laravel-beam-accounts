@@ -355,4 +355,53 @@ abstract class TestCase extends Orchestra
             $table->primary(['permission_id', 'role_id']);
         });
     }
+
+    /**
+     * The `personal_access_tokens` fixture, shaped the way this package's own
+     * `database/migrations/create_personal_access_tokens_table.php.stub` shapes it, PLUS the two
+     * columns `add_provenance_and_archived_to_personal_access_tokens_table.php.stub` adds — a host
+     * that runs this package's migrations has both, so a fixture with only the create is modelling
+     * a host that does not exist.
+     *
+     * NOT created by {@see setUp()}: this table is Sanctum's, adopted rather than owned, and the
+     * suites that need it each create it themselves (three of them deliberately build a *different*
+     * host population — a `string` tokenable_id, or a uuid `id` — to exercise the key-shape
+     * independence the deterministic minter is built for). This helper is the one that models the
+     * shipped shape, so it is the one pinned to the stub.
+     *
+     * `tokenable_id` is the single column deliberately NOT taken from the stub, and — exactly as
+     * with `model_id` in {@see createSpatieSchema()} — that is the stub's own instruction rather
+     * than an exception to it. A morph key must MATCH its holder's key type; the stub says
+     * `uuidMorphs` because the holder it assumes is `shared/create_users_table.php.stub`'s uuid
+     * `users`, while {@see createUsersSchema()} builds the bigint-keyed `users` that stub's quiet
+     * terminal deliberately leaves alone. Flip the holder and this column has to flip with it —
+     * which is why {@see PersonalAccessTokenFixtureMatchesShippedStubTest} names it as the single
+     * declared divergence instead of leaving it implicit. Converging it to uuid here would break
+     * the bigint-holder population this harness exists to model.
+     *
+     * Every OTHER column is the stub's, and that test executes the two stubs into a scratch schema
+     * and diffs the column types both ways. Change either side alone and it goes red naming the
+     * column.
+     */
+    protected function createPersonalAccessTokensSchema(): void
+    {
+        Schema::create('personal_access_tokens', function (Blueprint $table): void {
+            $table->id();
+            $table->string('tokenable_type');
+            // bigint, matching this harness's bigint-keyed `users` holder — see the docblock.
+            $table->unsignedBigInteger('tokenable_id');
+            // `text`, not `string`: Sanctum's own column is a text and the stub keeps it. This read
+            // `string` until nothing compared the two (beam-docs-satellite 26).
+            $table->text('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            // From the provenance/archived ALTER stub, not the create.
+            $table->string('provenance')->nullable();
+            $table->timestamp('archived_at')->nullable();
+            $table->timestamps();
+            $table->index(['tokenable_type', 'tokenable_id']);
+        });
+    }
 }

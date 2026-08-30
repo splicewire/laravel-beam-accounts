@@ -44,20 +44,10 @@ beforeEach(function () {
         $table->timestamp('accepted_at')->nullable();
     });
 
-    Schema::create('personal_access_tokens', function (Blueprint $table): void {
-        $table->id();
-        $table->string('tokenable_type');
-        $table->unsignedBigInteger('tokenable_id');
-        $table->string('name');
-        $table->string('token', 64)->unique();
-        $table->text('abilities')->nullable();
-        $table->timestamp('last_used_at')->nullable();
-        $table->timestamp('expires_at')->nullable();
-        $table->string('provenance')->nullable();
-        $table->timestamp('archived_at')->nullable();
-        $table->timestamps();
-        $table->index(['tokenable_type', 'tokenable_id']);
-    });
+    // The shipped `personal_access_tokens` shape, defined once on the harness and pinned to the two
+    // stubs that produce it by PersonalAccessTokenFixtureMatchesShippedStubTest. It used to be
+    // hand-built here, with nothing tying it to either stub in either direction.
+    $this->createPersonalAccessTokensSchema();
 });
 
 /** Mint a PAT owned by a user (tokenable_* are Sanctum-guarded, so set them raw). */
