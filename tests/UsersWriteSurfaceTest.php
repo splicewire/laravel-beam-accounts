@@ -6,7 +6,9 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Ops\LogInAsUser;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\OperationKind;
+use Splicewire\Beam\Particle\ParticleOperationRegistry;
 use Splicewire\Beam\Particle\Subject\OperationSubjectModel;
 
 beforeEach(function () {
@@ -53,7 +55,16 @@ it('gates login-as to root, so an ordinary user cannot assume an identity', func
 // ── The login-as op ───────────────────────────────────────────────────────────────────────────
 
 it('declares login-as as a write op on the users resource', function () {
-    $op = LogInAsUser::operation();
+    // Read the op the way the framework builds it — discover the ATTRIBUTE, then read the registry.
+    // This is deliberately not a call to a factory method: `LogInAsUser` became attributed
+    // (particle-operation-surface 18 retired `model:`, which was the one thing forcing it imperative),
+    // and the assertions below are only meaningful if they run against the VO that
+    // `AttributedParticleDiscovery` actually produces. Every slot must survive that translation —
+    // `signed:` in particular was absent from it for two days, during which "cannot be signed" and
+    // "declared unsigned" were the same reading.
+    app(AttributedParticleDiscovery::class)->registerClass(LogInAsUser::class);
+
+    $op = app(ParticleOperationRegistry::class)->get('users', 'login-as');
     $subjectModel = app(OperationSubjectModel::class);
 
     expect($op->resource)->toBe('users')

@@ -45,7 +45,7 @@ trait WiresDemo
         // and its route share one demo gate — when demo is off neither exists, which is what the
         // retired bespoke route did too.
         Route::middleware('web')->group(function () {
-            Particle::ops('users', 'users', [LogInAsUser::operation()], ['method' => 'get']);
+            Particle::ops('users', 'users', [LogInAsUser::class], ['method' => 'get']);
         });
     }
 }

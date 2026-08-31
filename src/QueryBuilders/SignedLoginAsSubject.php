@@ -65,7 +65,7 @@ class SignedLoginAsSubject
     /** The particle resource key the login-as operation is mounted on. */
     public const RESOURCE = 'users';
 
-    /** The operation name, as declared by {@see LogInAsUser::operation()}. */
+    /** The operation name, as declared by {@see LogInAsUser}'s `#[ParticleOp]`. */
     public const OPERATION = 'login-as';
 
     /**

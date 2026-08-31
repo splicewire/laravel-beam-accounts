@@ -9,8 +9,8 @@ use Splicewire\Beam\Accounts\Actions\LogInAs;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
+use Splicewire\Beam\Particle\Attributes\ParticleOp;
 use Splicewire\Beam\Particle\OperationKind;
-use Splicewire\Beam\Particle\ParticleOperation;
 
 /**
  * Assume a user's identity — the ONE implementation of login-as, reached as
@@ -69,35 +69,37 @@ use Splicewire\Beam\Particle\ParticleOperation;
  * over `BeamAccounts::userModel()` — so
  * {@see \Splicewire\Beam\Particle\Subject\OperationSubjectModel} resolves the host's configured
  * model at REQUEST time, which is strictly later and strictly better than registration time. So the
- * one thing that forced this class to be imperative no longer does. Nothing else here needs config,
- * so folding it to `#[ParticleOp]` is now merely open rather than blocked — its own ticket, not
- * this one.
+ * one thing that forced this class to be imperative no longer does. Nothing else here needs config.
+ *
+ * ✅ **Folded 2026-08-31.** This is now an attributed op, and it is the first consumer `signed:` has
+ * ever had — the slot was built for exactly this operation (api-surface-coherence 95) and until now
+ * could only be reached from an imperative declaration, which is to say: not from here.
+ *
+ * ⚠️ The conversion's one real risk was silent, and is pinned rather than argued.
+ * `AttributedParticleDiscovery` translates the attribute into a {@see ParticleOperation}, and a slot
+ * missing from that translation does not fail — it takes the runtime default. `signed:` was absent
+ * from it for two days, during which "cannot be signed" and "declared unsigned" were the same
+ * reading. `UsersWriteSurfaceTest` therefore asserts against the DISCOVERED VO, not against a
+ * factory: it registers the class through discovery and reads the op back out of
+ * {@see \Splicewire\Beam\Particle\ParticleOperationRegistry}, so a slot lost in translation fails
+ * the suite instead of quietly disarming this op.
  */
+#[ParticleOp(
+    resource: 'users',
+    name: 'login-as',
+    kind: OperationKind::Write,
+    output: AuthUserData::class,
+    // Declared, both of them, and only because `signed:` exists. See the class docblock: this op is
+    // the reason that slot was built, and the two lines below are the measurement that it works —
+    // `ability:` gates the operator half without 403ing the signed link, and `input: false` binds
+    // without 422ing it, because `expires`/`signature` are framework parameters on a `signed:` op
+    // rather than caller payload.
+    ability: 'loginAs',
+    input: false,
+    signed: true,
+)]
 class LogInAsUser
 {
-    /**
-     * The runtime declaration. It no longer resolves the host's user model in — the `users` resource
-     * carries that, and `OperationSubjectModel` reads it there.
-     */
-    public static function operation(): ParticleOperation
-    {
-        return new ParticleOperation(
-            resource: 'users',
-            name: 'login-as',
-            kind: OperationKind::Write,
-            handle: self::handle(...),
-            output: AuthUserData::class,
-            // Declared, both of them, and only because `signed:` exists. See the class docblock: this
-            // op is the reason that slot was built, and the two lines below are the measurement that
-            // it works — `ability:` gates the operator half without 403ing the signed link, and
-            // `input: false` binds without 422ing it, because `expires`/`signature` are framework
-            // parameters on a `signed:` op rather than caller payload.
-            ability: 'loginAs',
-            input: false,
-            signed: true,
-        );
-    }
-
     public static function handle(Model $user, Request $request, mixed $actor = null): mixed
     {
         // The ONLY check left here, and it is an ENVIRONMENT gate rather than an authorization one —
