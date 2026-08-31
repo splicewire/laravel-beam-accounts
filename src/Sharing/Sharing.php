@@ -30,7 +30,7 @@ use Splicewire\Beam\Particle\ParticleResourceRegistry;
  * there never was, so RULING 2 required no change on this factory. ⚠️ Beam's own prose implies
  * otherwise by counting these ops among an "anchor" population, and it is wrong on both halves: the
  * set is FIVE, not six (the sixth went with the link-sharing primitive gutted 2026-08-28), and none
- * of the five has ever been an anchor at any host. See {@see declareAnchorResource()}.
+ * of the five has ever been an anchor at any host. See {@see declareResourceForKey()}.
  *
  * Usage (in a host provider boot):
  *   Sharing::attachTo('songs', Composition::class, [
@@ -102,7 +102,7 @@ class Sharing
             );
         }
 
-        self::declareAnchorResource($resourceKey, $model);
+        self::declareResourceForKey($resourceKey, $model);
 
         Route::middleware($middleware)->prefix($groupPrefix)->group(function () use ($urlKey, $resourceKey, $ops) {
             Particle::ops($urlKey, $resourceKey, $ops);
@@ -144,12 +144,10 @@ class Sharing
      *
      * @param  class-string<Model>  $model
      */
-    protected static function declareAnchorResource(string $resourceKey, string $model): void
+    protected static function declareResourceForKey(string $resourceKey, string $model): void
     {
-        if (! class_exists(ParticleResourceRegistry::class)) {
-            return;
-        }
-
+        // No `class_exists()` guard: `splicewire/laravel-beam` is a hard `require` of this package, so
+        // a guard here would be dead code pretending to be defensive.
         app()->booted(function () use ($resourceKey, $model) {
             $resources = app(ParticleResourceRegistry::class);
 
