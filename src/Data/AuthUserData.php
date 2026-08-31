@@ -49,7 +49,7 @@ class AuthUserData extends BeamData
         public array $roles,
         /** @var string[] */
         public array $permissions,
-        /** @var array<int, array<string, mixed>> */
+        /** @var list<TenantRefData> */
         public array $tenants,
         // ⚠️ These two are camelCase ON THE WIRE, and the attributes DECLARE that rather than change
         // it. Global output mapping is off, so an undeclared property has always published its own
@@ -164,15 +164,24 @@ class AuthUserData extends BeamData
     }
 
     /**
-     * @return array<string, mixed>
+     * Project one tenant into the thin reference the auth payload carries.
+     *
+     * ⚠️ Returns a DECLARED {@see TenantRefData}, not the `array<string, mixed>` it used to. That
+     * array crossed the wire on every authenticated request as an undeclared shape — invisible to
+     * the wire-name audit (no properties to inspect), to codegen, and to the schema projection —
+     * which is exactly what the particle doctrine's one invariant forbids. `ui/src/stores/user.ts`
+     * was hand-writing the type because there was nothing to generate.
+     *
+     * The emitted keys are unchanged: `id`, `name`, `domain`, `primaryHost`. `primaryHost` stays
+     * camelCase because it is what ships and `SystemZone.tsx` reads it — see {@see TenantRefData}.
      */
-    protected static function tenantRow($tenant): array
+    protected static function tenantRow($tenant): TenantRefData
     {
-        return [
-            'id' => $tenant->id,
-            'name' => $tenant->name,
-            'domain' => $tenant->domains->first()?->domain,
-            'primaryHost' => method_exists($tenant, 'primaryHost') ? $tenant->primaryHost() : null,
-        ];
+        return new TenantRefData(
+            id: (string) $tenant->id,
+            name: (string) $tenant->name,
+            domain: $tenant->domains->first()?->domain,
+            primaryHost: method_exists($tenant, 'primaryHost') ? $tenant->primaryHost() : null,
+        );
     }
 }

@@ -136,3 +136,29 @@ class FakeTenant implements Tenant
         return $callback($this);
     }
 }
+
+// ── the tenants list is a DECLARED shape, not a hand-rolled array ────────────────────────────────
+
+it('projects each tenant through a declared DTO, not an ad-hoc array', function () {
+    $row = Splicewire\Beam\Accounts\Data\TenantRefData::from([
+        'id' => 't1',
+        'name' => 'Acme',
+        'domain' => 'acme.test',
+        'primaryHost' => 'acme.example.com',
+    ]);
+
+    expect($row)->toBeInstanceOf(Splicewire\Beam\Accounts\Data\TenantRefData::class)
+        ->and($row->primaryHost)->toBe('acme.example.com');
+});
+
+it('keeps the tenant row wire keys EXACTLY as the SPA already reads them', function () {
+    // ⚠️ These four keys are a published contract. `SystemZone.tsx:27` does
+    // `tenant.primaryHost?.split('.')[0]` to label the tenant switcher, and `stores/user.ts` types
+    // it by hand. `primaryHost` is camelCase because that is what ships today — declaring it is the
+    // point; renaming it to `primary_host` would be a breaking change wearing a cleanup's clothes.
+    $keys = array_keys(Splicewire\Beam\Accounts\Data\TenantRefData::from([
+        'id' => 't1', 'name' => 'Acme', 'domain' => null, 'primaryHost' => null,
+    ])->toArray());
+
+    expect($keys)->toBe(['id', 'name', 'domain', 'primaryHost']);
+});
