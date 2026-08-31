@@ -9,7 +9,6 @@ use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Rushing\Popcorn\Concerns\ChainsTraitMethods;
 use Rushing\Popcorn\Contracts\ChainsTraitMethods as ChainsTraitMethodsContract;
-use Rushing\Popcorn\Registries\RegistryIndex;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Splicewire\Beam\Accounts\Concerns\WiresApiGuard;
@@ -371,14 +370,6 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // trait — and the sequence does not rest on where a `use` statement sits, which `pint`'s
         // `ordered_traits` fixer resorts alphabetically.
         $this->chainTraitMethods('boot');
-
-        // The registry this package owns, described from the OWNER's own boot (registry-kernel
-        // ticket 38 / 08 D7 — a registry describes itself, nobody describes on another's behalf) and
-        // AFTER the boot chain, so anything the chain registers is already in place. Declaring and
-        // indexing are two acts: until this runs the index holds nothing, and `popcorn:registries`
-        // cannot route `beam.accounts.*`.
-        $index = $this->app->make(RegistryIndex::class);
-        $index->describe($this->app->make(BundleRegistry::class), by: self::class);
 
         // Self-register into beam-core's install manifest (order 5: users/permission_tables are
         // foundational — publish early, ahead of the default-order-100 packages that FK into them)
