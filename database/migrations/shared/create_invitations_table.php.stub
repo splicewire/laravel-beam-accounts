@@ -11,8 +11,11 @@ use Rushing\SchemaConvergence\ConvergentTable;
  * `create_teams_table` — see that file's docblock. Squashed pre-prod, and further squashed together
  * with the old separate `add_lifecycle_to_invitations_table` ALTER (Frame OS ticket 20's
  * `invited_by`/`accepted_at` columns the Invitations resource reads — `accepted_at` null = pending):
- * one plain guarded create with the final column set, FK pointed at the prefixed parent
- * (`beam_teams`), no legacy-name rename branch, no separate lifecycle ALTER.
+ * one plain guarded create with the final column set, no legacy-name rename branch, no separate
+ * lifecycle ALTER.
+ *
+ * `team_id` carries no foreign key: it holds a `TeamContract` key, which is deliberately not a key
+ * into any one table. The column's own note below carries that argument.
  */
 return new class extends Migration
 {
@@ -21,12 +24,31 @@ return new class extends Migration
         ConvergentTable::named($this->target())
             ->define(function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('team_id')->constrained(Beam::table('teams'))->cascadeOnDelete();
+                // The OWNING TEAM, as a `TeamContract` key rather than as a row in one table.
+                //
+                // This was `foreignId('team_id')->constrained(Beam::table('teams'))->cascadeOnDelete()`
+                // until 2026-08-31, and that single line was both promises a `TeamContract` refuses to
+                // make: a WIDTH (bigint) and a TABLE (`beam_teams`). The contract's own signature is
+                // `teamKey(): int|string` and its docblock says outright that it "says nothing about the
+                // backing table, key type, or provisioning: those are the host's private seam" — so a
+                // string-keyed host team (beam-tenancy's `Tenant`: `system`, `demo`, `beam_demo`)
+                // implemented the interface and still could not be pointed at by an invitation. That is
+                // what forked a duplicate `tenant_invitations` off this table.
+                //
+                // ⚠️ The FK is GONE, not relocated, and that is the deliberate cost: a foreign key names
+                // exactly one parent table, and this column's parent is whatever the host resolved through
+                // `beam.accounts.teams.resolver`. Referential integrity for the beam-`Team` case moves to
+                // `Team`'s own delete path; the orphan risk is one pending invitation row, and
+                // `InvitationData::scope()` already refuses to surface a row whose team is not the current
+                // one. Indexed, because the scope's every read filters on it.
+                //
+                // `Invitation` casts this to `string`, so `5` and `"5"` cannot both reach a comparison —
+                // see that model, and `InvitationTeamKeyTest`.
+                $table->string('team_id')->index();
                 $table->string('email');
                 $table->string('role')->default('member');
                 $table->string('token')->unique();
-                // The inviting USER, so uuid — see the note in `create_teams_table`. `team_id` above
-                // stays `foreignId` because it points at `teams.id`, which really is `$table->id()`.
+                // The inviting USER, so uuid — see the note in `create_teams_table`.
                 $table->uuid('invited_by')->nullable();
                 $table->timestamp('accepted_at')->nullable();
                 $table->timestamps();

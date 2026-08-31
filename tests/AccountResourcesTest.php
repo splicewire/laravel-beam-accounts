@@ -116,7 +116,10 @@ it('prepares a new invitation for the current team as an owner', function () {
 
     InvitationData::prepare($invitation, CreateInvitationData::from(['email' => 'new@example.test', 'role' => 'member']), $owner);
 
-    expect($invitation->team_id)->toBe($team->id)
+    // `(string)` deliberately: `team_id` holds a `TeamContract` key, which the contract declares
+    // `int|string`, so the model casts it. `$team->id` is beam's own bigint here — the cast is what
+    // makes this assertion read the same at a string-keyed host. See `InvitationTeamKeyTest`.
+    expect($invitation->team_id)->toBe((string) $team->id)
         ->and($invitation->email)->toBe('new@example.test')
         ->and($invitation->token)->not->toBeEmpty()
         ->and($invitation->accepted_at)->toBeNull()

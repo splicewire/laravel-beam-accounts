@@ -299,6 +299,37 @@ class FixtureSchemaMatchesShippedStubsTest extends TestCase
     }
 
     /**
+     * `beam_invitations.team_id` holds a {@see \Splicewire\Beam\Accounts\Contracts\TeamContract} key, and that contract declares the key
+     * `int|string` — *"It says nothing about the backing table, key type, or provisioning: those are
+     * the host's private seam."* So the column may not be a bigint, in the stub or in the fixture.
+     *
+     * This is the same class of claim as the uuid one above and it is asserted for the same reason:
+     * a bigint here does not merely inconvenience a string-keyed host, it makes the invitation
+     * surface structurally unable to name that host's team at all — which is what forked
+     * `splicewire/laravel-beam-tenancy`'s `tenant_invitations` off in the first place.
+     *
+     * ⚠️ sqlite is dynamically typed, which is precisely why this reads the DECLARED type rather than
+     * inserting a string and calling the insert a proof. `TeamResolverSeamTest` has been writing
+     * `team_id => 'host-team-1'` into this column and passing since it was written; on Postgres the
+     * same line is an error.
+     */
+    public function test_the_shipped_stubs_do_not_pin_the_invitation_team_key_to_a_bigint(): void
+    {
+        $this->discoverPairs();
+
+        foreach ([self::PROBE => 'the package\'s shipped stub', null => 'the test fixture'] as $connection => $where) {
+            $shape = $this->columns('beam_invitations', $connection === '' ? null : $connection)['team_id'] ?? null;
+
+            $this->assertSame(
+                'varchar not-null',
+                $shape,
+                "`beam_invitations.team_id` is `{$shape}` in {$where}. It carries a TeamContract key, which "
+                .'that contract declares `int|string`, so it cannot be an integer column.'
+            );
+        }
+    }
+
+    /**
      * Run every shipped stub's `up()` on the throwaway probe connection, then return the sorted list
      * of tables the probe and the fixture both hold.
      *

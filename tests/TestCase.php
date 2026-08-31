@@ -252,7 +252,9 @@ abstract class TestCase extends Orchestra
 
         Schema::create(Beam::table('invitations'), function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('team_id');
+            // A `TeamContract` key, not a `beam_teams` row — see the shipped stub's note. Pinned to
+            // the stub by `FixtureSchemaMatchesShippedStubsTest`, in both directions.
+            $table->string('team_id')->index();
             $table->string('email');
             $table->string('role')->default('member');
             $table->string('token')->unique();
