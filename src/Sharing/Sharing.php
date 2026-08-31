@@ -14,12 +14,23 @@ use Splicewire\Beam\Facades\Particle;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
+use Splicewire\Beam\Particle\ParticleResource;
+use Splicewire\Beam\Particle\ParticleResourceRegistry;
 
 /**
  * Attachable sharing (ADR-0009, tracer 04 generalized): one call gives ANY beam particle
  * resource the full sharing capability over its HasVisibility model — share/unshare (AccessGrant)
  * and the request-access → approve/decline view-request flow. All five verbs are model-agnostic
  * particle operations.
+ *
+ * ## Authorization (particle-operation-surface 19, RULING 2)
+ *
+ * All five verbs already declare an `ability:` — `$manage` (default `'update'`) for share/unshare and
+ * the two request decisions, `$requestAbility` for `request-access`. There is no ungated op here and
+ * there never was, so RULING 2 required no change on this factory. ⚠️ Beam's own prose implies
+ * otherwise by counting these ops among an "anchor" population, and it is wrong on both halves: the
+ * set is FIVE, not six (the sixth went with the link-sharing primitive gutted 2026-08-28), and none
+ * of the five has ever been an anchor at any host. See {@see declareAnchorResource()}.
  *
  * Usage (in a host provider boot):
  *   Sharing::attachTo('songs', Composition::class, [
@@ -91,8 +102,69 @@ class Sharing
             );
         }
 
+        self::declareAnchorResource($resourceKey, $model);
+
         Route::middleware($middleware)->prefix($groupPrefix)->group(function () use ($urlKey, $resourceKey, $ops) {
             Particle::ops($urlKey, $resourceKey, $ops);
+        });
+    }
+
+    /**
+     * particle-operation-surface 19, RULING 1 — make sure `$resourceKey` names a DECLARED
+     * `ParticleResource`, so the five ops above resolve `{id}` through the registry rather than
+     * through `RecordSubject`'s `$operation->model::query()->findOrFail($id)` fallback (which applies
+     * none of a resource's `scope`, `routeKey` or `includes`).
+     *
+     * Registered from the same call that registers the ops, so a host gets it automatically — the
+     * whole point being that "this key resolves to that model" is a property of the RESOURCE, stated
+     * once, rather than restated on every op.
+     *
+     * ## At every host that exists today this is a NO-OP, and that is the correct outcome
+     *
+     * Measured 2026-08-31 from a booted registry probe at every `~/Herd/*` root:
+     * `Sharing::attachTo()` has exactly ONE call site in the estate
+     * (`~/Herd/audiostud/app/Providers/SongSharingServiceProvider.php`, key `'songs'`), and audiostud
+     * already declares `songs` as a real, scoped resource. So the guard below declines and nothing
+     * changes. This exists for the host that attaches to a key it has not declared — and beam's own
+     * prose has been counting these five ops as live anchors when none of them ever was.
+     *
+     * ## Two constraints, both load-bearing
+     *
+     * **Deferred and guarded**, because registering at an exact key that is already taken does NOT
+     * throw — it REPLACES, silently, leaving the entry count unchanged. An eager registration would
+     * therefore be free to overwrite the host's own `songs` declaration, `scope` gate and all, purely
+     * on provider boot order. `booted()` makes the `has()` check read the FINAL registry state, so
+     * the host's declaration wins regardless of who booted first.
+     *
+     * **It opens no affordance.** `$model` is host-supplied, so this package cannot know whether its
+     * backing can write, and `BackingResolver::assertAffordancesWithinCapability()` THROWS at
+     * registration for an affordance opened past a backing's capability. A closed declaration is also
+     * the honest one: an anchor resolves a subject and is never written through — the sharing verbs
+     * write through their own handlers, not through a particle write pipeline.
+     *
+     * @param  class-string<Model>  $model
+     */
+    protected static function declareAnchorResource(string $resourceKey, string $model): void
+    {
+        if (! class_exists(ParticleResourceRegistry::class)) {
+            return;
+        }
+
+        app()->booted(function () use ($resourceKey, $model) {
+            $resources = app(ParticleResourceRegistry::class);
+
+            if ($resources->has($resourceKey)) {
+                return;
+            }
+
+            $resources->register(new ParticleResource(
+                key: $resourceKey,
+                backing: $model,
+                readOnly: true,
+                editable: false,
+                deletable: false,
+                showable: false,
+            ));
         });
     }
 
