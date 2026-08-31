@@ -26,6 +26,19 @@ enum TokenProvenance: string
     /** A `broker:{slug}` provisioning token minted by the tenant grant pipeline. */
     case Broker = 'broker';
 
+    /**
+     * A token held by a SERVICE identity — the sync daemon and its kin, which authenticate as a
+     * central user but are machines, not people.
+     *
+     * Note this enum ALREADY carried {@see self::Broker} above, so accounts already owned the
+     * machine axis at the credential layer. This case is one addition to a correctly-tiered existing
+     * vocabulary, not a new concept arriving — the axis was only ever missing one tier up, on
+     * `tenant_users.role`, where `service` was squatting in a human role column
+     * ({@see \Splicewire\Beam\Accounts\Enums\Role} is `owner|admin|member`). That is what
+     * `tenant_machine_identities` moves out; this is the credential end of the same identity.
+     */
+    case Service = 'service';
+
     /** A token minted by a passwordless passkey (WebAuthn) sign-in (login-branding-passkey ticket 09). */
     case Passkey = 'passkey';
 
@@ -39,6 +52,7 @@ enum TokenProvenance: string
             self::Session => 'Session',
             self::Dev => 'Dev',
             self::Broker => 'Broker',
+            self::Service => 'Service',
             self::Passkey => 'Passkey',
             self::Federation => 'Federation',
         };
@@ -60,6 +74,15 @@ enum TokenProvenance: string
 
         if (str_starts_with($name, 'federation-resolve:') || in_array('federation:resolve', $abilities, true)) {
             return self::Federation;
+        }
+
+        // The sync service identity's token. Matched on the name alone — deliberately NOT on an
+        // ability, because which abilities a service token carries is precisely what a sibling pass
+        // is still measuring, and inferring from an unsettled ability set would bake a guess into a
+        // backfill. Placed after Broker/Federation so a token that is both stays classified by its
+        // more specific pipeline.
+        if (str_starts_with($name, 'splicewire-sync')) {
+            return self::Service;
         }
 
         if (in_array($name, ['dev-login-as', 'dev-verify'], true) || str_starts_with($name, 'PostmanRuntime')) {
