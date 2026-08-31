@@ -39,6 +39,15 @@ trait WiresAuthorization
         Gate::define('manageMembers', [MembershipPolicy::class, 'manageMembers']);
         Gate::define('manageInvitations', [MembershipPolicy::class, 'manageInvitations']);
 
+        // The same decision subjected onto ONE invitation — what a particle operation on an
+        // `Invitation` declares, since `ability:` is checked against the subject the operation
+        // resolved. `Gate::define`, deliberately NOT `Gate::policy(Invitation::class, …)`: giving
+        // the model a policy is not additive, because `Gate::getPolicyFor()` becoming non-null
+        // routes EVERY ability asked about an `Invitation` — the `create`/`delete` the Frame write
+        // path asks about the `invitations` resource included — into a class that does not define
+        // them, which resolves to a denial. A named ability has no blast radius.
+        Gate::define('manageInvitation', [MembershipPolicy::class, 'manageInvitation']);
+
         // The `users` resource's write gate ({@see UserPolicy}) — needed now that the resource
         // widened `editable`. Registered against the CONFIGURED user model, since hosts routinely
         // subclass ours, and deferred to `booted()` so a host's own AuthServiceProvider has already

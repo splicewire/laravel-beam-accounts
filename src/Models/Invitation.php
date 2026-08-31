@@ -41,6 +41,28 @@ class Invitation extends Model
     }
 
     /**
+     * The connection `beam_invitations` lives on — the seam that lets this model serve a TENANTED
+     * host, and the last thing `TenantInvitation` had that this model did not.
+     *
+     * An invitation is prospective membership: it is issued to an email before the invitee has any
+     * tenant context, and the accept flow resolves its token on a route with no tenancy middleware
+     * at all. So at a tenanted host it MUST live on the shared central database — the table exists
+     * in every tenant schema too (the stub is `shared/`), and a send that wrote the tenant copy
+     * while accept read the central one would mint invitations nobody could redeem, silently and
+     * behind a 201.
+     *
+     * ⚠️ A config key rather than `protected $connection = 'central'`, for exactly the reason
+     * `beam.accounts.tokens.connection` states in-file: a hardcoded pin is unoverridable off the
+     * host it was written for, and the majority of this package's hosts are single-database and
+     * have no `central` connection to name. null = the app default, which is the only answer a
+     * non-tenanted host can use.
+     */
+    public function getConnectionName(): ?string
+    {
+        return config('beam.accounts.invitations.connection') ?: parent::getConnectionName();
+    }
+
+    /**
      * The owning team AS BEAM'S OWN `Team`.
      *
      * ⚠️ Correct only where the host's team notion IS {@see Team}. `team_id` is a `TeamContract` key

@@ -300,6 +300,25 @@ return [
         'connection' => null,
     ],
 
+    // The invitations resource. `connection` is the seam that lets the one packaged `Invitation`
+    // serve a TENANTED host as well as a single-database one, and it is why
+    // `splicewire/laravel-beam-tenancy` no longer forks a `TenantInvitation`/`tenant_invitations`
+    // pair of its own.
+    //
+    // An invitation is PROSPECTIVE membership: it is addressed to an email before the invitee has
+    // any tenant context, and the accept flow resolves its bearer token on a central route with no
+    // tenancy middleware. `create_invitations_table` is a `shared/` stub, so the table exists in
+    // every tenant schema as well as centrally — and a host that let `send` write the tenant copy
+    // while `accept` read the central one would mint invitations nobody could redeem, silently,
+    // behind a 201. A tenanted host therefore sets 'central' here.
+    //
+    // null = the app default, which is the only answer a non-tenanted host can use. Same shape and
+    // same argument as `tokens.connection` above: a config key rather than a `protected $connection`
+    // on the model, because a hardcoded pin is unoverridable off the host it was written for.
+    'invitations' => [
+        'connection' => null,
+    ],
+
     // The users resource — the identity roster. `scope` is the load-bearing row-level isolation on
     // the widest shared table in the package: an `(Builder, ?Authenticatable): Builder` callable
     // applied to BOTH the list and the per-record read, so the two can never disagree. The default
