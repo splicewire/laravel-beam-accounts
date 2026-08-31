@@ -51,7 +51,23 @@ class AuthUserData extends BeamData
         public array $permissions,
         /** @var array<int, array<string, mixed>> */
         public array $tenants,
+        // ⚠️ These two are camelCase ON THE WIRE, and the attributes DECLARE that rather than change
+        // it. Global output mapping is off, so an undeclared property has always published its own
+        // PHP name — `isRoot`/`isDemo` have been the live keys since this projection replaced
+        // AuthUserResource, and the SPA reads them that way in 17 files (`user.isRoot` in
+        // ui/src/app/shell/SystemZone.tsx, ui/src/features/operator/RequireRoot.tsx, ui/src/stores/user.ts;
+        // `isDemo` in ui/src/app/shell/SectionBar.tsx and sectionMeta.ts). Nothing anywhere reads
+        // `is_root`/`is_demo`.
+        //
+        // So do NOT "tidy" these to snake to match `access_token` above or the wider estate: that
+        // sibling is snake because the retired resource published it snake (HTTP-07), and these are
+        // camel because this projection published them camel. Both attributes are pinning what is
+        // ALREADY on the wire — which is the wire-name convention's actual rule (declare the wire,
+        // and the PHP spelling becomes free), not a house preference for either casing. Changing
+        // either argument is a breaking API change to an authenticated response, not a cleanup.
+        #[MapOutputName('isRoot')]
         public bool $isRoot,
+        #[MapOutputName('isDemo')]
         public ?bool $isDemo,
         public ?string $tenant,
     ) {}
