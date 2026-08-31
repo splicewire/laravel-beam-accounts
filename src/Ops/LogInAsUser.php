@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Actions\LogInAs;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
-use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
@@ -57,19 +56,28 @@ use Splicewire\Beam\Particle\ParticleOperation;
  * grow one; the replacement affordance for a developer is the command that already exists,
  * `splicewire:beam:accounts:login-as`, which mints exactly the signed link this op now declares.
  *
- * ## Why this is an imperative ParticleOperation and not a `#[ParticleOp]` class
+ * ## Why this WAS an imperative ParticleOperation — and why that reason is now spent
  *
- * An attribute cannot read config, and `model:` on a users operation MUST. `Models\User` is pinned
- * to the `central` connection, and hosts routinely subclass it as their own `App\Models\User` —
- * {@see UserData}'s docblock calls that seam load-bearing rather than theoretical. An attribute
- * literal would hardcode the package model AND its connection, so the op would resolve `{id}`
- * against the wrong table on every host that swaps the model. Registering imperatively lets `model:`
- * come from `BeamAccounts::userModel()` at registration time.
+ * The argument used to be: an attribute cannot read config, and `model:` on a users operation MUST,
+ * because `Models\User` is pinned to the `central` connection and hosts routinely subclass it as
+ * their own `App\Models\User` ({@see UserData}'s docblock calls that seam load-bearing rather than
+ * theoretical). An attribute literal would have hardcoded the package model AND its connection.
+ *
+ * `model:` is gone (particle-operation-surface ticket 18). The subject model is a property of the
+ * RESOURCE, and the `users` resource backs
+ * {@see \Splicewire\Beam\Accounts\Particle\Backing\ConfiguredUserBacking} — an `EloquentBacking`
+ * over `BeamAccounts::userModel()` — so
+ * {@see \Splicewire\Beam\Particle\Subject\OperationSubjectModel} resolves the host's configured
+ * model at REQUEST time, which is strictly later and strictly better than registration time. So the
+ * one thing that forced this class to be imperative no longer does. Nothing else here needs config,
+ * so folding it to `#[ParticleOp]` is now merely open rather than blocked — its own ticket, not
+ * this one.
  */
 class LogInAsUser
 {
     /**
-     * The runtime declaration, with the host's configured user model resolved in.
+     * The runtime declaration. It no longer resolves the host's user model in — the `users` resource
+     * carries that, and `OperationSubjectModel` reads it there.
      */
     public static function operation(): ParticleOperation
     {
@@ -77,7 +85,6 @@ class LogInAsUser
             resource: 'users',
             name: 'login-as',
             kind: OperationKind::Write,
-            model: BeamAccounts::userModel(),
             handle: self::handle(...),
             output: AuthUserData::class,
             // Declared, both of them, and only because `signed:` exists. See the class docblock: this

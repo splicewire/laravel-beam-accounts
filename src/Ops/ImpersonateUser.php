@@ -24,9 +24,13 @@ use Splicewire\Beam\Particle\ParticleOperation;
  *  - {@see UserPolicy::impersonate()} gates the SUBJECT — may THIS user be impersonated? Not
  *    yourself, and never another staff account.
  *
- * Imperative rather than `#[ParticleOp]` for the reason {@see LogInAsUser} documents at length: an
- * attribute cannot read config, and `model:` must be `BeamAccounts::userModel()` — `Models\User` is
- * pinned to the `central` connection and hosts routinely subclass it.
+ * Imperative rather than `#[ParticleOp]`, but no longer for the reason it used to give. `model:` is
+ * GONE (particle-operation-surface ticket 18): the subject model is now read off the op's RESOURCE
+ * — `users` backs {@see \Splicewire\Beam\Accounts\Particle\Backing\ConfiguredUserBacking}, which
+ * extends `EloquentBacking` on `BeamAccounts::userModel()`, so
+ * {@see \Splicewire\Beam\Particle\Subject\OperationSubjectModel} resolves exactly what the declared
+ * literal used to say, without saying it twice. What still keeps this imperative is `ability:`,
+ * which reads config, and the `$resource` parameter below.
  *
  * `$resource` is a parameter because hosts mount this on different keys: the package default is
  * `users`, audiostud has its own `operator-customers` admin resource and mounts it there. One
@@ -40,7 +44,6 @@ class ImpersonateUser
             resource: $resource,
             name: 'impersonate',
             kind: OperationKind::Write,
-            model: BeamAccounts::userModel(),
             handle: self::handle(...),
             ability: config('beam.accounts.impersonation.ability', 'entitlement:os.operate'),
             abilityModel: BeamAccounts::userModel(),

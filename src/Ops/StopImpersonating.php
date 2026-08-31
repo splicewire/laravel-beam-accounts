@@ -5,7 +5,6 @@ namespace Splicewire\Beam\Accounts\Ops;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Impersonation\Impersonation;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
@@ -41,7 +40,6 @@ class StopImpersonating
             resource: $resource,
             name: 'stop-impersonating',
             kind: OperationKind::Write,
-            model: BeamAccounts::userModel(),
             handle: self::handle(...),
             // DELIBERATELY UNGATED — see the class docblock. Do not put a token here.
             //

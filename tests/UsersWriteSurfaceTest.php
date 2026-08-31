@@ -7,6 +7,7 @@ use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Ops\LogInAsUser;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Particle\OperationKind;
+use Splicewire\Beam\Particle\Subject\OperationSubjectModel;
 
 beforeEach(function () {
     $this->policy = new UserPolicy;
@@ -53,17 +54,21 @@ it('gates login-as to root, so an ordinary user cannot assume an identity', func
 
 it('declares login-as as a write op on the users resource', function () {
     $op = LogInAsUser::operation();
+    $subjectModel = app(OperationSubjectModel::class);
 
     expect($op->resource)->toBe('users')
         ->and($op->name)->toBe('login-as')
         ->and($op->kind)->toBe(OperationKind::Write)
         // The point of the rewrite: the subject is resolved from `{id}` against a model, not from a
         // demo-subject string. That is what made it expressible as an op at all.
-        ->and($op->model)->toBe(BeamAccounts::userModel())
-        // NOT an attribute literal. `Models\User` is pinned to the `central` connection and hosts
-        // swap the model routinely, so a hardcoded class would resolve {id} against the wrong table
-        // — which is exactly how this first failed.
-        ->and($op->model)->not->toBe(Splicewire\Beam\Accounts\Models\User::class)
+        //
+        // Read through OperationSubjectModel rather than off `$op->model`, which this op no longer
+        // declares (particle-operation-surface 18). The fact that matters is unchanged and is now
+        // asserted where it actually lives: the `users` resource backs ConfiguredUserBacking, so the
+        // subject model follows `BeamAccounts::userModel()` — NOT a hardcoded `Models\User`, which is
+        // pinned to the `central` connection and is exactly how this first failed.
+        ->and($subjectModel->for($op))->toBe(BeamAccounts::userModel())
+        ->and($subjectModel->for($op))->not->toBe(Splicewire\Beam\Accounts\Models\User::class)
         // Both credentials are DECLARED (api-surface-coherence ticket 95). `ability:` states the
         // operator half; `signed:` states that a valid URL signature admits on its own, which is what
         // an anonymous signed-link holder holds and what `ability:` structurally cannot express. Before
