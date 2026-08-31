@@ -69,9 +69,11 @@ class InvitationData extends BeamData
         #[Description('When the invitation was sent, ISO-8601. Newest first is the default order.')]
         public ?string $createdAt,
         // Detail-only: an opaque actor id and a mtime are not list columns. Both are nullable
-        // because the two tables this shape serves disagree — beam-accounts' `invitations.invited_by`
-        // is nullable (an invite can predate the stamp), while beam-tenancy's `tenant_invitations`
-        // makes it NOT NULL. The wider type is the one that holds for both.
+        // because `beam_invitations.invited_by` is — an invite can predate the stamp. It was
+        // ALSO the wider of two disagreeing tables, back when `splicewire/laravel-beam-tenancy`
+        // forked a `tenant_invitations` that made the column NOT NULL; that fork is retired
+        // (`team_id` holds a `TeamContract` key now), so there is one table and the nullable
+        // reading is simply the true one rather than the accommodating one.
         #[NotInList]
         #[Description('Opaque id of the user who sent the invitation; null if it predates the stamp.')]
         public ?string $invitedBy = null,
