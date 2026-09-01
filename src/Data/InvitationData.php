@@ -11,6 +11,7 @@ use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
+use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
@@ -101,6 +102,20 @@ class InvitationData extends BeamData
     {
         $team = BeamAccounts::currentTeam();
         abort_if($team === null, 403, 'No active team to invite into.');
+
+        // ⚠️ `currentTeam()` is typed `?object`, not `?TeamContract`, because `beam.accounts.teams.resolver`
+        // is a host seam and nothing type-checks what a host binds to it — `splicewire/tower` binds
+        // `fn (): ?object => tenant()`. So the `memberRole()` call below is unchecked at the type level,
+        // and an ill-bound resolver would surface as a raw TypeError from inside a gate. Named as a 500
+        // instead: a misconfigured resolver is a misconfiguration, and it must not be mistaken for the
+        // 403 an ordinary member gets. Deliberately NOT a 403 — this estate's rule is that a check whose
+        // answer depends on the host is advisory, and the corollary here is that it must not be able to
+        // read as a legitimate denial.
+        abort_unless(
+            $team instanceof TeamContract,
+            500,
+            'config(beam.accounts.teams.resolver) returned a '.get_debug_type($team).', which does not implement TeamContract.'
+        );
 
         $teamKey = (string) $team->getKey();
 

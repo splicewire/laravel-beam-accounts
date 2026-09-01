@@ -31,9 +31,16 @@ trait WiresFrameResources
      *
      * **Always registers — there is no host off-switch, deliberately.**
      * {@see ParticleResourceRegistry} keys by resource key and the LAST registration wins, so a host
-     * that curates its own roster (e.g. splicewire-app, which registers tenant-scoped variants of
-     * tokens/invitations/members) overrides simply by registering after this package. App providers
-     * boot after auto-discovered package providers, so that is the default outcome, not a race.
+     * that genuinely needs a different DECLARATION overrides by registering after this package. App
+     * providers boot after auto-discovered package providers, so that is the default outcome, not a race.
+     *
+     * ⚠️ CORRECTED 2026-09-01 (particle-manifest-repatriation 06). This paragraph used to cite
+     * `~/Herd/splicewire-app` as the host "which registers tenant-scoped variants of
+     * tokens/invitations/members". It no longer does, and citing it as the healthy case was the
+     * mistake: all three keys carried a `superseded()` entry there, so which manifest a request saw
+     * was a fact about provider order. Every host fact those restatements carried had a seam —
+     * `beam.accounts.tokens.{model,scope}`, `beam.accounts.teams.resolver`, and the declaration's own
+     * `showable` — and re-registering is now the LAST resort here, not the documented route.
      *
      * A host that wants certainty lists the providers explicitly in `config/app.php` (preferred), or
      * defers its own registration to an `$app->booted()` callback — the latter only works while
@@ -88,10 +95,16 @@ trait WiresFrameResources
         // declaration type allowed a null there and beam's did not — the merge blocker ticket 11 §A10
         // named. With the model field gone there is nothing to null out.
         //
-        // ⚠️ `members` is registered by TWO packages: this one and tower. Both were raw definitions
-        // before, both are ParticleResources now, and the registry is still last-wins by key — so
-        // whichever provider boots later still wins. The merge did not create that collision and does
-        // not resolve it; it is recorded on the map for ticket 15.
+        // ✅ `members` used to be registered by TWO packages, this one and tower, with the registry
+        // last-wins by key — so whichever provider booted later won, at both `~/Herd/splicewire-app`
+        // and `~/Herd/tower`. It was the estate's only genuine package-vs-package resource contest.
+        // Resolved by particle-manifest-repatriation 06: tower's `MembershipResourceData` and
+        // `Frame\Sources\MembershipSource` are deleted and this is the sole `members` declaration.
+        //
+        // ⚠️ Which made `beam.accounts.teams.resolver` load-bearing at every tower host, because
+        // {@see MembershipSource} asks {@see \Splicewire\Beam\Accounts\Facades\BeamAccounts::currentTeam()}
+        // where tower's source called `tenant()` directly. Tower's own `TowerFrameResourceProvider`
+        // now defaults that key; without it a tower host's members list silently empties.
         $registry->register(new ParticleResource(
             key: 'members',
             backing: MembershipSource::class,
