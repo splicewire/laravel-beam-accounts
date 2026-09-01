@@ -95,8 +95,16 @@ class MembershipSource implements ResolvesRecord, StreamsRecords
         }
 
         // Which pivot column carries "joined" is the TEAM's fact, not this source's — see
-        // {@see HasMembers::memberJoinedColumn()}. Defaulted rather than required so a team that
-        // predates the seam (or satisfies `TeamContract` without the trait) keeps today's reading.
+        // {@see HasMembers::memberJoinedColumn()}. Defaulted rather than required because
+        // {@see \Splicewire\Beam\Accounts\Contracts\TeamContract} does not declare the method: an
+        // implementer that satisfies the contract without using `HasMembers` genuinely lacks it.
+        //
+        // ⚠️ Yes, this is a duck-typed `method_exists` probe, and the same change that added it DELETED
+        // one from `InvitationData::prepare()` on the argument that such probes lie. The two are not the
+        // same shape and the difference is the whole point: that one probed `teamRole`, which is TYPED
+        // `teamRole(Team $team)`, so the probe passed and the CALL was a TypeError. This one is nullary
+        // and untyped — it cannot pass and then fail. A `method_exists` on a no-argument accessor is a
+        // capability question; on a typed method it is a guess about the argument.
         $joinedColumn = method_exists($team, 'memberJoinedColumn')
             ? $team->memberJoinedColumn()
             : 'created_at';
