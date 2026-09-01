@@ -68,7 +68,7 @@ class PasskeyController extends Controller
         $options = $this->pullOptions($store, $input->handle, PublicKeyCredentialCreationOptions::class);
 
         if (! $options) {
-            return ResponseBody::from(['message' => 'This passkey challenge has expired. Please try again.'])->invalid();
+            return ResponseBody::from(['message' => 'This passkey challenge has expired. Please try again.'])->badRequest();
         }
 
         $passkey = $authenticator->register(
