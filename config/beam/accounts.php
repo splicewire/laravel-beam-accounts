@@ -33,6 +33,22 @@ return [
     // gate off, deleted its own `users` and `passkeys` creates, and nothing noticed until a fresh
     // install could not build a database at all.
     //
+    // THREE-STATE, and the third state is what makes the second auditable — the same shape
+    // `ParticleOperation`'s `ability:`/`input:` carry, for the same reason (an omission and a decision
+    // must not be spelled identically):
+    //
+    //   true       publish this estate's stubs onto this host's disk.
+    //   false      do not publish: every member is ALREADY COMMITTED here. A claim, and the audit
+    //              fails the host that gets it wrong.
+    //   'absent'   do not publish: this estate has NO PLACE at this host and never will. The audit
+    //              reads it as satisfied. `splicewire-app` is the live instance — it runs its own team
+    //              system over `tenant_users` and must never create `beam_teams`/`beam_memberships`.
+    //
+    // The third state is deliberately unreachable by omission: an unset key defaults to `true`, and
+    // `null` / `''` / a missing env var are falsy and therefore still the audited `false` claim. Only a
+    // host that types the word gets it. Absence is itself a claim, so it is still checked — see
+    // {@see \Splicewire\Beam\Accounts\BeamAccountsServiceProvider::estateDeclaredAbsent()}.
+    //
     //  - publish_auth_migrations — users/permission_tables/passkeys/PAT-create/PAT-provenance/the
     //    tenant identity estate.
     //  - publish_migrations — the teams/memberships/invitations/access-grants/

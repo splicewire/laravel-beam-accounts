@@ -139,3 +139,113 @@ it('reports the same closed keys the gate itself consulted', function () {
         ->and(BeamAccountsServiceProvider::closedGateKeysFor('migrations'))->toBe(['beam.accounts.register_migrations'])
         ->and(BeamAccountsServiceProvider::closedGateKeysFor('auth_migrations'))->toBe([]);
 });
+
+/**
+ * ## The third state
+ *
+ * `false` says "already committed here" and is a claim. `'absent'` says "this estate has no place
+ * here" and is a different claim. Before 2026-09-01 they were spelled the same, so `splicewire-app` —
+ * which must never create `beam_teams`/`beam_memberships`, and had said so in its own config docblock
+ * for months — failed its own build, with both printed remedies being things it must not do.
+ *
+ * The tests below are in two halves, and the second half is the load-bearing one: the third state must
+ * be UNREACHABLE BY OMISSION, or it is not a third state, it is a mute button on the audit.
+ */
+it('passes when an estate is declared absent and is absent, and says how it knows', function () {
+    config(['beam.accounts.publish_migrations' => 'absent']);
+
+    $findings = runAudit(seedCommitted([]));
+
+    expect(array_filter($findings, fn ($f) => $f->status !== DoctorStatus::Pass))->toBeEmpty()
+        ->and($findings[0]->detail)->toContain('deliberately absent')
+        ->and($findings[0]->detail)->toContain('0 of 8')
+        ->and($findings[0]->detail)->toContain('`beam.accounts.publish_migrations`');
+});
+
+/**
+ * `'absent'` is a truthy string, so a `(bool)` cast anywhere in the gate would silently RE-OPEN the
+ * publish it was written to close — the one bug that would make this state worse than not having it.
+ */
+it('closes the publish gate rather than re-opening it on the truthy string', function () {
+    config(['beam.accounts.publish_migrations' => 'absent']);
+
+    expect(BeamAccountsServiceProvider::publishesEstateNamed('migrations'))->toBeFalse()
+        ->and(BeamAccountsServiceProvider::estateDeclaredAbsent('migrations'))->toBeTrue()
+        ->and(BeamAccountsServiceProvider::closedGateKeysFor('migrations'))->toBe(['beam.accounts.publish_migrations']);
+});
+
+it('reads the third state through the deprecated register_* spelling too', function () {
+    config(['beam.accounts.register_migrations' => 'absent']);
+
+    expect(BeamAccountsServiceProvider::estateDeclaredAbsent('migrations'))->toBeTrue()
+        ->and(array_filter(runAudit(seedCommitted([])), fn ($f) => $f->status !== DoctorStatus::Pass))->toBeEmpty();
+});
+
+it('tolerates the casing and whitespace an env var arrives with', function () {
+    config(['beam.accounts.publish_migrations' => ' Absent ']);
+
+    expect(BeamAccountsServiceProvider::estateDeclaredAbsent('migrations'))->toBeTrue();
+});
+
+/**
+ * Absence is a claim too, so it is checked — but only to WARN. `laravel-beam-starter` owns its own
+ * bigint `create_users_table` / `create_permission_tables` / `create_passkeys_table`, whose stems
+ * collide exactly with three members of an auth estate it wants nothing to do with. A stem match
+ * cannot tell that from a leftover partial publish, and a check whose answer depends on the host must
+ * not throw.
+ */
+it('warns, never fails, when a host declaring an estate absent has member stems committed anyway', function () {
+    config(['beam.accounts.publish_auth_migrations' => 'absent']);
+
+    $findings = runAudit(seedCommitted(['shared/create_users_table', 'create_passkeys_table']));
+
+    expect(array_filter($findings, fn ($f) => $f->status === DoctorStatus::Fail))->toBeEmpty()
+        ->and($findings[0]->status)->toBe(DoctorStatus::Warn)
+        ->and($findings[0]->detail)->toContain('2 of 9')
+        ->and($findings[0]->detail)->toContain('create_users_table');
+});
+
+/**
+ * ⚠️ THE REGRESSION THAT MATTERS. Tower's `420f9e0` shape — gate off, files deleted — must still fail,
+ * and so must every route a host can reach WITHOUT typing the word: an unset env var (`null`), an empty
+ * one (`''`), and a plain `false`. If any of these excused the estate, the third state would have
+ * quietly retired the audit instead of completing it.
+ */
+it('still fails every spelling that is NOT the third state', function (mixed $value) {
+    config(['beam.accounts.publish_auth_migrations' => $value]);
+
+    $fails = array_values(array_filter(runAudit(seedCommitted([])), fn ($f) => $f->status === DoctorStatus::Fail));
+
+    expect(BeamAccountsServiceProvider::estateDeclaredAbsent('auth_migrations'))->toBeFalse()
+        ->and($fails)->toHaveCount(1)
+        ->and($fails[0]->detail)->toContain('9 of 9');
+})->with([
+    'the tower shape' => false,
+    'an unset env var' => null,
+    'an empty env var' => '',
+    'a string zero' => '0',
+]);
+
+/** A word that is not the word buys nothing — the third state is one spelling, not "anything truthy". */
+it('does not accept a near-miss word as the third state', function () {
+    config(['beam.accounts.publish_auth_migrations' => 'absent-ish']);
+
+    expect(BeamAccountsServiceProvider::estateDeclaredAbsent('auth_migrations'))->toBeFalse()
+        // Truthy and not the word: the gate is OPEN, so this host publishes and is not audited at all.
+        ->and(BeamAccountsServiceProvider::publishesEstateNamed('auth_migrations'))->toBeTrue();
+});
+
+/** The two estates are independently gated, and the third state must not leak across them. */
+it('excuses only the estate that declared itself absent', function () {
+    config([
+        'beam.accounts.publish_migrations' => 'absent',
+        'beam.accounts.publish_auth_migrations' => false, // the tower shape, alongside it
+    ]);
+
+    $findings = runAudit(seedCommitted([]));
+    $fails = array_values(array_filter($findings, fn ($f) => $f->status === DoctorStatus::Fail));
+
+    expect($fails)->toHaveCount(1)
+        ->and($fails[0]->detail)->toContain('publish_auth_migrations')
+        ->and($fails[0]->detail)->not->toContain('deliberately absent');
+});

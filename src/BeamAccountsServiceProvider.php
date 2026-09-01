@@ -80,6 +80,12 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
     use WiresSeed;
     use WiresTeamsMigrations;
 
+    /**
+     * The third value a publish gate can take, alongside `true` and `false`.
+     * {@see self::estateDeclaredAbsent()} for what it means and why it is a string.
+     */
+    public const ESTATE_ABSENT = 'absent';
+
     public function configurePackage(Package $package): void
     {
         // Publish-only .stub migrations (NOT ->discoversMigrations(), which loads at runtime).
@@ -214,12 +220,77 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         $closed = [];
 
         foreach (["publish_{$estate}", "register_{$estate}"] as $suffix) {
-            if (! (bool) config("beam.accounts.{$suffix}", true)) {
+            $value = config("beam.accounts.{$suffix}", true);
+
+            // `'absent'` is truthy as a string, so it has to be tested BEFORE the bool cast or the
+            // third state would silently re-open the publish gate — the one bug that would make this
+            // whole state worse than not having it.
+            if (self::readsAbsent($value) || ! (bool) $value) {
                 $closed[] = "beam.accounts.{$suffix}";
             }
         }
 
         return $closed;
+    }
+
+    /**
+     * The THIRD state: *"this estate is deliberately not present at this host, and never will be."*
+     *
+     * ## Why a third state exists at all
+     *
+     * The gate was two-state, and both readings assert the tables will exist: `true` = "publish them
+     * onto my disk", `false` = "they are already committed on my disk". {@see
+     * \Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit} checks the second, which is the whole
+     * point of it — but there is a real host it has no vocabulary for. `splicewire-app` runs its own
+     * team system over `tenant_users` (approach B: no table unification, no data migration) and the
+     * engine's `beam_teams`/`beam_memberships` **must never be created there**. It has said so in its
+     * own config docblock since before this audit existed, and the audit read that decision as the
+     * tower outage and told it to do one of two things it must not do.
+     *
+     * So the estate's own idiom applies — an omission and a decision must not be spelled identically
+     * ({@see \Splicewire\Beam\Particle\ParticleOperation}'s `ability:`/`input:`/`abilityModel:`, all
+     * three-state for exactly this reason). One slot, three values:
+     *
+     *   - **`true`** (default) — publish this estate's stubs onto the host's disk;
+     *   - **`false`** — do not publish, because every member is ALREADY COMMITTED here. A claim, and
+     *     the audit fails the host that gets it wrong;
+     *   - **`'absent'`** — do not publish, because this estate has no place at this host. The audit
+     *     reads it as satisfied.
+     *
+     * ## Why a string, and why this string
+     *
+     * The third state must be **unreachable by omission**, because "deliberately absent" and "nobody
+     * has looked yet" meaning the same thing is precisely the defect being fixed. Every accidental
+     * route lands somewhere else:
+     *
+     *   - key not set at all → `config(…, true)` → publishes (unchanged);
+     *   - `null`, `''`, `'0'`, a missing `.env` var → falsy → the AUDITED `false` claim, unchanged, so
+     *     a typo still fails loudly rather than muting the check;
+     *   - a pre-rename host carrying `register_* => false` → still the audited claim, unchanged.
+     *
+     * Only a host that typed the word gets the third state. Matched case-insensitively and trimmed
+     * because it also arrives through `env('ACCOUNT_PUBLISH_MIGRATIONS')`, where the value is whatever
+     * a human put after the `=`.
+     *
+     * ⚠️ And absence is a claim too, so it is also checked — weakly, and deliberately so: the audit
+     * WARNS (never fails) when a host declaring an estate absent has members of it committed anyway,
+     * because a stem collision there is a fact about the host, not about the declaration. See the
+     * audit's docblock.
+     */
+    public static function estateDeclaredAbsent(string $estate): bool
+    {
+        foreach (["publish_{$estate}", "register_{$estate}"] as $suffix) {
+            if (self::readsAbsent(config("beam.accounts.{$suffix}", true))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected static function readsAbsent(mixed $value): bool
+    {
+        return is_string($value) && strtolower(trim($value)) === self::ESTATE_ABSENT;
     }
 
     /**
