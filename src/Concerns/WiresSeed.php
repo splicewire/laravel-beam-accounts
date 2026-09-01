@@ -42,6 +42,24 @@ trait WiresSeed
         // and write it back so the manifest gate reads a concrete boolean.
         $flag = config('beam.accounts.demo.seed_users');
         $enabled = $flag !== null ? (bool) $flag : ! $this->app->environment('production');
+
+        // AND the demo gate with the TEAMS ESTATE gate. This seeder writes into `beam_teams` /
+        // `beam_memberships`, which exist only where the `migrations` estate published — and a host
+        // that runs its own team system turns that estate OFF precisely so those tables are never
+        // created on its disk (the flagship's `config/beam/accounts.php` says so in terms:
+        // "the engine's teams/memberships tables must never be created here").
+        //
+        // Gating on the demo key alone made those two facts contradict: the demo gate is on
+        // everywhere but production, so at such a host the seeder RAN and died on
+        // `relation "beam_teams" does not exist` — measured at ~/Herd/splicewire-app, where
+        // `splicewire:beam:seed` reported 3 seeded / 1 FAILED. The schema was not missing; the
+        // seeder was asking for an estate the host had deliberately declined.
+        //
+        // Read through publishesEstateNamed() rather than the raw key: the gate is the AND of the
+        // modern `publish_*` and legacy `register_*` spellings, and naming only one sends a reader
+        // to a key that is `true` at their host (the mistake beam-facade 155 spent a section on).
+        $enabled = $enabled && BeamAccountsServiceProvider::publishesEstateNamed('migrations');
+
         config(['beam.accounts.demo.seed_users' => $enabled]);
 
         $this->app->make(BeamSeedManifest::class)->register(
