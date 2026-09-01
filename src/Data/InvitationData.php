@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Data;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -47,6 +48,14 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     editData: CreateInvitationData::class,
     filterable: false,
     editable: false,
+    // No per-record detail — an invitation is listed, re-sent or revoked, never opened. The two
+    // `#[NotInList]` props below are a detail SHAPE nothing serves: `invitedBy` is an opaque actor id and
+    // `updatedAt` a mtime, and with `editable: false` there is no edit surface to feed either.
+    // ⚠️ `showable` defaults TRUE (readable ⇒ showable), so leaving it off is a promise made by not
+    // opting out — the same class of accident as `filterable`. `~/Herd/splicewire-app` closed it in the
+    // inline manifest that particle-manifest-repatriation 06 retired; this is that host fact descending,
+    // and it keeps `records/{id}` a 405 rather than turning it into a 200 on the way through.
+    showable: false,
 )]
 #[TypeScript]
 class InvitationData extends BeamData
@@ -93,15 +102,23 @@ class InvitationData extends BeamData
         $team = BeamAccounts::currentTeam();
         abort_if($team === null, 403, 'No active team to invite into.');
 
-        $teamKey = $team->getKey();
+        $teamKey = (string) $team->getKey();
 
-        // Owner/admin only — reproduces the bespoke owner/admin check.
-        $pivotRole = method_exists($actor, 'teamRole')
-            ? $actor->teamRole($team)
-            : optional($team->memberships()->where('user_id', $actor?->getKey())->first())->role;
+        // Owner/admin only — asked through the TEAM CONTRACT, which every team notion in the estate
+        // satisfies: beam's own `Team` implements `memberRole()` directly, and a host whose team lives on
+        // a foreign pivot gets it from {@see \Splicewire\Beam\Accounts\Concerns\HasMembers}.
+        //
+        // ⚠️ This used to be `method_exists($actor, 'teamRole') ? $actor->teamRole($team) : …` and it
+        // could not have worked off beam's own schema. `BelongsToTeams::teamRole()` is TYPED
+        // `teamRole(Team $team)`, so at a host whose team is not beam's `Team` the `method_exists` probe
+        // passes and the call is a TypeError; the fallback arm then reached `$team->memberships()`, a
+        // relation only beam's `Team` has. Both arms named beam's own schema while the guard pretended
+        // to be neutral — measured 2026-09-01 against `~/Herd/splicewire-app`, whose team is a
+        // string-keyed `Tenant` over `tenant_users`. The contract method is the neutral question.
+        $role = $actor instanceof Authenticatable ? $team->memberRole($actor) : null;
 
         abort_unless(
-            in_array($pivotRole, [Role::Owner->value, Role::Admin->value], true),
+            in_array($role, [Role::Owner, Role::Admin], true),
             403,
             'Only owners and admins can manage invitations.'
         );
@@ -118,7 +135,11 @@ class InvitationData extends BeamData
 
         $invitation->team_id = $teamKey;
         $invitation->email = $input->email;
-        $invitation->token = (string) Str::uuid();
+        // A 64-character `Str::random`, not a uuid. The estate's redemption route takes the token as a
+        // PATH SEGMENT (`POST invitations/{token}/accept`, {@see \Splicewire\Tower\Tenancy\Invitations\AcceptTenantInvitation}),
+        // so it is a bearer secret standing alone in a URL — a v4 uuid carries 122 bits and advertises
+        // its own shape. Every host minting one already used this; the DTO was the outlier.
+        $invitation->token = Str::random(64);
         $invitation->invited_by = $actor?->getKey();
         $invitation->accepted_at = null;
     }
@@ -129,8 +150,14 @@ class InvitationData extends BeamData
      */
     public static function scope(Builder $query): Builder
     {
+        $team = BeamAccounts::currentTeam();
+
         return $query
-            ->where('team_id', BeamAccounts::currentTeam()?->getKey())
+            // `(string)` deliberately, and only when there IS a team: `beam_invitations.team_id` holds a
+            // `TeamContract` key (declared `int|string`) and the model casts the column to string, so
+            // both sides are normalised at the comparison. A null team must stay null — casting it would
+            // ask for `team_id = ''` and match nothing by accident rather than by construction.
+            ->where('team_id', $team === null ? null : (string) $team->getKey())
             ->whereNull('accepted_at');
     }
 

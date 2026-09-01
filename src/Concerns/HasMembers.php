@@ -57,6 +57,28 @@ trait HasMembers
     }
 
     /**
+     * The pivot column holding the moment a seat became active — what the `members` list renders as
+     * "Joined". PUBLIC, unlike its siblings above, because the reader is
+     * {@see \Splicewire\Beam\Accounts\Frame\Sources\MembershipSource} rather than this trait: the
+     * source projects the pivot row and has to ask the team which column carries that fact.
+     *
+     * Default `created_at`, the pivot's own row age — correct for a host that simply attaches a seat.
+     * A host with an invite lifecycle names the column its acceptance stamps: `~/Herd/splicewire-app`'s
+     * `Tenant` returns `accepted_at`.
+     *
+     * ⚠️ Getting this wrong is SILENT. A `belongsToMany` only materialises the pivot columns its
+     * `withPivot()` names, so an absent column reads as `null` rather than as an error — and `joinedAt`
+     * simply renders empty. Measured 2026-09-01: `Tenant::users()` declares
+     * `withPivot('role', 'invited_at', 'accepted_at', 'removed_at')` and no `created_at`, so the
+     * hardcoded `created_at` this seam replaces would have blanked the Joined column at the flagship the
+     * moment tower's own membership source was retired.
+     */
+    public function memberJoinedColumn(): string
+    {
+        return 'created_at';
+    }
+
+    /**
      * The host's belongsToMany relation to member users, resolved through
      * {@see membersRelation()}.
      */

@@ -94,13 +94,20 @@ class MembershipSource implements ResolvesRecord, StreamsRecords
             $members = $members->get();
         }
 
+        // Which pivot column carries "joined" is the TEAM's fact, not this source's — see
+        // {@see HasMembers::memberJoinedColumn()}. Defaulted rather than required so a team that
+        // predates the seam (or satisfies `TeamContract` without the trait) keeps today's reading.
+        $joinedColumn = method_exists($team, 'memberJoinedColumn')
+            ? $team->memberJoinedColumn()
+            : 'created_at';
+
         return $members
             ->map(fn (Model $user) => new MembershipData(
                 id: (string) $user->getKey(),
                 name: $user->name,
                 email: $user->email,
                 role: $user->pivot->role,
-                joinedAt: $this->pivotTimestamp($user->pivot->created_at ?? null),
+                joinedAt: $this->pivotTimestamp($user->pivot->{$joinedColumn} ?? null),
             ))
             ->values();
     }

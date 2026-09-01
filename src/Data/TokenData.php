@@ -10,7 +10,7 @@ use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
-use Splicewire\Beam\Accounts\Models\PersonalAccessToken;
+use Splicewire\Beam\Accounts\Particle\Backing\ConfiguredTokenBacking;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
@@ -34,31 +34,48 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * token owner resolves differently binds `beam.accounts.tokens.scope` (an
  * `(Builder, ?Authenticatable): Builder` callable) and the model via `beam.accounts.tokens.model`.
  *
- * NOTE the `model:` attribute is the package default {@see PersonalAccessToken};
- * a host binding a bespoke PAT model subclasses this DTO and re-declares the attribute (attributes
- * cannot read config). The runtime scope IS config-resolved, so a subclass only overrides the model.
+ * The MODEL follows configuration too, and it did not always: `backing:` names
+ * {@see ConfiguredTokenBacking}, a `ResourceBacking` that resolves `beam.accounts.tokens.model` at
+ * REQUEST time. This paragraph used to instruct a host with a bespoke PAT model to *subclass this DTO
+ * and re-declare the attribute* — measured 2026-09-01, no host in the estate did that, and the one host
+ * with a bespoke PAT (`~/Herd/splicewire-app`, tower's uuid-keyed central model) restated the entire
+ * manifest imperatively instead. A resource that can only be host-fitted by being re-declared will be
+ * re-declared, and a restated manifest is what drifts.
  *
- * ⚠️ That subclass only takes effect if the host registers it from its OWN provider's `boot()`, which
- * runs after beam's. Listing it in `beam.core.resources.classes` does NOT work: that list is registered
- * FIRST by `Splicewire\Beam\BeamServiceProvider::discoverResources()`, and beam's own attributed classes
- * are registered after it and displace it under `OnDuplicate::Supersede`. Measured 2026-08-28 on the
+ * ⚠️ A host that still wants a whole different DECLARATION (not just a different model or scope) must
+ * register it from its OWN provider's `boot()`. Listing a replacement class in
+ * `beam.core.resources.classes` does NOT work: that list is registered FIRST by
+ * `Splicewire\Beam\BeamServiceProvider::discoverResources()`, and beam's own attributed classes are
+ * registered after it and displace it under `OnDuplicate::Supersede`. Measured 2026-08-28 on the
  * `users` resource at `~/Herd/splicewire`, whose listed override is displaced;
  * {@see \Splicewire\Beam\Accounts\Data\UserData} carries that measurement.
  *
- * The working route has a live witness on THIS resource: `~/Herd/splicewire-app` re-registers `tokens`
- * imperatively from `App\Providers\ParticleServiceProvider`, and on the same date it resolves to that
- * host's `TokenResourceData` with this DTO sitting in `superseded('tokens')`. Provider `boot()` wins;
- * the config list does not.
+ * ✅ This DTO is now the sole `tokens` declaration in the estate (particle-manifest-repatriation 06).
+ * `splicewire/tower`'s `Data\Frame\TokenResourceData` — the ancestor this class was promoted from — is
+ * deleted, and `~/Herd/splicewire-app`'s inline re-registration is retired onto
+ * `beam.accounts.tokens.{model,scope}` plus a `frame.realm_resource_overrides` presentation overlay.
+ * `superseded('tokens')` is empty at both hosts. The tower fossil was worth deleting on its own
+ * account: it declared no `scope()` convention method at all, so had tower ever scanned
+ * `src/Data/Frame` the winning `tokens` resource would have carried **no row-level boundary** on a
+ * table shared by every user.
  */
 #[ParticleResource(
     key: 'tokens',
-    backing: PersonalAccessToken::class,
+    backing: ConfiguredTokenBacking::class,
     label: 'API tokens',
     group: 'Settings',
     icon: 'key',
     form: 'bare',
     readOnly: true,
     deletable: true,
+    // No per-record detail. Every field this DTO carries is already a list column except `id`, which is
+    // the revoke handle rather than a fact worth reading, so `records/{id}` would answer a copy of the
+    // row the caller already has — on a table shared by every user in the estate. Closing it is the
+    // conservative direction: a host that wants the detail widens by re-declaring; a host that does not
+    // cannot un-mount one. (Measured 2026-09-01: `~/Herd/splicewire-app` had already closed it, in the
+    // inline manifest that particle-manifest-repatriation 06 retired, so this is the host fact
+    // descending rather than a new opinion.)
+    showable: false,
 )]
 #[TypeScript]
 class TokenData extends BeamData
