@@ -166,7 +166,7 @@ class PermissionModelPairingAudit implements DoctorAudit
         $file = $this->publishedMigration();
 
         if ($file === null) {
-            return [Finding::pass(self::CHECK, sprintf(
+            return [Finding::inconclusive(self::CHECK, sprintf(
                 'No `create_permission_tables` is published under %s, so this host does not own the '
                 .'permission schema and there is no pairing here to check. Note this is a real blind '
                 .'spot rather than a clean bill: a `roles` table created by a package-loaded migration '
