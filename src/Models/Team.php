@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Models;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -61,6 +62,28 @@ class Team extends Model implements TeamContract
             ->generateSlugsFrom(fn (self $team): string => $team->slugSource())
             ->saveSlugsTo('slug')
             ->doNotGenerateSlugsOnUpdate();
+    }
+
+    /**
+     * The slug is written on INSERT, not on the `creating` event alone.
+     *
+     * `HasSlug`'s only writer is a `static::creating` listener, and Laravel's skeleton `DatabaseSeeder`
+     * mutes every model event for the whole seed run (`WithoutModelEvents`) — so `migrate:fresh --seed`
+     * at any host provisioning a team died on `beam_teams.slug` NOT NULL, through `TeamProvisioner` and
+     * `DemoTeamSeeder` alike (theme-entries-and-authoring 02; measured at `~/Herd/numero` and
+     * `laravel-beam-starter`). A row of this shape must be complete whether or not a dispatcher is
+     * listening: the slug belongs to the declared shape, not to the event. Every writer passes through
+     * here, which is why the guard lives on the model and not in each caller (the per-caller placement
+     * is what produced the defect). The listener stays — with events on it runs first and this is a
+     * no-op; with events off this is the only writer.
+     */
+    protected function performInsert(Builder $query): bool
+    {
+        if (blank($this->getAttribute('slug'))) {
+            $this->generateSlugOnCreate();
+        }
+
+        return parent::performInsert($query);
     }
 
     /**
