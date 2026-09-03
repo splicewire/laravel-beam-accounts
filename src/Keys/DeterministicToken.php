@@ -23,14 +23,23 @@ use Illuminate\Support\Facades\DB;
 class DeterministicToken
 {
     /**
-     * @param  int|string  $id  The token primary key. An int for Sanctum's default bigint
-     *                          column; a string when the host keys personal_access_tokens
-     *                          by UUID (or any other string PK). Folded verbatim into the
-     *                          stored row and the `{id}|{plaintext}` bearer.
+     * @param  string  $id  The token primary key — a string (UUID) primary key. Every
+     *                      splicewire-operated host keys `personal_access_tokens` by uuid, so the
+     *                      `int|string` widening that carried Sanctum's default bigint column is
+     *                      gone (seed-provisioning-cleanup 01). Folded verbatim into the stored row
+     *                      and the `{id}|{plaintext}` bearer.
+     *
+     *                      ⚠️ This is a NARROWING, not a break, and the reason is worth knowing:
+     *                      nothing in this package or its callers declares `strict_types`, so an
+     *                      int a caller still passes (`~/Herd/numero`'s `SplicewireEngineKeySeeder`
+     *                      const, `laravel-satellite`'s `MintEngineKeyCommand` default) coerces to
+     *                      the identical numeric string and mints the identical bearer. Adding
+     *                      `declare(strict_types=1)` to any of those files would turn that into a
+     *                      TypeError — which is one more reason this estate's house style omits it.
      * @param  list<string>  $abilities
      */
     public function __construct(
-        public int|string $id,
+        public string $id,
         public string $plaintext,
         public string $tokenableType,
         public int|string $tokenableId,

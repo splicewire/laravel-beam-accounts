@@ -13,10 +13,11 @@ use Splicewire\Beam\Accounts\Keys\DeterministicToken;
  * each mint the credential they share with no handshake and no central store.
  */
 beforeEach(function () {
-    // Sanctum's table shape — the minter writes to it via the query builder, never a
-    // Sanctum class, so beam-accounts keeps Sanctum an opt-in dependency.
+    // Sanctum's table shape, keyed the way every splicewire-operated host keys it — by uuid.
+    // The minter writes through the query builder, never a Sanctum class, so beam-accounts keeps
+    // Sanctum an opt-in dependency and the shipped .stub stays the shipped .stub.
     Schema::create('personal_access_tokens', function (Blueprint $table) {
-        $table->id();
+        $table->uuid('id')->primary();
         $table->string('tokenable_type');
         $table->string('tokenable_id');
         $table->string('name');
@@ -29,19 +30,19 @@ beforeEach(function () {
 });
 
 /**
- * Re-key the table by uuid. Sanctum's shipped migration is bigint-keyed, but every
- * splicewire-operated host keys `personal_access_tokens` by uuid, and a Sanctum bearer IS
- * `{id}|{plaintext}` — `PersonalAccessToken::findToken()` splits on the pipe and looks the row
- * up BY PRIMARY KEY. So the id is a wire-format field, not merely a storage detail: if the
- * minter coerces it, the bearer it hands back cannot find its own row. Built here rather than
- * by mutating the package's .stub so the shipped default stays the shipped default.
+ * Re-key the table the way Sanctum's own shipped migration does — bigint. Not a supported
+ * splicewire configuration (seed-provisioning-cleanup 01 dropped the `int|string` widening that
+ * served it), but two live callers still pass an int constant: `~/Herd/numero`'s
+ * `SplicewireEngineKeySeeder::TOKEN_ID` and `laravel-satellite`'s `MintEngineKeyCommand` default.
+ * Neither file declares `strict_types`, so PHP coerces the int to the identical numeric string and
+ * the identical bearer — this fixture is what proves that, rather than leaving it argued.
  */
-function useUuidKeyedTokensTable(): void
+function useBigintKeyedTokensTable(): void
 {
     Schema::dropIfExists('personal_access_tokens');
 
     Schema::create('personal_access_tokens', function (Blueprint $table) {
-        $table->uuid('id')->primary();
+        $table->id();
         $table->string('tokenable_type');
         $table->string('tokenable_id');
         $table->string('name');
@@ -53,10 +54,16 @@ function useUuidKeyedTokensTable(): void
     });
 }
 
+/**
+ * The pinned satellite token id. A uuid5 in production (`SecondPartyTenantSeeder::tokenUuid()`);
+ * a fixed literal here, because the whole point of the primitive is that the id is an INPUT.
+ */
+const PINNED_TOKEN_ID = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+
 function makeToken(array $overrides = []): DeterministicToken
 {
     return new DeterministicToken(
-        id: $overrides['id'] ?? 990003,
+        id: $overrides['id'] ?? PINNED_TOKEN_ID,
         plaintext: $overrides['plaintext'] ?? 'numeroSatelliteServiceToken00000000000v1',
         tokenableType: $overrides['tokenableType'] ?? 'user',
         tokenableId: $overrides['tokenableId'] ?? 'owner-uuid',
@@ -64,9 +71,19 @@ function makeToken(array $overrides = []): DeterministicToken
     );
 }
 
+it('declares a string (uuid) primary key, with no int widening left', function () {
+    // The narrowing IS the deliverable (seed-provisioning-cleanup 01), and it is invisible to every
+    // behavioural test in this file: `int|string` and `string` accept the same inputs in coercive
+    // mode, so only the declaration itself can witness it.
+    $id = (new ReflectionClass(DeterministicToken::class))->getConstructor()->getParameters()[0];
+
+    expect($id->getName())->toBe('id')
+        ->and((string) $id->getType())->toBe('string');
+});
+
 it('derives the bearer as a pure function of id and plaintext', function () {
     // Same inputs → same bearer, computed with no DB, no randomness. This IS the shared credential.
-    expect(makeToken()->bearer())->toBe('990003|numeroSatelliteServiceToken00000000000v1')
+    expect(makeToken()->bearer())->toBe(PINNED_TOKEN_ID.'|numeroSatelliteServiceToken00000000000v1')
         ->and(makeToken()->bearer())->toBe(makeToken()->bearer());
 
     // The stored hash is likewise a pure function of the plaintext.
@@ -76,9 +93,9 @@ it('derives the bearer as a pure function of id and plaintext', function () {
 it('mints one reset-surviving row and returns the bearer', function () {
     $bearer = makeToken()->mint();
 
-    expect($bearer)->toBe('990003|numeroSatelliteServiceToken00000000000v1');
+    expect($bearer)->toBe(PINNED_TOKEN_ID.'|numeroSatelliteServiceToken00000000000v1');
 
-    $row = DB::table('personal_access_tokens')->where('id', 990003)->first();
+    $row = DB::table('personal_access_tokens')->where('id', PINNED_TOKEN_ID)->first();
     expect($row->tokenable_type)->toBe('user')
         ->and($row->tokenable_id)->toBe('owner-uuid')
         ->and($row->name)->toBe('numero-satellite')
@@ -91,17 +108,8 @@ it('is idempotent — re-minting never duplicates and never changes the credenti
     $second = makeToken()->mint();
 
     expect($second)->toBe($first)
-        ->and(DB::table('personal_access_tokens')->where('id', 990003)->count())->toBe(1)
+        ->and(DB::table('personal_access_tokens')->where('id', PINNED_TOKEN_ID)->count())->toBe(1)
         ->and(DB::table('personal_access_tokens')->count())->toBe(1);
-});
-
-it('accepts a string (uuid) id — folded verbatim into the bearer', function () {
-    // Hosts that key personal_access_tokens by UUID (not Sanctum's default bigint) pass a
-    // string id; it composes the bearer exactly like an int, no coercion.
-    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
-
-    expect(makeToken(['id' => $uuid])->bearer())
-        ->toBe($uuid.'|numeroSatelliteServiceToken00000000000v1');
 });
 
 it('mints against a uuid-keyed table storing the pinned uuid verbatim as the row id', function () {
@@ -109,9 +117,7 @@ it('mints against a uuid-keyed table storing the pinned uuid verbatim as the row
     // coerces the key. `mint()` writes through the query builder, so Eloquent's
     // `HasUniqueIds::setUniqueIds()` — which only generates `if (empty($this->{$column}))` —
     // never even runs; the pinned value is the only candidate the insert ever sees.
-    useUuidKeyedTokensTable();
-
-    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+    $uuid = PINNED_TOKEN_ID;
 
     makeToken(['id' => $uuid])->mint();
 
@@ -124,9 +130,7 @@ it('mints against a uuid-keyed table storing the pinned uuid verbatim as the row
 });
 
 it('returns a bearer whose id half is the pinned uuid, so it can find its own row', function () {
-    useUuidKeyedTokensTable();
-
-    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+    $uuid = PINNED_TOKEN_ID;
 
     $bearer = makeToken(['id' => $uuid])->mint();
 
@@ -142,9 +146,7 @@ it('returns a bearer whose id half is the pinned uuid, so it can find its own ro
 });
 
 it('is idempotent on a uuid-keyed table — one row, same bearer', function () {
-    useUuidKeyedTokensTable();
-
-    $uuid = '2b1e7c9a-3f4d-5a6b-8c7d-9e0f1a2b3c4d';
+    $uuid = PINNED_TOKEN_ID;
 
     $first = makeToken(['id' => $uuid])->mint();
     $second = makeToken(['id' => $uuid])->mint();
@@ -154,10 +156,14 @@ it('is idempotent on a uuid-keyed table — one row, same bearer', function () {
         ->and(DB::table('personal_access_tokens')->where('id', $uuid)->count())->toBe(1);
 });
 
-it('still mints on the bigint default when the pinned id arrives as a numeric string', function () {
-    // The callers dropped their `(int)` casts so a uuid survives. This proves that removal is
-    // non-lossy for the bigint hosts: a console argument is always a string, and '990003'
-    // must still land on, and find, the same row as the int 990003.
+it('coerces a live int caller onto the bigint default it still uses', function () {
+    // NOT a supported configuration — `string` is the declared type now. It is asserted because two
+    // live callers pass an int constant (`~/Herd/numero`'s `SplicewireEngineKeySeeder::TOKEN_ID`,
+    // `laravel-satellite`'s `MintEngineKeyCommand` default) and neither file declares
+    // `strict_types`, so PHP coerces. The narrowing is therefore a narrowing and not an outage —
+    // and adding `declare(strict_types=1)` to either file would make it one.
+    useBigintKeyedTokensTable();
+
     $bearer = makeToken(['id' => '990003'])->mint();
 
     expect($bearer)->toBe('990003|numeroSatelliteServiceToken00000000000v1');
