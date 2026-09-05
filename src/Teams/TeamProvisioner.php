@@ -18,13 +18,27 @@ class TeamProvisioner
 {
     public function __construct(private RealmReachGrant $reach) {}
 
+    /**
+     * `updateOrCreate` keyed on the user's own personal team, so a re-seed re-uses it instead of
+     * minting a second one. It was a plain `Team::create()` until 2026-09-05, and `DemoTeamSeeder`
+     * — whose docblock claims idempotence — calls this: three install runs at `~/Herd/beam` left
+     * three personal teams for one user, with live memberships and team-scoped role rows pointing
+     * at the orphans and `current_team_id` repointed to the newest.
+     * `tests/DemoSeedIdempotenceTest.php` runs the seeder TWICE; a single run passes either way,
+     * which is why a one-run test would have certified the defect.
+     *
+     * Two things this does NOT do. It does not clean up duplicates a host already minted — the
+     * `firstOrNew` behind `updateOrCreate` binds to whichever row comes back first and leaves the
+     * rest permanently orphaned, so an existing host needs a one-off data repair as well. And it
+     * rewrites `name` on every call, so a user-renamed personal team reverts to the default on a
+     * re-provision; latent today (nothing renames a personal team) and inherited from the sibling.
+     */
     public function personalTeamFor(Authenticatable $user, ?string $name = null): Team
     {
-        $team = Team::create([
-            'user_id' => $user->getKey(),
-            'name' => $name ?? $this->personalTeamName($user),
-            'personal_team' => true,
-        ]);
+        $team = Team::updateOrCreate(
+            ['user_id' => $user->getKey(), 'personal_team' => true],
+            ['name' => $name ?? $this->personalTeamName($user)],
+        );
 
         $this->addMember($user, $team, Role::Owner);
         $user->forceFill(['current_team_id' => $team->getKey()])->save();
@@ -35,9 +49,12 @@ class TeamProvisioner
     /**
      * `$user` becomes Owner of their own personal Team holding `manage` on every provisioned realm's
      * root ({@see RealmReachGrant}) — the grant-cascade equivalent of a blanket `is_staff` grant
-     * (theme-entries-and-authoring). `updateOrCreate` on the user's own personal team (not
-     * {@see personalTeamFor()}'s plain `create`) so this is idempotent — safe to call from a factory
-     * state or a reseed without minting a second orphaned team.
+     * (theme-entries-and-authoring). `updateOrCreate` on the user's own personal team so this is
+     * idempotent — safe to call from a factory state or a reseed without minting a second orphaned
+     * team. {@see personalTeamFor()} carried a plain `create` until 2026-09-05 and now writes the
+     * same row the same way; the two still differ in that this one PRESERVES an existing
+     * `current_team_id` rather than repointing it (a user who has switched teams stays where they
+     * were), and grants the realm reach above — which is the whole reason it exists.
      */
     public function personalTeamWithFullReachFor(Authenticatable $user, ?string $name = null): Team
     {
