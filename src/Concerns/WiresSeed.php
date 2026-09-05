@@ -5,6 +5,7 @@ namespace Splicewire\Beam\Accounts\Concerns;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
+use Splicewire\Beam\Accounts\Database\Seeders\RolePermissionsSeeder;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Seed\BeamSeedManifest;
 
@@ -68,5 +69,24 @@ trait WiresSeed
             order: 10,
             configGate: 'beam.accounts.demo.seed_users',
         );
+
+        // The role-permission backfill — a SECOND step from this package, and therefore a second
+        // manifest key: the registry is keyed by coordinate and `OnDuplicate::Supersede`, so
+        // re-using the package name would silently replace the demo step with this one. The key is
+        // a relative-URI coordinate under the package's own name, which is what `RelativeUriKey`
+        // already accepts for the slash in a composer name.
+        //
+        // UNGATED, unlike the demo step, and ordered ahead of it: it fabricates no subjects, it
+        // re-derives authorization for roles the host already has, so a production seed wants it —
+        // and it must not be the thing that repairs a host only when demo mode is on. It is
+        // nonetheless AND-ed with the same teams-estate fact, since it reads the `roles` table this
+        // package publishes; a host that declined that estate has no rows for it to touch.
+        if (BeamAccountsServiceProvider::publishesEstateNamed('migrations')) {
+            $this->app->make(BeamSeedManifest::class)->register(
+                package: 'splicewire/laravel-beam-accounts/role-permissions',
+                seederClass: RolePermissionsSeeder::class,
+                order: 5,
+            );
+        }
     }
 }

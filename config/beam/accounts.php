@@ -1,5 +1,7 @@
 <?php
 
+use Splicewire\Beam\Accounts\Authorization\RolePermissions;
+
 return [
     // The session guard the account surface runs on. Satellites are session/cookie
     // consumer apps — the token 'api' guard is a separate, opt-in door (issue 07).
@@ -294,6 +296,25 @@ return [
     // callable returning the scope object whose `getKey()` is the invitations/memberships `team_id`.
     'teams' => [
         'resolver' => null,
+    ],
+
+    // What each team role may DO to a cascade-policed model — the permission rows
+    // `Authorization\RolePermissions` writes and attaches whenever a team-scoped spatie role is
+    // created ({@see \Splicewire\Beam\Accounts\Teams\TeamProvisioner::syncSpatieRole()}).
+    //
+    // ⚠️ Without these, a beam host authorizes NOTHING. `rushing/laravel-permission-cascade`'s
+    // `BaseModelPolicy::viewAny()` resolves `<morph-alias>.view`, so a model carrying
+    // `#[UseCascadePolicy]` denies every principal — the team's own owner included — until some row
+    // exists. Nothing in the family wrote one before 2026-09-05, which is why an out-of-the-box
+    // install rendered one nav row: the only resource whose model has no policy at all.
+    //
+    // The MODEL side is not listed here and must not be: it is derived from the Gate's policy map,
+    // so a package that adds a policed model is covered at every host with no edit here. Only the
+    // ability tiers are a decision, and this is the decision. Keys are `Enums\Role` values; a role
+    // absent from this map holds nothing. Tokens are the cascade's own spelling — `force-delete`,
+    // not `forceDelete`.
+    'roles' => [
+        'abilities' => RolePermissions::DEFAULT_ABILITIES,
     ],
 
     // The API-tokens resource. `model` is the PAT model the list/revoke reads (a host with a bespoke

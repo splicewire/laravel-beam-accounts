@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Teams;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Spatie\Permission\PermissionRegistrar;
+use Splicewire\Beam\Accounts\Authorization\RolePermissions;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Membership;
@@ -16,7 +17,7 @@ use Splicewire\Beam\Accounts\Models\Team;
  */
 class TeamProvisioner
 {
-    public function __construct(private RealmReachGrant $reach) {}
+    public function __construct(private RealmReachGrant $reach, private RolePermissions $rolePermissions) {}
 
     /**
      * `updateOrCreate` keyed on the user's own personal team, so a re-seed re-uses it instead of
@@ -99,6 +100,14 @@ class TeamProvisioner
 
         $roleModel = app(config('permission.models.role'))::findOrCreate($role->value, BeamAccounts::guard());
         $user->syncRoles([$roleModel]);
+
+        // The role row exists but holds no permissions until something writes them, and until
+        // 2026-09-05 nothing in the family did — so `BaseModelPolicy::viewAny()` denied every
+        // cascade-policed resource to every principal, team owner included. This is the one place a
+        // team-scoped role row is created, so it is where the tokens are attached: every team gets a
+        // working authorization model at the moment it has a role, not only where a host remembered
+        // to run a seeder. {@see RolePermissions} derives the token set from the Gate's policy map.
+        $this->rolePermissions->syncTo($roleModel, $role);
 
         $registrar->setPermissionsTeamId($previous);
     }
