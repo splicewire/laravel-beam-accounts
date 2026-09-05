@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Data;
 
+use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Data\BeamData;
 
@@ -17,7 +18,7 @@ class LoginInputData extends BeamData
     public function __construct(
         public string $email,
         public string $password,
-        public ?bool $remember = false,
+        public bool|Optional|null $remember = false,
     ) {}
 
     /**

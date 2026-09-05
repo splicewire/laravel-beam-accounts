@@ -5,10 +5,12 @@ namespace Splicewire\Beam\Accounts\Http\Controllers\Api\V1;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
 use Rushing\LaravelDataSchemasScribe\Attributes\ResponseFromData;
 use Splicewire\Beam\Accounts\Auth\AuthTokenFactory;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Data\LoginInputData;
+use Splicewire\Beam\Accounts\Data\LoginResponseData;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Data\ResponseBody;
 use Splicewire\Beam\Http\Controller;
@@ -33,7 +35,9 @@ class LoginController extends Controller
      * The `Request` rides alongside the typed `LoginInputData` for the User-Agent (token name) and the
      * remember flag; `LoginInputData` carries + validates the credentials.
      */
-    #[ResponseFromData(AuthUserData::class)]
+    #[RequestFromData(LoginInputData::class)]
+    #[ResponseFromData(LoginResponseData::class)]
+    #[ResponseFromData(LoginResponseData::class, status: 401)]
     public function login(LoginInputData $input, Request $request): ResponseBody
     {
         if (Auth::attempt(['email' => $input->email, 'password' => $input->password])) {
