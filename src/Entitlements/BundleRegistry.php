@@ -7,7 +7,6 @@ use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Key;
 use Rushing\Popcorn\Registries\OnDuplicate;
 use Rushing\Popcorn\Registries\Optionality;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryKey;
 
 /**
@@ -44,13 +43,10 @@ use Rushing\Popcorn\Registries\RegistryKey;
  */
 #[IsRegistry(
     root: 'beam.accounts.entitlements.bundles',
-    of: 'named entitlement-key bundles a plan maps to',
-    arity: RegistryArity::PickOne,
     entryType: 'list<string>',
     onDuplicate: OnDuplicate::Supersede,
     optionality: Optionality::Optional,
-    note: 'A bundle is a NAMED SET, so the read picks one bundle and the union across several is the '
-        .'caller\'s fold (`keysForMany()`), not the registry\'s arity.',
+    description: 'Named entitlement-key bundles for plans. Read a bundle by name; keysForMany() unions the keys across several bundles.',
 )]
 class BundleRegistry extends ConfigRegistry
 {
