@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\QueryBuilders;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * The load-bearing row-level scope for the account Tokens resource (Frame OS ticket 20).
@@ -37,5 +38,26 @@ class TokensQuery
         return $query
             ->where('tokenable_type', $user->getMorphClass())
             ->where('tokenable_id', $user->getKey());
+    }
+
+    /**
+     * The SAME ownership question as {@see self::scopeToOwner()}, asked of one already-loaded token
+     * instead of a query — what a policy can ask, since a policy is handed the model.
+     *
+     * It lives here, adjacent to the scope, precisely so the two cannot drift: they are one rule
+     * ("`tokenable` is this principal") written twice only because a WHERE clause and a predicate are
+     * different grammars. {@see \Splicewire\Beam\Accounts\Authorization\TokenPolicy} is the caller.
+     *
+     * Keys compare as strings for the same reason the cascade's own `ownsDirectly()` does: the estate
+     * spans uuid-keyed and bigint-keyed hosts, and `tokenable_id` reads back typed by the driver.
+     */
+    public static function isOwnedBy(Model $token, ?Authenticatable $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return $token->getAttribute('tokenable_type') === $user->getMorphClass()
+            && (string) $token->getAttribute('tokenable_id') === (string) $user->getAuthIdentifier();
     }
 }

@@ -4,10 +4,40 @@ namespace Splicewire\Beam\Accounts\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Rushing\PermissionCascade\Attributes\UseCascadePolicy;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Facades\Beam;
 
+/**
+ * A pending or accepted seat offer.
+ *
+ * ## Why it carries a policy
+ *
+ * `schemastud/laravel-frame`'s generic resource socket fails CLOSED on the write axis: a model with
+ * no policy refuses `create`/`update`/`delete` for every actor, owner included
+ * ({@see \Schemastud\Frame\Authorization\ResourceAuthorizer::allows()}). `invitations` is a
+ * write-capable Frame resource ({@see \Splicewire\Beam\Accounts\Data\InvitationData} — `create` +
+ * `delete`, `editable: false`), so without this attribute "invite a teammate" is a 403 out of the
+ * box. Measured at `~/Herd/beam` 2026-09-05, before this line existed.
+ *
+ * Plain `#[UseCascadePolicy]` with NO overrides is the whole declaration: the tiers
+ * {@see \Splicewire\Beam\Accounts\Authorization\RolePermissions::DEFAULT_ABILITIES} seeds already
+ * say what this resource needs — owner and admin hold `create`/`delete`, member holds only `view`.
+ * Inviting a teammate changes who can reach the tenant, so it is deliberately NOT a member-tier act;
+ * that is the same line {@see \Splicewire\Beam\Accounts\Authorization\MembershipPolicy::manageInvitations()}
+ * already drew, and the two now agree by construction rather than by coincidence.
+ *
+ * ⚠️ The permission tokens are DERIVED from `Gate::policies()`, so this attribute is the only edit
+ * a new policed model needs — but existing teams' roles are synced at role-CREATION time, so a host
+ * that already has teams must run `splicewire:beam:seed` (→ {@see \Splicewire\Beam\Accounts\Database\Seeders\RolePermissionsSeeder})
+ * once for the new tokens to land. Until it does, the resource stays refused rather than open.
+ *
+ * The DTO's own `prepare()` owner/admin `abort_unless` stays where it is: it is a second, narrower
+ * statement that also covers a host which retiers `beam.accounts.roles.abilities` to hand `create`
+ * to members, and it names the team explicitly where the token rung is team-agnostic.
+ */
+#[UseCascadePolicy]
 class Invitation extends Model
 {
     protected $guarded = [];
