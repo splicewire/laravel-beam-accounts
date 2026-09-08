@@ -71,7 +71,7 @@ trait WiresSeed
         );
 
         // The role-permission backfill — a SECOND step from this package, and therefore a second
-        // manifest key: the registry is keyed by coordinate and `OnDuplicate::Supersede`, so
+        // manifest key: the registry is keyed by coordinate and `OnKeyDuplicate::Supersede`, so
         // re-using the package name would silently replace the demo step with this one. The key is
         // a relative-URI coordinate under the package's own name, which is what `RelativeUriKey`
         // already accepts for the slash in a composer name.

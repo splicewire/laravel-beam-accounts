@@ -46,7 +46,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * register it from its OWN provider's `boot()`. Listing a replacement class in
  * `beam.core.resources.classes` does NOT work: that list is registered FIRST by
  * `Splicewire\Beam\BeamServiceProvider::discoverResources()`, and beam's own attributed classes are
- * registered after it and displace it under `OnDuplicate::Supersede`. Measured 2026-08-28 on the
+ * registered after it and displace it under `OnKeyDuplicate::Supersede`. Measured 2026-08-28 on the
  * `users` resource at `~/Herd/splicewire`, whose listed override is displaced;
  * {@see \Splicewire\Beam\Accounts\Data\UserData} carries that measurement.
  *

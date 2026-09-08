@@ -5,8 +5,8 @@ namespace Splicewire\Beam\Accounts\Entitlements;
 use Rushing\Popcorn\Laravel\Registries\ConfigRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Key;
-use Rushing\Popcorn\Registries\OnDuplicate;
-use Rushing\Popcorn\Registries\Optionality;
+use Rushing\Popcorn\Registries\OnKeyDuplicate;
+use Rushing\Popcorn\Registries\PopulationRequirement;
 use Rushing\Popcorn\Registries\RegistryKey;
 
 /**
@@ -44,8 +44,8 @@ use Rushing\Popcorn\Registries\RegistryKey;
 #[IsRegistry(
     root: 'beam.accounts.entitlements.bundles',
     entryType: 'list<string>',
-    onDuplicate: OnDuplicate::Supersede,
-    optionality: Optionality::Optional,
+    onKeyDuplicate: OnKeyDuplicate::Supersede,
+    populationRequirement: PopulationRequirement::Optional,
     description: 'Named entitlement-key bundles for plans. Read a bundle by name; keysForMany() unions the keys across several bundles.',
 )]
 class BundleRegistry extends ConfigRegistry

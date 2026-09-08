@@ -76,7 +76,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  *     superseded:     1
  *     displaced data: App\Data\UserData   backing: App\Models\User
  *
- * The host's re-declaration is the DISPLACED entry — it loses. `OnDuplicate::Supersede` means the LAST
+ * The host's re-declaration is the DISPLACED entry — it loses. `OnKeyDuplicate::Supersede` means the LAST
  * writer wins, and `Splicewire\Beam\BeamServiceProvider::discoverResources()` registers the explicit
  * `beam.core.resources.classes` list FIRST, then the cached Frame manifest (or, in dev, the live scan)
  * carrying beam's own attributed classes — which land second and displace it. So the two routes are
