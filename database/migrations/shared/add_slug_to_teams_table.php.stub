@@ -112,8 +112,13 @@ return new class extends Migration
             return (string) ($team->name ?? '');
         }
 
-        $owner = Schema::hasTable('users')
-            ? DB::table('users')->where('id', $team->user_id)->first()
+        // Read defensively, as every other column on this row is: `$team` is a raw query-builder
+        // row, and a personal team whose owner column is absent or null must not be looked up with
+        // a null key — it would match nothing on one driver and error on another.
+        $ownerId = $team->user_id ?? null;
+
+        $owner = $ownerId !== null && Schema::hasTable('users')
+            ? DB::table('users')->where('id', $ownerId)->first()
             : null;
 
         $email = $owner->email ?? null;
