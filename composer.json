@@ -46,7 +46,7 @@
     },
     "suggest": {
         "laravel/sanctum": "Install in a satellite to activate its own opt-in token 'api' guard seam alongside the engine's session/Fortify web guard.",
-        "splicewire/laravel-beam-notifications": "Activates this package's `to_roles:` / `to_teams:` recipient kinds, which it registers into `beam.notifications.recipient_kinds` unconditionally — the entries are inert strings without the notify package and live with it, so nothing here probes whether it is installed."
+        "splicewire/laravel-beam-notifications": "Activates this package's `to_roles:` / `to_teams:` recipient kinds, which it registers into `beam.notifications.recipient_kinds` unconditionally \u2014 the entries are inert strings without the notify package and live with it, so nothing here probes whether it is installed."
     },
     "autoload": {
         "psr-4": {
@@ -66,7 +66,7 @@
                     {
                         "fromPrefix": "splicewire/laravel-beam-accounts",
                         "toPrefix": "splicewire/laravel-tower",
-                        "because": "the account engine is reusable by any beam site; the auth surface lives DOWN here and is consumed UP by the tower host — beam-accounts never requires tower. particle-contribution-seam 18 deleted the host-specific TowerAuthUserData/Extras subclass entirely: a package extends the auth projection by contributing a named slice of the `me` particle resource, which composes, rather than by swapping a one-slot class-string or binding a one-slot port"
+                        "because": "the account engine is reusable by any beam site; the auth surface lives DOWN here and is consumed UP by the tower host \u2014 beam-accounts never requires tower. particle-contribution-seam 18 deleted the host-specific TowerAuthUserData/Extras subclass entirely: a package extends the auth projection by contributing a named slice of the `me` particle resource, which composes, rather than by swapping a one-slot class-string or binding a one-slot port"
                     },
                     {
                         "fromPrefix": "splicewire/laravel-beam-accounts",
@@ -91,6 +91,125 @@
         }
     },
     "repositories": [
+        {
+            "type": "path",
+            "url": "../../rushing/codegen",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-data-filters",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-data-schemas-scribe",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-doctor",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-notification-status",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-permission-cascade",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-pipeline-registry",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-popcorn",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-schema-convergence",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/laravel-versioning",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../rushing/php-popcorn",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../schemastud/laravel-data-schemas",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../schemastud/laravel-frame",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../schemastud/laravel-json-ns",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../../schemastud/php-json-ns",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../laravel-beam",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../laravel-beam-notifications",
+            "options": {
+                "symlink": true
+            }
+        },
         {
             "type": "git",
             "url": "https://github.com/stephenr85/laravel-permission-cascade.git"
