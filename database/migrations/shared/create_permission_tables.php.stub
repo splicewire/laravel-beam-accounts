@@ -180,6 +180,9 @@ return new class extends Migration
     /**
      * Add team columns to existing permission tables that were loaded from a
      * schema dump created before teams mode was enabled.
+     *
+     * @param  array<string, string>  $tableNames
+     * @param  array{team_foreign_key: string}  $columnNames
      */
     private function addTeamColumnsIfMissing(array $tableNames, array $columnNames): void
     {
