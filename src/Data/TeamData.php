@@ -29,6 +29,14 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  */
 #[ParticleResource(
     key: 'teams',
+    // No data-filters query, so stop promising one (`particle.filterable-promise`;
+    // `particle-write-surface` 09). `filterable` defaults to `true` and this never opted out, so
+    // `ParticleController::index()` would raise on a key with no registration. Nothing reaches it: a
+    // route sweep at `~/Herd/splicewire-app` found `teams` on **zero** of 926 routes (54
+    // `ParticleController` routes matched in the same pass, so the zero is a real absence, not a
+    // failed sweep), and no `->beam()->inResource('teams')` stamp exists in the estate. The resource
+    // is reachable only through Frame's `{resource}` wildcard, which catches and degrades.
+    filterable: false,
     backing: Team::class,
     label: 'Teams',
     group: 'Platform',
