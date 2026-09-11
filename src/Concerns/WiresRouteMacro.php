@@ -32,5 +32,31 @@ trait WiresRouteMacro
                 // one directory short. php -l passes and only a runtime read fails.
                 ->group(dirname(__DIR__, 2).'/routes/account.php');
         });
+
+        /**
+         * The account-tier REST survivors — tokens (reveal-once mint + lifecycle), members
+         * (role change + remove) and invitations (send/resend/revoke).
+         *
+         * A MACRO ONLY — unlike `splicewireAccountRoutes()` above, nothing in this package calls it.
+         * `routes/account-api.php`'s header carries the two reasons; the short one is that
+         * `~/Herd/splicewire-app` already mounts this family under the same route NAMES from its own
+         * route file, and a package that registered them unconditionally would decide by provider
+         * order which one that host serves.
+         *
+         * The host supplies the prefix and the middleware, because both are facts about an exposure
+         * that mints bearer credentials. Defaults reproduce the flagship's own mount
+         * (`beam/accounts`, session `web` + `auth`), so a starter can call it bare.
+         */
+        Route::macro('splicewireAccountApiRoutes', function (?string $prefix = null, ?array $middleware = null) {
+            $prefix ??= (string) config('beam.accounts.api_root', 'beam/accounts');
+            $middleware ??= (array) config('beam.accounts.routes.middleware', ['web', 'auth']);
+
+            Route::prefix($prefix)
+                ->name('beam.accounts.')
+                ->middleware($middleware)
+                // `dirname(__DIR__, 2)` for the same reason as above — this trait lives one level
+                // deeper than the provider the macro was extracted from.
+                ->group(dirname(__DIR__, 2).'/routes/account-api.php');
+        });
     }
 }

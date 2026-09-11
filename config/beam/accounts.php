@@ -77,6 +77,21 @@ return [
         'middleware' => ['web', 'auth'],
     ],
 
+    // The URI root the account-tier REST survivors mount under — tokens (reveal-once mint +
+    // lifecycle), members (role change + remove), invitations (send/resend/revoke). Each nests as
+    // `{api_root}/{resource}` with canonical `beam.accounts.{resource}.*` route names.
+    //
+    // ⚠️ THIS KEY WAS READ BEFORE IT WAS DECLARED. `~/Herd/splicewire-app` has mounted its own copy
+    // of this family at `config('beam.accounts.api_root', 'beam/accounts')` since the ADR-0124 tier
+    // move (`routes/tenant.php:1231`), against a key this config file did not carry — so the literal
+    // default was the only value the estate had ever used, and a host that set the key would have
+    // been overriding nothing it could find. Declaring it here makes the flagship's read resolve to a
+    // real declaration and gives `Route::splicewireAccountApiRoutes()` its default.
+    //
+    // A host still owns the EXPOSURE: the macro takes an explicit prefix and middleware, and nothing
+    // in this package mounts it. See `routes/account-api.php`.
+    'api_root' => env('ACCOUNT_API_ROOT', 'beam/accounts'),
+
     // Name given to the personal team provisioned on registration. {name} is the user's name.
     'personal_team_name' => "{name}'s Team",
 

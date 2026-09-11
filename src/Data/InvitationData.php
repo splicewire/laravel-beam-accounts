@@ -100,43 +100,9 @@ class InvitationData extends BeamData
      */
     public static function prepare(Model $invitation, CreateInvitationData $input, ?object $actor): void
     {
-        $team = BeamAccounts::currentTeam();
-        abort_if($team === null, 403, 'No active team to invite into.');
-
-        // ⚠️ `currentTeam()` is typed `?object`, not `?TeamContract`, because `beam.accounts.teams.resolver`
-        // is a host seam and nothing type-checks what a host binds to it — `splicewire/tower` binds
-        // `fn (): ?object => tenant()`. So the `memberRole()` call below is unchecked at the type level,
-        // and an ill-bound resolver would surface as a raw TypeError from inside a gate. Named as a 500
-        // instead: a misconfigured resolver is a misconfiguration, and it must not be mistaken for the
-        // 403 an ordinary member gets. Deliberately NOT a 403 — this estate's rule is that a check whose
-        // answer depends on the host is advisory, and the corollary here is that it must not be able to
-        // read as a legitimate denial.
-        abort_unless(
-            $team instanceof TeamContract,
-            500,
-            'config(beam.accounts.teams.resolver) returned a '.get_debug_type($team).', which does not implement TeamContract.'
-        );
+        $team = self::assertManages($actor);
 
         $teamKey = (string) $team->getKey();
-
-        // Owner/admin only — asked through the TEAM CONTRACT, which every team notion in the estate
-        // satisfies: beam's own `Team` implements `memberRole()` directly, and a host whose team lives on
-        // a foreign pivot gets it from {@see \Splicewire\Beam\Accounts\Concerns\HasMembers}.
-        //
-        // ⚠️ This used to be `method_exists($actor, 'teamRole') ? $actor->teamRole($team) : …` and it
-        // could not have worked off beam's own schema. `BelongsToTeams::teamRole()` is TYPED
-        // `teamRole(Team $team)`, so at a host whose team is not beam's `Team` the `method_exists` probe
-        // passes and the call is a TypeError; the fallback arm then reached `$team->memberships()`, a
-        // relation only beam's `Team` has. Both arms named beam's own schema while the guard pretended
-        // to be neutral — measured 2026-09-01 against `~/Herd/splicewire-app`, whose team is a
-        // string-keyed `Tenant` over `tenant_users`. The contract method is the neutral question.
-        $role = $actor instanceof Authenticatable ? $team->memberRole($actor) : null;
-
-        abort_unless(
-            in_array($role, [Role::Owner, Role::Admin], true),
-            403,
-            'Only owners and admins can manage invitations.'
-        );
 
         $existing = Invitation::query()
             ->where('team_id', $teamKey)
@@ -157,6 +123,63 @@ class InvitationData extends BeamData
         $invitation->token = Str::random(64);
         $invitation->invited_by = $actor?->getKey();
         $invitation->accepted_at = null;
+    }
+
+    /**
+     * The MANAGE gate on its own — "may this actor administer the current team's invitations?" —
+     * returning the resolved team so a caller that also needs it does not resolve it twice.
+     *
+     * Extracted from {@see self::prepare()} verbatim (no rule changed) because REVOKE needs the same
+     * question and `prepare()` cannot answer it: revoke has no input DTO and no model to prepare. The
+     * alternative was a second copy of the owner/admin check in
+     * {@see \Splicewire\Beam\Accounts\Http\Controllers\Account\TeamInvitationController}, which is
+     * exactly the second-authority shape `particle-manifest-repatriation` 06 retired for these keys.
+     *
+     * Frame's own revoke path does not call this and does not need to: it is gated one rung up by
+     * {@see \Splicewire\Beam\Accounts\Models\Invitation}'s `#[UseCascadePolicy]` `delete` token, which
+     * `RolePermissions::DEFAULT_ABILITIES` grants to owner and admin and withholds from member. This
+     * method is the narrower, team-explicit statement of the same line — see the Invitation model's
+     * docblock for why both exist.
+     */
+    public static function assertManages(?object $actor): TeamContract
+    {
+        $team = BeamAccounts::currentTeam();
+        abort_if($team === null, 403, 'No active team to invite into.');
+
+        // ⚠️ `currentTeam()` is typed `?object`, not `?TeamContract`, because `beam.accounts.teams.resolver`
+        // is a host seam and nothing type-checks what a host binds to it — `splicewire/tower` binds
+        // `fn (): ?object => tenant()`. So the `memberRole()` call below is unchecked at the type level,
+        // and an ill-bound resolver would surface as a raw TypeError from inside a gate. Named as a 500
+        // instead: a misconfigured resolver is a misconfiguration, and it must not be mistaken for the
+        // 403 an ordinary member gets. Deliberately NOT a 403 — this estate's rule is that a check whose
+        // answer depends on the host is advisory, and the corollary here is that it must not be able to
+        // read as a legitimate denial.
+        abort_unless(
+            $team instanceof TeamContract,
+            500,
+            'config(beam.accounts.teams.resolver) returned a '.get_debug_type($team).', which does not implement TeamContract.'
+        );
+
+        // Owner/admin only — asked through the TEAM CONTRACT, which every team notion in the estate
+        // satisfies: beam's own `Team` implements `memberRole()` directly, and a host whose team lives on
+        // a foreign pivot gets it from {@see \Splicewire\Beam\Accounts\Concerns\HasMembers}.
+        //
+        // ⚠️ This used to be `method_exists($actor, 'teamRole') ? $actor->teamRole($team) : …` and it
+        // could not have worked off beam's own schema. `BelongsToTeams::teamRole()` is TYPED
+        // `teamRole(Team $team)`, so at a host whose team is not beam's `Team` the `method_exists` probe
+        // passes and the call is a TypeError; the fallback arm then reached `$team->memberships()`, a
+        // relation only beam's `Team` has. Both arms named beam's own schema while the guard pretended
+        // to be neutral — measured 2026-09-01 against `~/Herd/splicewire-app`, whose team is a
+        // string-keyed `Tenant` over `tenant_users`. The contract method is the neutral question.
+        $role = $actor instanceof Authenticatable ? $team->memberRole($actor) : null;
+
+        abort_unless(
+            in_array($role, [Role::Owner, Role::Admin], true),
+            403,
+            'Only owners and admins can manage invitations.'
+        );
+
+        return $team;
     }
 
     /**
