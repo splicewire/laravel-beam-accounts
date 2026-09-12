@@ -11,7 +11,21 @@ use Splicewire\Beam\Data\BeamData;
 class ApiTokenData extends BeamData
 {
     public function __construct(
-        public int $id,
+        /**
+         * The token's KEY as a string, whatever shape the host's key is.
+         *
+         * ⚠️ Was `int`, and `ApiTokenController::present()` cast to match. Measured 2026-09-12 at
+         * `https://fresh-tower.test`: on a uuid-keyed host every roster row claimed the same id, and
+         * Archive issued `DELETE /beam/accounts/tokens/1` and got 500. A uuid key is a documented
+         * HOST shape (`beam.accounts.tokens.model`), tower, satellite and the flagship all run one,
+         * and the package's bigint default is why every existing assertion agreed with itself.
+         *
+         * The sibling particle projection `TokenData::$id` had always been a string, and
+         * `is_current` on this very class compares `(string) $token->getKey()`. This brings the REST
+         * DTO to the settled rule `ImpersonationTest` states for a shared shape: string keys, so a
+         * uuid-keyed and a bigint-keyed host share one shape.
+         */
+        public string $id,
         public string $name,
         /** Where the token came from — drives the type chip + facet filter. */
         public TokenProvenance $provenance,

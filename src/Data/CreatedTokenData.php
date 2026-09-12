@@ -10,7 +10,8 @@ use Splicewire\Beam\Data\BeamData;
 class CreatedTokenData extends BeamData
 {
     public function __construct(
-        public int $id,
+        /** The minted token's KEY as a string — see {@see ApiTokenData::$id} for why it is not an int. */
+        public string $id,
         public string $name,
         /** The reveal-once plaintext secret — never returned again after this response. */
         public string $token,

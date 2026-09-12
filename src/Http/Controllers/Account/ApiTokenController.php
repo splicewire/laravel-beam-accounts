@@ -131,7 +131,7 @@ class ApiTokenController extends Controller
 
         return response()->json([
             'data' => new CreatedTokenData(
-                id: (int) $token->getKey(),
+                id: (string) $token->getKey(),
                 name: (string) $token->name,
                 token: $plainText,
             ),
@@ -200,7 +200,7 @@ class ApiTokenController extends Controller
 
         return response()->json([
             'data' => new CreatedTokenData(
-                id: (int) $new->getKey(),
+                id: (string) $new->getKey(),
                 name: (string) $new->name,
                 token: $plainText,
             ),
@@ -406,7 +406,7 @@ class ApiTokenController extends Controller
             : TokenProvenance::infer((string) $token->name, $token->abilities ?? []);
 
         return new ApiTokenData(
-            id: (int) $token->getKey(),
+            id: (string) $token->getKey(),
             name: (string) $token->name,
             provenance: $provenance,
             abilities: $this->scopeFor($token->abilities),
