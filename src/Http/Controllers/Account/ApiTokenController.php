@@ -349,18 +349,54 @@ class ApiTokenController extends Controller
         return TokenData::scope($model::query());
     }
 
-    /** One of the acting principal's own tokens by id, or null — never another principal's row. */
+    /**
+     * One of the acting principal's own tokens by id, or null — never another principal's row.
+     *
+     * The id is validated against {@see BeamAccounts::tokenModel()}'s key SHAPE before it ever
+     * reaches the query: a uuid-keyed host handed a non-uuid segment (or an int-keyed host handed a
+     * non-numeric one) is a malformed id, not a lookup miss, and answering null for it here is what
+     * keeps that a 404 at every call site instead of a driver-level SQLSTATE error escaping as a 500.
+     */
     protected function findOwnToken(string $id): ?Model
     {
+        if (! $this->idMatchesKeyShape($id)) {
+            return null;
+        }
+
         return $this->scoped()->where($this->keyName(), $id)->first();
     }
 
     /** The PAT model's key column, read off the configured model rather than assumed to be `id`. */
     protected function keyName(): string
     {
+        return $this->tokenModelInstance()->getKeyName();
+    }
+
+    /**
+     * Whether `$id` is a value that could possibly BE {@see BeamAccounts::tokenModel()}'s key —
+     * checked against the model's declared key shape, never against a specific host's id scheme.
+     *
+     * A non-incrementing string key (`HasUuids`, and every uuid-keyed host in the estate uses it)
+     * must be a well-formed uuid; anything else falls back to the incrementing-integer shape the
+     * package's own default model carries.
+     */
+    protected function idMatchesKeyShape(string $id): bool
+    {
+        $model = $this->tokenModelInstance();
+
+        if ($model->getKeyType() === 'string' && ! $model->getIncrementing()) {
+            return Str::isUuid($id);
+        }
+
+        return ctype_digit($id);
+    }
+
+    /** A throwaway instance of {@see BeamAccounts::tokenModel()}, for key-shape introspection only. */
+    protected function tokenModelInstance(): Model
+    {
         $model = BeamAccounts::tokenModel();
 
-        return (new $model)->getKeyName();
+        return new $model;
     }
 
     /**
