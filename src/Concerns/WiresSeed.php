@@ -44,22 +44,31 @@ trait WiresSeed
         $flag = config('beam.accounts.demo.seed_users');
         $enabled = $flag !== null ? (bool) $flag : ! $this->app->environment('production');
 
-        // AND the demo gate with the TEAMS ESTATE gate. This seeder writes into `beam_teams` /
-        // `beam_memberships`, which exist only where the `migrations` estate published — and a host
-        // that runs its own team system turns that estate OFF precisely so those tables are never
-        // created on its disk (the flagship's `config/beam/accounts.php` says so in terms:
-        // "the engine's teams/memberships tables must never be created here").
+        // AND the demo gate with the TEAMS ESTATE, which this seeder writes into (`beam_teams` /
+        // `beam_memberships`). A host that runs its own team system declares that estate ABSENT
+        // precisely so those tables are never created on its disk (the flagship's
+        // `config/beam/accounts.php` says so in terms: "the engine's teams/memberships tables must
+        // never be created here"). Gating on the demo key alone made the two facts contradict — the
+        // demo gate is on everywhere but production, so at such a host the seeder RAN and died on
+        // `relation "beam_teams" does not exist`, measured at ~/Herd/splicewire-app where
+        // `splicewire:beam:seed` reported 3 seeded / 1 FAILED.
         //
-        // Gating on the demo key alone made those two facts contradict: the demo gate is on
-        // everywhere but production, so at such a host the seeder RAN and died on
-        // `relation "beam_teams" does not exist` — measured at ~/Herd/splicewire-app, where
-        // `splicewire:beam:seed` reported 3 seeded / 1 FAILED. The schema was not missing; the
-        // seeder was asking for an estate the host had deliberately declined.
+        // ⚠️ The estate reading is `estateDeclaredPresent()`, NOT `publishesEstateNamed()`. The gate
+        // has three values and only `'absent'` declines the estate: `false` means "already committed
+        // on my disk", a host that carries the migrations in its own repository. Reading the publish
+        // flag collapsed those two and stopped seeding every such host — measured on a fresh
+        // `laravel-tower-starter` install (ux-demo-convergence `G1-TOWER-FRESH-INSTALL`, 2026-09-12):
+        // tables migrated, `ACCOUNT_SEED_DEMO_USERS=true`, and `beam:seed` reported a gated skip, so
+        // `demo-owner` had no team and 403'd out of `/operator`. Both spellings of the key are read
+        // by the helper, since naming only the modern one sends a reader to a key that is `true` at
+        // their host (the mistake beam-facade 155 spent a section on).
         //
-        // Read through publishesEstateNamed() rather than the raw key: the gate is the AND of the
-        // modern `publish_*` and legacy `register_*` spellings, and naming only one sends a reader
-        // to a key that is `true` at their host (the mistake beam-facade 155 spent a section on).
-        $enabled = $enabled && BeamAccountsServiceProvider::publishesEstateNamed('migrations');
+        // This stays a pure CONFIG read: it resolves in `boot`, where no database connection is
+        // guaranteed and a `Schema::hasTable()` here would put a schema query on every request. The
+        // "are the tables actually there" half is capability rather than policy, and lives at the
+        // point of use — {@see DemoTeamSeeder::run()} skips itself with a message, exactly as its
+        // ungated sibling {@see RolePermissionsSeeder} already did.
+        $enabled = $enabled && BeamAccountsServiceProvider::estateDeclaredPresent('migrations');
 
         config(['beam.accounts.demo.seed_users' => $enabled]);
 
@@ -79,9 +88,10 @@ trait WiresSeed
         // UNGATED, unlike the demo step, and ordered ahead of it: it fabricates no subjects, it
         // re-derives authorization for roles the host already has, so a production seed wants it —
         // and it must not be the thing that repairs a host only when demo mode is on. It is
-        // nonetheless AND-ed with the same teams-estate fact, since it reads the `roles` table this
-        // package publishes; a host that declined that estate has no rows for it to touch.
-        if (BeamAccountsServiceProvider::publishesEstateNamed('migrations')) {
+        // nonetheless AND-ed with the same teams-estate fact, since it syncs team-scoped roles; a
+        // host that declared that estate absent runs its own team system and has no rows for it to
+        // touch. Same reading as above: a host that committed the estate itself still has them.
+        if (BeamAccountsServiceProvider::estateDeclaredPresent('migrations')) {
             $this->app->make(BeamSeedManifest::class)->register(
                 package: 'splicewire/laravel-beam-accounts/role-permissions',
                 seederClass: RolePermissionsSeeder::class,

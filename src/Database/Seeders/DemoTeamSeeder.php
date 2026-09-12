@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
@@ -36,6 +37,21 @@ class DemoTeamSeeder extends Seeder
     {
         if (! BeamDemo::enabled()) {
             $this->command?->warn('beam-accounts: demo subjects skipped (demo affordances disabled in this environment).');
+
+            return;
+        }
+
+        // Capability, checked here rather than in the config gate that registers this step. The gate
+        // is resolved in the provider's `boot`, where there is no database to ask — it can only read
+        // what the host DECLARED about the teams estate ({@see
+        // \Splicewire\Beam\Accounts\Concerns\WiresSeed}). Whether the tables are actually on this
+        // connection is a run-time fact, and the answer to it is a message and a return, not the
+        // `relation "beam_teams" does not exist` fatal that took down a whole `splicewire:beam:seed`
+        // run at ~/Herd/splicewire-app. Mirrors {@see RolePermissionsSeeder::run()}'s own guard.
+        $teams = (new Team)->getTable();
+
+        if (! Schema::hasTable($teams)) {
+            $this->command?->warn("beam-accounts: demo subjects skipped (no `{$teams}` table on this connection — the teams estate is not migrated here).");
 
             return;
         }

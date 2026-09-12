@@ -288,6 +288,33 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         return false;
     }
 
+    /**
+     * Whether this host CARRIES an estate — the question a consumer of the estate's *tables* asks,
+     * which is not the question {@see self::publishesEstateNamed()} answers.
+     *
+     * Of the gate's three values only one declines the estate. `true` publishes the stubs and `false`
+     * claims *"every member is ALREADY COMMITTED here"* — both assert the tables will exist, and the
+     * publish audit exists precisely to hold a host to the second claim. Only `'absent'` says the
+     * estate has no place at this host.
+     *
+     * So a reader that needs "are these tables part of this host" must NOT read `publishesEstateNamed()`:
+     * that collapses `false` into `'absent'` and treats a host that committed the migrations itself as
+     * a host that declined them. {@see \Splicewire\Beam\Accounts\Concerns\WiresSeed} did exactly that
+     * and silently stopped seeding `laravel-tower-starter`, whose gate is `false` for the ordinary
+     * reason (ux-demo-convergence `G1-TOWER-FRESH-INSTALL`, measured 2026-09-12 on a fresh tower
+     * checkout: the tables were migrated, the demo gate was on, and no demo team was written).
+     *
+     * ⚠️ This is a DECLARATION, not an observation: it reads config and never touches the database,
+     * because its callers run in the provider's `boot` where no connection is guaranteed and a schema
+     * query would land on every request. A caller that needs the table to actually be there asks
+     * `Schema::hasTable()` at the point of use — see {@see Database\Seeders\RolePermissionsSeeder} and
+     * {@see Database\Seeders\DemoTeamSeeder}, which each skip themselves with a message instead.
+     */
+    public static function estateDeclaredPresent(string $estate): bool
+    {
+        return ! self::estateDeclaredAbsent($estate);
+    }
+
     protected static function readsAbsent(mixed $value): bool
     {
         return is_string($value) && strtolower(trim($value)) === self::ESTATE_ABSENT;
