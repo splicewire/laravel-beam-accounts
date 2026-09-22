@@ -109,7 +109,6 @@ trait WiresFrameResources
             key: 'members',
             backing: MembershipSource::class,
             data: MembershipData::class,
-            filterable: false,
             form: 'bare',
             label: 'Members',
             group: 'Settings',

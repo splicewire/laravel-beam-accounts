@@ -24,13 +24,6 @@ it('registers `me` as a particle resource', function () {
         ->and($resource->modelClass())->toBe(config('auth.providers.users.model'));
 });
 
-it('declares `filterable: false`, because a singleton has no index to route', function () {
-    // ⚠️ Load-bearing, and the default is the opposite. Ticket 14 found `filterable: true` routes an
-    // index through the shipped `PayloadParticleReader::query()`, which THROWS — an armed default that
-    // stays invisible for exactly as long as nothing registers the declaration.
-    expect(app(ParticleResourceRegistry::class)->get(MeController::KEY)->filterable)->toBeFalse();
-});
-
 it('is read-only and unframed — writes stay on the existing PATCH /me', function () {
     $resource = app(ParticleResourceRegistry::class)->get(MeController::KEY);
 

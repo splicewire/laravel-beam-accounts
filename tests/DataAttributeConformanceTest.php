@@ -13,10 +13,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
 /**
  * The particle doctrine's "list facets are declared on the Data class" rule, guarded.
  *
- * The doctrine is explicit that the default order is single-sourced either way — "a
- * `filterable: false` resource still reads the SAME `#[Sortable(default: true)]`" — so a resource
- * that declares none is relying on whatever order the database happens to return. Every one of
- * these six was in that state until this guard went in.
+ * Filter controls derive from the declared vocabulary. Resource scopes apply to all reads.
  */
 $resources = [
     AccessGrantData::class,

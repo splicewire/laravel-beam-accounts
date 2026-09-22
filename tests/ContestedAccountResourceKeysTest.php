@@ -55,10 +55,6 @@ it('keeps the token revoke scope on the declaration, config-seamed', function ()
 });
 
 it('serves no per-record detail for tokens or invitations', function () {
-    // ⚠️ `showable` defaults TRUE, so this is a promise made by NOT opting out — the same shape as
-    // `filterable`. It has to live on the DECLARATION and not on a `frame.realm_resource_overrides`
-    // entry: measured 2026-09-01, the frame transport resolves `$registry->get($resource)`
-    // realm-unaware, so an overlay renders the nav correctly and still answers 200 on `records/{id}`.
     $registry = app(ParticleResourceRegistry::class);
 
     expect($registry->get('tokens')->showable)->toBeFalse()

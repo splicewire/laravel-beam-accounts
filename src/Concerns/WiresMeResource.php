@@ -42,12 +42,7 @@ trait WiresMeResource
      *
      * ## Shape
      *
-     * Model-backed (the configured user model), so the contribution fold receives a real `Model` at
-     * {@see \Splicewire\Beam\Http\Particle\ParticleController::projectRecord()} like every other
-     * resource. `filterable: false` because there is no list — ticket 14 found the default `true` routes
-     * an index through the shipped hydrator's throwing `query()`, and a singleton has no index to save.
-     * `readOnly` + `frame: false`: writes are the existing `PATCH /me` profile controller's, and there is
-     * no admin surface for a resource with one row per caller.
+     * Filter controls derive from the declared vocabulary. Resource scopes apply to all reads.
      *
      * Subject resolution is the ONE thing the generic controller cannot do here — a singleton has no
      * `{id}` — and {@see MeController} overrides exactly that, nothing else.
@@ -73,7 +68,6 @@ trait WiresMeResource
             // `data::from($record)` provably cannot — and the bearer is read off the live request because
             // the closure is handed only the record.
             project: fn (Model $user): AuthUserData => AuthUserData::fromUser($user, request()?->bearerToken()),
-            filterable: false,
             readOnly: true,
             frame: false,
         ));

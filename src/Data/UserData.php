@@ -102,7 +102,6 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     input: ProfileUpdateInputData::class,
     editData: ProfileUpdateInputData::class,
     policy: UserPolicy::class,
-    filterable: false,
     readOnly: true,
     editable: true,
     deletable: false,

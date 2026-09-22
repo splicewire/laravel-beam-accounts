@@ -47,15 +47,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     form: 'bare',
     input: CreateInvitationData::class,
     editData: CreateInvitationData::class,
-    filterable: false,
     editable: false,
-    // No per-record detail — an invitation is listed, re-sent or revoked, never opened. The two
-    // `#[NotInList]` props below are a detail SHAPE nothing serves: `invitedBy` is an opaque actor id and
-    // `updatedAt` a mtime, and with `editable: false` there is no edit surface to feed either.
-    // ⚠️ `showable` defaults TRUE (readable ⇒ showable), so leaving it off is a promise made by not
-    // opting out — the same class of accident as `filterable`. `~/Herd/splicewire-app` closed it in the
-    // inline manifest that particle-manifest-repatriation 06 retired; this is that host fact descending,
-    // and it keeps `records/{id}` a 405 rather than turning it into a 200 on the way through.
     showable: false,
 )]
 #[TypeScript]
