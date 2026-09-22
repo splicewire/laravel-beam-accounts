@@ -9,13 +9,13 @@ use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Ops\LogInAsUser;
 
 /**
- * Mint the signed `users/{id}/op/login-as` link for a demo subject — the ONE place that turns a
+ * Mint the signed `users/{id}/login-as` link for a demo subject — the ONE place that turns a
  * subject KEY into a URL a browser can follow.
  *
  * ## Why a caller cannot build this URL, and why that was defect 172(a)
  *
  * The demo one-click sign-in built its href client-side, from the generated wayfinder route:
- * `loginAs.url(subject.key)`. The mount is `users/{id}/op/login-as` against a uuid-keyed model, so
+ * `loginAs.url(subject.key)`. The mount was `users/{id}/op/login-as` against a uuid-keyed model, so
  * that produced `users/owner/op/login-as` and a 500 — `invalid input syntax for type uuid: "owner"`.
  *
  * The obvious repair is to pass the id instead of the slug. **It does not work, and finding that out
@@ -140,7 +140,7 @@ class DemoLoginLinks
         }
 
         return URL::temporarySignedRoute(
-            'users.op.login-as',
+            'users.login-as',
             now()->addMinutes($this->minutes($minutes)),
             ['id' => $user->getKey()],
         );

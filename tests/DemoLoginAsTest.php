@@ -40,7 +40,7 @@ function seedDemo(): void
  */
 function signedLoginAs(int|string $id, int $minutes = 30): string
 {
-    return URL::temporarySignedRoute('users.op.login-as', now()->addMinutes($minutes), ['id' => $id]);
+    return URL::temporarySignedRoute('users.login-as', now()->addMinutes($minutes), ['id' => $id]);
 }
 
 it('derives the demo roster from the Role enum plus a solo subject', function () {
@@ -136,7 +136,7 @@ it('refuses an UNSIGNED login-as in every environment, and mints no session', fu
 
     $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
 
-    $this->get('/users/'.$owner->getKey().'/op/login-as')->assertNotFound();
+    $this->get('/users/'.$owner->getKey().'/login-as')->assertNotFound();
 
     expect(auth()->check())->toBeFalse();
 });
@@ -321,7 +321,7 @@ it('mints a signed link per demo subject, and following one authenticates the se
     expect(array_column($links, 'key'))->toBe(BeamDemo::keys());
 
     foreach ($links as $link) {
-        expect($link['url'])->toContain('/op/login-as')->toContain('signature=');
+        expect($link['url'])->toContain('/login-as')->toContain('signature=')->not->toContain('/op/');
         // The route carries the subject's UUID/key, never the subject SLUG — the 500 in 172(a) was
         // `users/owner/op/login-as`.
         expect($link['url'])->not->toContain('/users/'.$link['key'].'/');
