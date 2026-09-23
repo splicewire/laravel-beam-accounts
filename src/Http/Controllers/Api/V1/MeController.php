@@ -4,7 +4,6 @@ namespace Splicewire\Beam\Accounts\Http\Controllers\Api\V1;
 
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
-use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Http\Particle\ParticleController;
 use Splicewire\Beam\Particle\Contribution\ResourceContribution;
@@ -32,12 +31,9 @@ use Splicewire\Beam\Particle\ParticleResource;
  * and there is no id to forge (ticket 16 §A6). A policy check here would additionally make `/me`
  * depend on whether a host happens to have registered a `UserPolicy@view`, which most do not.
  *
- * ## The permission-cache flush is load-bearing
- *
- * Lifted verbatim from the host route closure this replaces: the SPA calls `/me` once per tenant
- * navigation and reads its roles/permissions off the result, so a stale spatie permission cache serves
- * the PREVIOUS tenant's grants. Guarded by `class_exists` because beam-accounts does not require
- * spatie/laravel-permission — {@see AuthUserData::identityCore()} reaches for roles the same optional way.
+ * Permission-cache freshness belongs to the identity projection: {@see AuthUserData::fromUser()}
+ * checks central Root membership through BeamAccounts::isRoot(), which refreshes the registrar and
+ * restores its current team. Both canonical Frame reads and this subject resolver use that projection.
  *
  * @see ResourceContribution  how beam-commerce and beam-embed add their slices to this projection
  */
@@ -58,10 +54,6 @@ class MeController extends ParticleController
      */
     public function show(Request $request, string $id = ''): Responsable
     {
-        if (class_exists(PermissionRegistrar::class)) {
-            app(PermissionRegistrar::class)->forgetCachedPermissions();
-        }
-
         return $this->respond($this->particleResource($request), $request->user(), $request);
     }
 

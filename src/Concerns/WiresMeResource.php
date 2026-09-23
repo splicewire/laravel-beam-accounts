@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Concerns;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
@@ -44,8 +45,8 @@ trait WiresMeResource
      *
      * Filter controls derive from the declared vocabulary. Resource scopes apply to all reads.
      *
-     * Subject resolution is the ONE thing the generic controller cannot do here — a singleton has no
-     * `{id}` — and {@see MeController} overrides exactly that, nothing else.
+     * The declaration confines every query to the request actor. The current singleton mount also
+     * selects that actor directly; Frame lists, detail lookups and summaries use the same row scope.
      */
     #[Chained('boot', order: 130)]
     protected function bootMeResource(): void
@@ -62,6 +63,11 @@ trait WiresMeResource
             key: MeController::KEY,
             backing: BeamAccounts::userModel(),
             data: AuthUserData::class,
+            scope: function (Builder $query): Builder {
+                $id = request()->user()?->getAuthIdentifier();
+
+                return $id === null ? $query->whereRaw('1 = 0') : $query->whereKey($id);
+            },
             // `AuthUserData` is not `AuthUserData::from($user)`: the identity core branches on tenancy
             // (tenant-scoped roles vs. the central tenants list) and mirrors the caller's bearer back as
             // `access_token`. `project:` is legal residue under ticket 12 §A4's rule — it does something

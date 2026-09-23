@@ -24,11 +24,29 @@ it('registers `me` as a particle resource', function () {
         ->and($resource->modelClass())->toBe(config('auth.providers.users.model'));
 });
 
-it('is read-only and unframed — writes stay on the existing PATCH /me', function () {
+it('projects read-only capabilities without changing current Frame discovery', function () {
     $resource = app(ParticleResourceRegistry::class)->get(MeController::KEY);
+    $definition = $resource->toResourceDefinition();
 
     expect($resource->readOnly)->toBeTrue()
-        ->and($resource->isFramed())->toBeFalse();
+        ->and($resource->isFramed())->toBeFalse()
+        ->and($definition->creatable)->toBeFalse()
+        ->and($definition->editable)->toBeFalse()
+        ->and($definition->deletable)->toBeFalse()
+        ->and($definition->showable)->toBeTrue();
+});
+
+it('evaluates the declaration scope for the current actor and returns no rows without one', function () {
+    $ada = User::create(['name' => 'Ada', 'email' => 'ada@example.test', 'password' => 'secret']);
+    $bo = User::create(['name' => 'Bo', 'email' => 'bo@example.test', 'password' => 'secret']);
+    $resource = app(ParticleResourceRegistry::class)->get(MeController::KEY);
+
+    foreach ([$ada, $bo, null] as $actor) {
+        request()->setUserResolver(fn () => $actor);
+        $rows = ($resource->scope)(User::query())->get()->modelKeys();
+
+        expect($rows)->toBe($actor === null ? [] : [$actor->getKey()]);
+    }
 });
 
 it('projects the identity core through the declaration, mirroring the caller bearer', function () {
