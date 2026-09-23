@@ -13,8 +13,9 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
 /**
  * "My access requests" (ADR-0009, tracer 04) — the view-requests the current user filed, with
  * status, as a declarative particle resource. Owner-side (incoming) requests stay per-resource.
+ * This ledger is list-only: requesting and deciding access belong to the sharing operations.
  */
-#[ParticleResource(key: 'view-requests', backing: ViewRequest::class)]
+#[ParticleResource(key: 'view-requests', backing: ViewRequest::class, readOnly: true, showable: false)]
 class ViewRequestData extends BeamData
 {
     public function __construct(
@@ -28,7 +29,7 @@ class ViewRequestData extends BeamData
         public string $requestableType,
         #[Description('Key of the record access was requested to, as a string.')]
         public string $requestableId,
-        #[Description('Where the request stands: pending, approved, or denied.')]
+        #[Description('Where the request stands: pending, approved, or declined.')]
         public string $status,
         #[Description('When the owner decided, ISO-8601; null while the request is pending.')]
         public ?string $decidedAt,
@@ -37,10 +38,15 @@ class ViewRequestData extends BeamData
     public static function scope(Builder $query): Builder
     {
         $actor = Auth::user();
+        $id = $actor?->getAuthIdentifier();
+
+        if ($id === null) {
+            return $query->whereRaw('1 = 0');
+        }
 
         return $query
-            ->where('requester_type', $actor?->getMorphClass() ?? 'user')
-            ->where('requester_id', (string) Auth::id());
+            ->where('requester_type', $actor->getMorphClass())
+            ->where('requester_id', (string) $id);
     }
 
     public static function project(ViewRequest $request): self

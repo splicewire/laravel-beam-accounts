@@ -15,8 +15,9 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * "Shared with me" (ADR-0009, tracer 04) — the directory-ACL grants where the current user is the
  * grantee, as a declarative particle resource. Points at the OOTB AccessGrant model; a host that
  * binds a different grant_model registers its own read resource.
+ * This ledger is list-only: grant creation and revocation belong to target-authorized sharing operations.
  */
-#[ParticleResource(key: 'access-grants', backing: AccessGrant::class)]
+#[ParticleResource(key: 'access-grants', backing: AccessGrant::class, readOnly: true, showable: false)]
 class AccessGrantData extends BeamData
 {
     public function __construct(
@@ -40,10 +41,15 @@ class AccessGrantData extends BeamData
     public static function scope(Builder $query): Builder
     {
         $actor = Auth::user();
+        $id = $actor?->getAuthIdentifier();
+
+        if ($id === null) {
+            return $query->whereRaw('1 = 0');
+        }
 
         return $query
-            ->where('grantee_type', $actor?->getMorphClass() ?? 'user')
-            ->where('grantee_id', (string) Auth::id());
+            ->where('grantee_type', $actor->getMorphClass())
+            ->where('grantee_id', (string) $id);
     }
 
     public static function project(Model $grant): self
