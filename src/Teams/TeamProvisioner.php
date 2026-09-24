@@ -72,6 +72,30 @@ class TeamProvisioner
     }
 
     /**
+     * A SHARED team the user starts for themselves (self-service team creation): a new, non-personal
+     * `Team` they own, an Owner membership with the team-scoped spatie role and its permission tokens,
+     * and the team made current — the same three facts registration's {@see personalTeamFor()} writes,
+     * minus the personal flag.
+     *
+     * Always a new row, never an `updateOrCreate`: two teams may share a name, and a user may start as
+     * many as they like. No realm reach is granted — {@see personalTeamWithFullReachFor()}'s staff-shaped
+     * `manage` on every realm root is a demo/operator affordance, not something self-service confers.
+     */
+    public function createTeamFor(Authenticatable $user, string $name): Team
+    {
+        $team = Team::create([
+            'user_id' => $user->getKey(),
+            'name' => $name,
+            'personal_team' => false,
+        ]);
+
+        $this->addMember($user, $team, Role::Owner);
+        $user->forceFill(['current_team_id' => $team->getKey()])->save();
+
+        return $team;
+    }
+
+    /**
      * Attach a user to a team with a role, mirroring the assignment into spatie's
      * team-scoped role so the permission cascade resolves against it.
      */

@@ -20,6 +20,7 @@ trait WiresRoutes
     {
         if (config('beam.accounts.register_routes', true)) {
             Route::splicewireAccountRoutes();
+            Route::splicewireTeamRoutes();
         }
     }
 }

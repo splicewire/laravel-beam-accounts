@@ -34,6 +34,22 @@ trait WiresRouteMacro
         });
 
         /**
+         * Getting onto a team — the `teams.create` page + `CreateTeam` op, the emailed
+         * `invitations.accept` page + `RedeemInvitation` op (`routes/teams.php`).
+         *
+         * Auto-mounted alongside the settings surface when `register_routes` is on; a host that turns
+         * that off calls it from its own route file, OUTSIDE any `auth` group, because the accept page
+         * must open for a guest. `$middleware` guards the three signed-in routes (default: the settings
+         * middleware, `web` + `auth`), `$guestMiddleware` the accept page (default: `web`).
+         */
+        Route::macro('splicewireTeamRoutes', function (?array $middleware = null, ?array $guestMiddleware = null) {
+            $authMiddleware = $middleware ?? (array) config('beam.accounts.routes.middleware', ['web', 'auth']);
+            $guestMiddleware ??= ['web'];
+
+            require dirname(__DIR__, 2).'/routes/teams.php';
+        });
+
+        /**
          * The account-tier REST survivors — tokens (reveal-once mint + lifecycle), members
          * (role change + remove) and invitations (send/resend/revoke).
          *

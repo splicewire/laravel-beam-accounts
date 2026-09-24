@@ -149,6 +149,11 @@ class TeamInvitationController extends Controller
         $invitation->role = $input->role;
         $invitation->save();
 
+        // …and runs the resource's own `afterWrite()` after it, as the generic writer does — which is
+        // where the invitation is mailed. Without this call a TeamPage send wrote a row nobody was told
+        // about (measured at the beam starter 2026-09-24: no mail in the log for any invitation).
+        InvitationData::afterWrite($invitation, $input);
+
         return $invitation;
     }
 

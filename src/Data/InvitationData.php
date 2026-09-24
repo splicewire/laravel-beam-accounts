@@ -15,6 +15,7 @@ use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
+use Splicewire\Beam\Accounts\Teams\InvitationMailer;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
@@ -35,8 +36,9 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  *  - NO in-place edit → `editable: false` (show/update 405) while create + delete stay open.
  *
  * DOMAIN-NEUTRAL: the team is {@see BeamAccounts::currentTeam()} (the current-or-personal team by default; a
- * host binds `beam.accounts.teams.resolver` to scope to its own notion — e.g. tower's TENANT). Mail
- * send/resend + token-based accept stay a host REST survivor (over-ceiling for the generic pipeline).
+ * host binds `beam.accounts.teams.resolver` to scope to its own notion — e.g. tower's TENANT). Every
+ * persisted send/resend is mailed through {@see self::afterWrite()}; the signed link lands on the
+ * `invitations.accept` page and is redeemed by {@see \Splicewire\Beam\Accounts\Ops\RedeemInvitation}.
  */
 #[ParticleResource(
     key: 'invitations',
@@ -115,6 +117,19 @@ class InvitationData extends BeamData
         $invitation->token = Str::random(64);
         $invitation->invited_by = $actor?->getKey();
         $invitation->accepted_at = null;
+    }
+
+    /**
+     * After a send or resend is persisted, email the invitee their signed accept link
+     * ({@see InvitationMailer}). Runs on the Frame/particle writer's path; the account-tier REST
+     * survivor calls it too, so both transports mail exactly once per write. A host with no
+     * `invitations.accept` route, or an invitation naming no beam team, sends nothing.
+     */
+    public static function afterWrite(Model $invitation, mixed $input): void
+    {
+        if ($invitation instanceof Invitation) {
+            app(InvitationMailer::class)->send($invitation);
+        }
     }
 
     /**
