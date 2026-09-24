@@ -309,8 +309,15 @@ return [
     // domain-neutral default is the current user's current-or-personal team; a host whose "active
     // team" is a different notion (e.g. a per-request TENANT) binds a resolver here — a `(): ?object`
     // callable returning the scope object whose `getKey()` is the invitations/memberships `team_id`.
+    //
+    // `model` is the team the package's OWN team flows create and seat people on — self-service team
+    // creation and the emailed invitation link (`Route::splicewireTeamRoutes()`). null derives it:
+    // beam's `Models\Team`, or nothing when `publish_migrations` is `'absent'`. Bind a `Team` subclass
+    // to extend it; `false` (or the host's own team class) turns those flows off, and the macro then
+    // mounts none of its routes. Read through `BeamAccounts::teamModel()`.
     'teams' => [
         'resolver' => null,
+        'model' => null,
     ],
 
     // What each team role may DO to a cascade-policed model — the permission rows

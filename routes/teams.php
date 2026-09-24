@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Http\Controllers\InvitationAcceptController;
 use Splicewire\Beam\Accounts\Http\Controllers\TeamController;
 use Splicewire\Beam\Accounts\Ops\CreateTeam;
@@ -27,7 +28,18 @@ use Splicewire\Beam\Facades\Particle;
 |
 | The two variables are supplied by the macro: `$authMiddleware` for the three signed-in routes and
 | `$guestMiddleware` for the accept page, which a guest must be able to open.
+|
+| NOTHING mounts where this host has no beam team model (`BeamAccounts::teamModel()` is null: the
+| teams estate is declared `'absent'`, or `beam.accounts.teams.model` names the host's own team). Every
+| route here creates or seats a beam `Team` through `TeamProvisioner`, so on a host whose team is its
+| tenant each would be a 500 against a `beam_teams` table that does not exist. With the names absent,
+| `DashboardWelcome` offers neither "Create a team" nor the invitation hint, as it does at any host
+| that never called the macro.
 */
+
+if (BeamAccounts::teamModel() === null) {
+    return;
+}
 
 Route::middleware($authMiddleware)->group(function (): void {
     Route::get('teams/create', [TeamController::class, 'create'])->name('teams.create');

@@ -16,8 +16,10 @@ use Splicewire\Beam\Accounts\Notifications\TeamInvitationNotification;
  *  - The host mounts no `invitations.accept` route: there is no link that could work, and a mail
  *    telling someone to "open the link" with no link is worse than none. `DashboardWelcome` reads the
  *    same route name to decide whether to mention invitations at all.
- *  - The invitation names no beam `Team` (a tower tenant's invitation): its host mails through its own
- *    `DispatchesInvitationMail`, whose link points at its own accept operation.
+ *  - The invitation names no beam `Team` (a tower tenant's invitation), or the host has no beam team
+ *    model at all ({@see \Splicewire\Beam\Accounts\Facades\BeamAccounts::teamModel()} is null): its
+ *    host mails through its own `DispatchesInvitationMail`, whose link points at its own accept
+ *    operation. Checked FIRST, before the route, so a host without `beam_teams` never queries it.
  *  - It is already accepted.
  *
  * Returns whether a mail was sent, so a caller (and a test) can tell a skip from a send.

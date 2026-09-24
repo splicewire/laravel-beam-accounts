@@ -10,7 +10,7 @@ use Splicewire\Beam\Accounts\BeamAccountsManager;
  *
  * It holds NO logic: every method it appears to have resolves through `__callStatic` to the
  * container-bound {@see BeamAccountsManager}, which is where the host-resolution seam prose and the
- * surface itself live. The surface is CLOSED at the six methods below.
+ * surface itself live. The surface is CLOSED at the seven methods below.
  *
  * Deliberately NOT registered as a global alias (`extra.laravel.aliases`): every call site imports
  * this class explicitly, so a bare `\BeamAccounts` can never become a second, import-free way to say
@@ -31,6 +31,7 @@ use Splicewire\Beam\Accounts\BeamAccountsManager;
  * @method static string guard()
  * @method static string tokenModel()
  * @method static object|null currentTeam()
+ * @method static string|null teamModel()
  * @method static bool isRoot(?\Illuminate\Contracts\Auth\Authenticatable $user)
  *
  * @see BeamAccountsManager

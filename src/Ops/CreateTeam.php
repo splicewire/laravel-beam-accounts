@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Data\CreateTeamInputData;
 use Splicewire\Beam\Accounts\Data\TeamData;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
 use Splicewire\Beam\Particle\OperationKind;
@@ -58,6 +59,10 @@ class CreateTeam
         $input = CreateTeamInputData::from($request->all());
 
         abort_if($actor === null, 401);
+
+        // No beam team model here (the host's team is its tenant): the op is not mounted by
+        // `routes/teams.php`, and a host that mounts it anyway gets a 404, not a provisioner failure.
+        abort_if(BeamAccounts::teamModel() === null, 404);
 
         $team = app(TeamProvisioner::class)->createTeamFor($actor, trim($input->name));
 

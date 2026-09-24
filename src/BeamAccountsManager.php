@@ -101,6 +101,39 @@ class BeamAccountsManager
     }
 
     /**
+     * The model beam-accounts' OWN team flows write and read: self-service creation
+     * ({@see Teams\TeamProvisioner::createTeamFor()}), the invitation email and the redemption of its
+     * link ({@see Teams\InvitationRedemption}). Null when those flows have no place at this host.
+     *
+     * Those flows seat people through {@see Teams\TeamProvisioner}, which writes beam's membership
+     * rows and team-scoped roles, so they only work over beam's own {@see Models\Team} (or a subclass).
+     * A host whose team notion is something else keeps its `TeamContract` behind
+     * `beam.accounts.teams.resolver` and runs its own creation, mail and accept paths: tower's
+     * `AcceptTenantInvitation` over `tenant_users` at `splicewire/splicewire-app`, whose `beam_teams`
+     * table does not exist. A query here would be a 500 on every invitation write there.
+     *
+     * `beam.accounts.teams.model`:
+     *  - unset / null: derived. {@see Models\Team}, unless the host declared the teams estate
+     *    `'absent'` (`publish_migrations`), which says in so many words that `beam_teams` has no place
+     *    here; then null.
+     *  - `Team` or a subclass: that class.
+     *  - `false`, or any other class (the host's own `TeamContract`, e.g. its tenant): null. That model
+     *    is reached through the resolver, not provisioned by this package.
+     *
+     * @return class-string<Models\Team>|null
+     */
+    public function teamModel(): ?string
+    {
+        $configured = config('beam.accounts.teams.model');
+
+        if ($configured === null) {
+            return BeamAccountsServiceProvider::estateDeclaredAbsent('migrations') ? null : Models\Team::class;
+        }
+
+        return is_string($configured) && is_a($configured, Models\Team::class, true) ? $configured : null;
+    }
+
+    /**
      * The central-Root check, flip-safe (admin-redesign ticket 02, Q1 — the `centralUserIsRoot()`
      * null-team footgun).
      *

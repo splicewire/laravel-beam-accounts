@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Teams;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use LogicException;
 use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Authorization\RolePermissions;
 use Splicewire\Beam\Accounts\Enums\Role;
@@ -80,10 +81,18 @@ class TeamProvisioner
      * Always a new row, never an `updateOrCreate`: two teams may share a name, and a user may start as
      * many as they like. No realm reach is granted — {@see personalTeamWithFullReachFor()}'s staff-shaped
      * `manage` on every realm root is a demo/operator affordance, not something self-service confers.
+     *
+     * The row is written through {@see BeamAccounts::teamModel()}. A host with no beam team model (its
+     * team is a tenant, provisioned by its own pipeline) cannot create one this way: the routes that
+     * reach this are not mounted there, and a direct call is a {@see LogicException}, not a query
+     * against a table the host does not have.
      */
     public function createTeamFor(Authenticatable $user, string $name): Team
     {
-        $team = Team::create([
+        $model = BeamAccounts::teamModel()
+            ?? throw new LogicException('This host has no beam team model (beam.accounts.teams.model), so a team cannot be created through beam-accounts.');
+
+        $team = $model::create([
             'user_id' => $user->getKey(),
             'name' => $name,
             'personal_team' => false,

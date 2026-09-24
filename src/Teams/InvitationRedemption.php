@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Models\Team;
 
@@ -33,10 +34,12 @@ use Splicewire\Beam\Accounts\Models\Team;
  * ## Scope: beam's own team
  *
  * Redemption seats the invitee through {@see TeamProvisioner::addMember()}, which writes beam's own
- * membership row and team-scoped role. A host whose team notion is something else (a tower tenant over
- * `tenant_users`) redeems through its own operation — tower's `AcceptTenantInvitation` — and this
- * class answers `invalid` for an invitation whose `team_id` names no beam `Team`, rather than seating
- * someone on a team that does not exist here.
+ * membership row and team-scoped role. The team is read through {@see BeamAccounts::teamModel()}, never
+ * a hardcoded `Team`: a host whose team notion is something else (a tower tenant over `tenant_users`)
+ * has no `beam_teams` table at all, and redeems through its own operation (tower's
+ * `AcceptTenantInvitation`). There `teamModel()` is null, {@see self::team()} answers null without a
+ * query, and this class answers `invalid` rather than seating someone on a team that does not exist
+ * here — or, as it did on 2026-09-24, throwing on the missing table from inside every invitation write.
  */
 class InvitationRedemption
 {
@@ -66,10 +69,16 @@ class InvitationRedemption
         return $token === '' ? null : Invitation::query()->where('token', $token)->first();
     }
 
-    /** The beam team the invitation seats its holder on, or null when it names none here. */
+    /**
+     * The beam team the invitation seats its holder on, or null when it names none here — including
+     * when this host has no beam team model at all ({@see BeamAccounts::teamModel()}), in which case
+     * nothing is queried.
+     */
     public function team(Invitation $invitation): ?Team
     {
-        return Team::query()->find($invitation->team_id);
+        $model = BeamAccounts::teamModel();
+
+        return $model === null ? null : $model::query()->find($invitation->team_id);
     }
 
     /**
