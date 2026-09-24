@@ -94,7 +94,8 @@ class BeamAccountsManager
 
         $user = Auth::user();
 
-        return method_exists($user, 'currentTeamOrPersonal')
+        // No ambient user (a Gate asked `forUser()` outside a request, a queue job): no current team.
+        return $user !== null && method_exists($user, 'currentTeamOrPersonal')
             ? $user->currentTeamOrPersonal()
             : null;
     }

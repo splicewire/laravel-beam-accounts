@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Gate;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Rushing\PermissionCascade\Support\CascadePolicyRegistrar;
 use Rushing\Popcorn\Concerns\Chained;
+use Splicewire\Beam\Accounts\Authorization\InvitationPolicy;
 use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
 use Splicewire\Beam\Accounts\Authorization\TokenPolicy;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
@@ -69,7 +70,13 @@ trait WiresAuthorization
         // the same shape beam-core uses for `Hook`/`BeamSchema` and beam-ux for `BeamUxEntry`. The
         // attribute alone is inert; nothing scans for it. Without this line the `invitations` Frame
         // resource refuses create and revoke to every actor including the team owner.
+        //
+        // Registered through the cascade (so the attribute is validated and the container key is the
+        // cascade's), then re-bound to {@see InvitationPolicy}: the cascade tokens OR the team role
+        // `manageInvitations` already names. A host that seeds its own roles never received the
+        // `invitation.*` tokens, and the owner was refused (splicewire-app, 2026-09-24).
         CascadePolicyRegistrar::register(Invitation::class);
+        $this->app->bind('permission-cascade-policy:'.Invitation::class, fn () => new InvitationPolicy);
 
         // The `tokens` resource's gate ({@see TokenPolicy}) — registered against the CONFIGURED PAT
         // model for the same reason the user policy below is, and guarded the same way: a host that

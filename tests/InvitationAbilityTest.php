@@ -139,3 +139,35 @@ it('lives on the app default connection until a host names one', function () {
 
     config(['beam.accounts.invitations.connection' => null]);
 });
+
+/**
+ * The model POLICY follows the same line, for a host whose team roles never received `invitation.*`
+ * tokens (a host team on its own pivot — here and at splicewire-app, 2026-09-24). Frame's write gate
+ * asks `create`/`delete` of the policy; with the cascade tokens alone it refused the owner.
+ */
+it('lets the team owner and admin create and revoke through the model policy without cascade tokens', function () {
+    foreach ([Role::Owner, Role::Admin] as $role) {
+        $user = ($this->seat)('policy-'.strtolower($role->value).'@example.test', $role);
+
+        expect(Gate::forUser($user)->allows('create', Invitation::class))->toBeTrue()
+            ->and(Gate::forUser($user)->allows('delete', $this->invitation))->toBeTrue()
+            ->and(Gate::forUser($user)->allows('delete', new Invitation))->toBeTrue();
+    }
+});
+
+it('refuses the model policy to a member, an outsider, and a foreign-team invitation', function () {
+    $member = ($this->seat)('policy-member@example.test', Role::Member);
+    $outsider = User::create(['name' => 'Yan', 'email' => 'yan@example.test', 'password' => 'x']);
+    $owner = ($this->seat)('policy-owner-x@example.test', Role::Owner);
+    $foreign = Invitation::create([
+        'team_id' => 'some-other-team',
+        'email' => 'policy-elsewhere@example.test',
+        'role' => 'member',
+        'token' => 'tok-policy-foreign',
+    ]);
+
+    expect(Gate::forUser($member)->allows('create', Invitation::class))->toBeFalse()
+        ->and(Gate::forUser($member)->allows('delete', $this->invitation))->toBeFalse()
+        ->and(Gate::forUser($outsider)->allows('create', Invitation::class))->toBeFalse()
+        ->and(Gate::forUser($owner)->allows('delete', $foreign))->toBeFalse();
+});

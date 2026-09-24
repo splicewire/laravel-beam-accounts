@@ -21,9 +21,12 @@ use Splicewire\Beam\Facades\Beam;
  * `delete`, `editable: false`), so without this attribute "invite a teammate" is a 403 out of the
  * box. Measured at `~/Herd/beam` 2026-09-05, before this line existed.
  *
- * Plain `#[UseCascadePolicy]` with NO overrides is the whole declaration: the tiers
+ * Plain `#[UseCascadePolicy]` with NO overrides is the declaration: the tiers
  * {@see \Splicewire\Beam\Accounts\Authorization\RolePermissions::DEFAULT_ABILITIES} seeds already
  * say what this resource needs — owner and admin hold `create`/`delete`, member holds only `view`.
+ * The binding is {@see \Splicewire\Beam\Accounts\Authorization\InvitationPolicy}, which also admits
+ * `create`/`delete` to the team's owner and admin by membership role, for a host whose roles never
+ * received the tokens (splicewire-app, 2026-09-24).
  * Inviting a teammate changes who can reach the tenant, so it is deliberately NOT a member-tier act;
  * that is the same line {@see \Splicewire\Beam\Accounts\Authorization\MembershipPolicy::manageInvitations()}
  * already drew, and the two now agree by construction rather than by coincidence.
