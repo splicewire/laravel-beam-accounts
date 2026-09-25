@@ -10,6 +10,8 @@ use Splicewire\Beam\Accounts\Database\Seeders\RolePermissionsSeeder;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Accounts\Tests\Fixtures\PolicedWidget;
+use Splicewire\Beam\Accounts\Tests\Fixtures\ReservedWidget;
+use Splicewire\Beam\Accounts\Tests\Fixtures\ReservedWidgetPolicy;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 /**
@@ -19,8 +21,9 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
  * exactly one row.
  */
 beforeEach(function () {
-    Relation::morphMap(['policed-widget' => PolicedWidget::class]);
+    Relation::morphMap(['policed-widget' => PolicedWidget::class, 'reserved-widget' => ReservedWidget::class]);
     CascadePolicyRegistrar::register(PolicedWidget::class);
+    Gate::policy(ReservedWidget::class, ReservedWidgetPolicy::class);
 });
 
 it('derives the policed model set from the gate rather than a hand-kept list', function () {
@@ -131,4 +134,44 @@ it('leaves a role the host defined itself alone', function () {
     app(RolePermissionsSeeder::class)->run();
 
     expect($bespoke->fresh()->permissions()->pluck('name')->all())->toBe(['bespoke.thing']);
+});
+
+/**
+ * A policy implementing `GrantedExplicitly` (commerce's `PlanPolicy`, tower's `ConduitPolicy`) keeps its
+ * model out of the uniform tiering: no role holds its tokens by default, so only a `Gate::before`
+ * superuser can write it.
+ */
+it('grants a reserved model to no role by default', function () {
+    $perms = app(RolePermissions::class);
+
+    expect($perms->policedModels())->not->toContain(ReservedWidget::class)
+        ->and($perms->reservedModels())->toBe([ReservedWidget::class]);
+
+    foreach (Role::cases() as $role) {
+        expect(array_filter($perms->tokensFor($role), fn (string $t) => str_starts_with($t, 'reserved-widget.')))->toBe([]);
+    }
+});
+
+it('grants a reserved model only through the explicit grants config', function () {
+    config()->set('beam.accounts.roles.grants', [
+        'owner' => [ReservedWidget::class => ['view', 'update']],
+    ]);
+    $perms = app(RolePermissions::class);
+
+    expect($perms->tokensFor(Role::Owner))->toContain('reserved-widget.view', 'reserved-widget.update')
+        ->and($perms->tokensFor(Role::Owner))->not->toContain('reserved-widget.delete')
+        ->and($perms->tokensFor(Role::Admin))->not->toContain('reserved-widget.view');
+
+    $owner = User::create(['name' => 'Res', 'email' => 'res@example.test', 'password' => 'password-1234']);
+    $member = User::create(['name' => 'Rem', 'email' => 'rem@example.test', 'password' => 'password-1234']);
+    $team = app(TeamProvisioner::class)->personalTeamFor($owner);
+    app(TeamProvisioner::class)->addMember($member, $team, Role::Member);
+
+    app(PermissionRegistrar::class)->setPermissionsTeamId($team->getKey());
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $owner->unsetRelation('roles')->unsetRelation('permissions');
+    $member->unsetRelation('roles')->unsetRelation('permissions');
+
+    expect(Gate::forUser($owner)->allows('viewAny', ReservedWidget::class))->toBeTrue()
+        ->and(Gate::forUser($member)->allows('viewAny', ReservedWidget::class))->toBeFalse();
 });

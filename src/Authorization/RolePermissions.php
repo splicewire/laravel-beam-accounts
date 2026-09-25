@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Authorization;
 
 use Illuminate\Support\Facades\Gate;
+use Rushing\PermissionCascade\Contracts\GrantedExplicitly;
 use Rushing\PermissionCascade\Facades\PermissionNamer;
 use Rushing\PermissionCascade\Policies\BaseModelPolicy;
 use Spatie\Permission\PermissionRegistrar;
@@ -55,6 +56,16 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * exists — a demo seed, a real registration, an invitation accepted — instead of only where a host
  * remembered to run a seeder. Idempotent: `findOrCreate` + `syncPermissions`.
  *
+ * ## Reserved models are granted by name, never derived
+ *
+ * A policy implementing {@see GrantedExplicitly} (commerce's `PlanPolicy`, tower's `ConduitPolicy`)
+ * declares that its tokens are not team content: the owning package cannot know which of a host's
+ * roles should write a platform plan catalog or a tenant's conduit credentials. Such a model is left
+ * out of {@see policedModels()}, so the uniform tiering grants it nothing, and with no explicit grant
+ * the only principal that passes is the host's `Gate::before` superuser (Root). A host grants those
+ * tokens deliberately through `beam.accounts.roles.grants` ({@see explicitTokensFor()}), which names
+ * the model and the abilities per role. The same key can add a token to any role.
+ *
  * ⚠️ Permissions are GLOBAL; roles are TEAM-SCOPED (measured: `permissions` has no `team_id`
  * column, `roles` does). So the permission rows are written once and every team's own role row
  * links to the same ones. A caller must have set the registrar's team id before calling
@@ -91,6 +102,10 @@ class RolePermissions
         foreach (Gate::policies() as $model => $policy) {
             $policy = (string) $policy;
 
+            if ($this->reserved($policy)) {
+                continue;
+            }
+
             if (str_starts_with($policy, 'permission-cascade-policy:')
                 || $policy === BaseModelPolicy::class
                 || is_subclass_of($policy, BaseModelPolicy::class)) {
@@ -101,6 +116,55 @@ class RolePermissions
         sort($models);
 
         return $models;
+    }
+
+    /**
+     * Every model whose bound policy reserves its tokens ({@see GrantedExplicitly}): policed, and
+     * deliberately absent from {@see policedModels()}.
+     *
+     * @return list<class-string>
+     */
+    public function reservedModels(): array
+    {
+        $models = [];
+
+        foreach (Gate::policies() as $model => $policy) {
+            if ($this->reserved((string) $policy)) {
+                $models[] = $model;
+            }
+        }
+
+        sort($models);
+
+        return $models;
+    }
+
+    /**
+     * The tokens a host grants `$role` BY NAME through `beam.accounts.roles.grants`
+     * (`[role => [ModelClass::class => [abilities]]]`), the only way a reserved model's tokens reach a
+     * role. Empty by default, so a reserved model is Root-only until a host names it.
+     *
+     * @return list<string>
+     */
+    public function explicitTokensFor(Role|string $role): array
+    {
+        $value = $role instanceof Role ? $role->value : $role;
+
+        $tokens = [];
+
+        foreach ((array) (config('beam.accounts.roles.grants', [])[$value] ?? []) as $model => $abilities) {
+            foreach (PermissionNamer::names($model, array_values((array) $abilities)) as $token) {
+                $tokens[] = $token;
+            }
+        }
+
+        return array_values(array_unique($tokens));
+    }
+
+    /** A class-string policy implementing {@see GrantedExplicitly}; a synthetic cascade key never is. */
+    private function reserved(string $policy): bool
+    {
+        return class_exists($policy) && is_a($policy, GrantedExplicitly::class, true);
     }
 
     /**
@@ -122,7 +186,7 @@ class RolePermissions
 
     /**
      * The full permission-token list `$role` should hold: every policed model crossed with that
-     * role's abilities.
+     * role's abilities, plus the tokens the host grants it by name ({@see explicitTokensFor()}).
      *
      * @return list<string>
      */
@@ -130,11 +194,11 @@ class RolePermissions
     {
         $abilities = $this->abilitiesFor($role);
 
-        if ($abilities === []) {
-            return [];
-        }
+        $tokens = $this->explicitTokensFor($role);
 
-        $tokens = [];
+        if ($abilities === []) {
+            return $tokens;
+        }
 
         foreach ($this->policedModels() as $model) {
             foreach (PermissionNamer::names($model, $abilities) as $token) {

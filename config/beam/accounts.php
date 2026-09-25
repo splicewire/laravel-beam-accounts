@@ -337,6 +337,13 @@ return [
     // not `forceDelete`.
     'roles' => [
         'abilities' => RolePermissions::DEFAULT_ABILITIES,
+
+        // Tokens granted to a role BY NAME: `[role => [ModelClass::class => [abilities]]]`. The tiering
+        // above is derived from every cascade-policed model EXCEPT those whose policy implements
+        // `Rushing\PermissionCascade\Contracts\GrantedExplicitly` (a commerce `Plan`, a tower
+        // `Conduit`): their tokens reach a role only through this key. Empty by default, so those
+        // models are writable by the host's `Gate::before` superuser (Root) and nobody else.
+        'grants' => [],
     ],
 
     // The API-tokens resource. `model` is the PAT model the list/revoke reads (a host with a bespoke
