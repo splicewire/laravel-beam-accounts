@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Concerns;
 
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Rushing\PermissionCascade\Support\CascadePolicyRegistrar;
@@ -75,8 +76,21 @@ trait WiresAuthorization
         // cascade's), then re-bound to {@see InvitationPolicy}: the cascade tokens OR the team role
         // `manageInvitations` already names. A host that seeds its own roles never received the
         // `invitation.*` tokens, and the owner was refused (splicewire-app, 2026-09-24).
+        //
+        // `invitation` is the model's morph alias, registered here beside its policy (ADR-0118,
+        // suite-green TRIAGE decision 6, 2026-09-25). The alias IS the cascade token prefix:
+        // unaliased, `PermissionNamer` minted `splicewirebeamaccountsmodelsinvitation.*`, so the tokens
+        // `RolePermissions` synced were the slugged class name. A host that already holds rows under
+        // that spelling renames them in a data migration (the flagship's
+        // `shared/2026_09_25_000100_store_morph_aliases_for_policied_models`), so no grant is lost.
+        //
+        // The re-bind reads the key the cascade actually registered (`Gate::policies()`) instead of
+        // restating its spelling, so the InvitationPolicy binding (6111b3e) follows whatever key the
+        // cascade chooses — today the class-keyed `permission-cascade-policy:<class>`, unchanged by
+        // the alias.
+        Relation::morphMap(['invitation' => Invitation::class]);
         CascadePolicyRegistrar::register(Invitation::class);
-        $this->app->bind('permission-cascade-policy:'.Invitation::class, fn () => new InvitationPolicy);
+        $this->app->bind(Gate::policies()[Invitation::class], fn () => new InvitationPolicy);
 
         // The `tokens` resource's gate ({@see TokenPolicy}) — registered against the CONFIGURED PAT
         // model for the same reason the user policy below is, and guarded the same way: a host that

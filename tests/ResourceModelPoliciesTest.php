@@ -181,10 +181,13 @@ it('derives both new models into the seeded token set with no edit to RolePermis
     $ownerTokens = app(RolePermissions::class)->tokensFor(Role::Owner);
     $memberTokens = app(RolePermissions::class)->tokensFor(Role::Member);
 
-    expect($ownerTokens)->toContain('splicewirebeamaccountsmodelsinvitation.create')
-        ->and($ownerTokens)->toContain('splicewirebeamaccountsmodelsinvitation.delete')
-        ->and($memberTokens)->toContain('splicewirebeamaccountsmodelsinvitation.view')
-        ->and($memberTokens)->not->toContain('splicewirebeamaccountsmodelsinvitation.create');
+    // The prefix is the `invitation` morph alias (ADR-0118), not the slugged class name it leaked
+    // before the alias was registered.
+    expect($ownerTokens)->toContain('invitation.create')
+        ->and($ownerTokens)->toContain('invitation.delete')
+        ->and($memberTokens)->toContain('invitation.view')
+        ->and($memberTokens)->not->toContain('invitation.create')
+        ->and(array_filter([...$ownerTokens, ...$memberTokens], fn (string $t) => str_contains($t, 'splicewire')))->toBe([]);
 });
 
 /**

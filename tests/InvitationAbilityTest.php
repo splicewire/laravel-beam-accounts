@@ -171,3 +171,9 @@ it('refuses the model policy to a member, an outsider, and a foreign-team invita
         ->and(Gate::forUser($outsider)->allows('create', Invitation::class))->toBeFalse()
         ->and(Gate::forUser($owner)->allows('delete', $foreign))->toBeFalse();
 });
+
+it('answers the invitation morph alias, and the InvitationPolicy binding survives it', function () {
+    expect((new Invitation)->getMorphClass())->toBe('invitation')
+        ->and(Illuminate\Database\Eloquent\Relations\Relation::getMorphedModel('invitation'))->toBe(Invitation::class)
+        ->and(Gate::getPolicyFor(Invitation::class))->toBeInstanceOf(Splicewire\Beam\Accounts\Authorization\InvitationPolicy::class);
+});
