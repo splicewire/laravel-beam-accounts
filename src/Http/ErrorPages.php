@@ -10,6 +10,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Splicewire\Beam\Accounts\Data\Pages\ErrorPageData;
+use Splicewire\Beam\Realm\RealmRegistry;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -81,7 +82,7 @@ final class ErrorPages
         }
 
         try {
-            return Inertia::render(self::COMPONENT, self::page($status, $e))
+            return Inertia::render(self::COMPONENT, self::page($status, $e, $request))
                 ->toResponse($request)
                 ->setStatusCode($status);
         } catch (Throwable) {
@@ -89,7 +90,7 @@ final class ErrorPages
         }
     }
 
-    public static function page(int $status, ?Throwable $e = null): ErrorPageData
+    public static function page(int $status, ?Throwable $e = null, ?Request $request = null): ErrorPageData
     {
         // Only a 403 or 503 message is written for the viewer (a policy's "This action is
         // unauthorized.", an `abort(403, '…')`, a maintenance note). A 404's message can name a model
@@ -106,6 +107,48 @@ final class ErrorPages
             default => ['Something went wrong', 'An unexpected error stopped this page from loading. Please try again in a moment.'],
         };
 
-        return new ErrorPageData(status: $status, title: $title, message: $own !== '' ? $own : $fallback);
+        return new ErrorPageData(
+            status: $status,
+            title: $title,
+            message: $own !== '' ? $own : $fallback,
+            realm: self::realmOf($request),
+        );
+    }
+
+    /**
+     * The realm a request was in: the matched route's own `realm` default (how a realm-mounted route says
+     * so, the same fact Frame's NavManifest reads), else the realm whose non-root routeBase the path sits
+     * under, the longest match winning. A root routeBase (`/`) names no realm here: every path sits under it.
+     */
+    private static function realmOf(?Request $request): ?string
+    {
+        if ($request === null) {
+            return null;
+        }
+
+        $own = $request->route()?->defaults['realm'] ?? null;
+        if (is_string($own) && $own !== '') {
+            return $own;
+        }
+
+        if (! app()->bound(RealmRegistry::class)) {
+            return null;
+        }
+
+        $path = '/'.ltrim($request->path(), '/');
+        $best = null;
+        $bestLength = 0;
+        foreach (app(RealmRegistry::class)->all() as $key => $realm) {
+            $base = rtrim($realm->routeBase, '/');
+            if ($base === '' || strlen($base) <= $bestLength) {
+                continue;
+            }
+            if ($path === $base || str_starts_with($path, $base.'/')) {
+                $best = $key;
+                $bestLength = strlen($base);
+            }
+        }
+
+        return $best;
     }
 }

@@ -32,6 +32,8 @@ beforeEach(function () {
     Route::get('boom/down', fn () => abort(503, 'Back at noon.'));
     Route::get('boom/chosen', fn () => throw new HttpResponseException(response('custom', 403)));
     Route::get('api/boom/policy', fn () => throw new AuthorizationException);
+    Route::get('operator/boom', fn () => throw new AuthorizationException);
+    Route::get('console/boom', fn () => throw new AuthorizationException)->defaults('realm', 'operator');
 
     $this->inertia = ['X-Inertia' => 'true', 'X-Requested-With' => 'XMLHttpRequest'];
 });
@@ -89,4 +91,14 @@ it('leaves JSON error responses exactly as they were', function () {
 
 it('does not replace a response somebody built on purpose', function () {
     $this->get('/boom/chosen', $this->inertia)->assertStatus(403)->assertSee('custom');
+});
+
+it('names the realm the refused request was in, so the page renders in that realm\'s shell', function () {
+    // A 403 under /operator rendered in the ACCOUNT shell: the page only knew signed-in vs guest
+    // (launch follow-ups 02). The realm comes from the route's own `realm` default when it carries one,
+    // else from the realm whose routeBase the path sits under; a request in no realm sends null.
+    $this->get('/operator/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', 'operator');
+    $this->get('/console/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', 'operator');
+    $this->get('/boom/policy', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', null);
+    $this->get('/no/such/page', $this->inertia)->assertStatus(404)->assertJsonPath('props.realm', null);
 });

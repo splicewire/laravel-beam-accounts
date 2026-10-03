@@ -24,5 +24,10 @@ final class ErrorPageData extends Data
         public int $status,
         public string $title,
         public string $message,
+        /**
+         * The realm the refused request was in (`operator`, `user`, …), so the page renders in that realm's
+         * shell; null for a request in no realm (an unscoped page, an unrouted 404).
+         */
+        public ?string $realm = null,
     ) {}
 }
