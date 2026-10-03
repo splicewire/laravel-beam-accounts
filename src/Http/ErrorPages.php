@@ -8,8 +8,10 @@ use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Splicewire\Beam\Accounts\Data\Pages\ErrorPageData;
+use Splicewire\Beam\Realm\RealmGateAbility;
 use Splicewire\Beam\Realm\RealmRegistry;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -116,11 +118,42 @@ final class ErrorPages
     }
 
     /**
-     * The realm a request was in: the matched route's own `realm` default (how a realm-mounted route says
-     * so, the same fact Frame's NavManifest reads), else the realm whose non-root routeBase the path sits
-     * under, the longest match winning. A root routeBase (`/`) names no realm here: every path sits under it.
+     * The realm a request was in, named only when the viewer may ENTER it, so the page renders in that
+     * realm's shell with a way back that works (owner decision 14: a refusal renders inside the host layout,
+     * with a way back). A viewer refused at the realm's door (a member at /operator) gets null, so the page
+     * falls back to the account shell and /dashboard instead of a rail and a link that refuse them again.
+     *
+     * Which realm: the matched route's own `realm` default (the same fact Frame's NavManifest reads), else
+     * the realm whose non-root routeBase the path sits under, the longest match winning. A root routeBase
+     * (`/`) names no realm here: every path sits under it. Entry: the realm's gate ability
+     * ({@see RealmGateAbility}); a realm with none is open to any signed-in viewer. A guest gets null.
      */
     private static function realmOf(?Request $request): ?string
+    {
+        $realm = self::requestRealm($request);
+        $user = $request?->user();
+
+        if ($realm === null || $user === null) {
+            return null;
+        }
+
+        $ability = app()->bound(RealmRegistry::class)
+            ? RealmGateAbility::for($realm, app(RealmRegistry::class))
+            : null;
+
+        if ($ability === null) {
+            return $realm;
+        }
+
+        // A gate that cannot answer names no realm; it must never cost the viewer the error page itself.
+        try {
+            return Gate::forUser($user)->allows($ability) ? $realm : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private static function requestRealm(?Request $request): ?string
     {
         if ($request === null) {
             return null;

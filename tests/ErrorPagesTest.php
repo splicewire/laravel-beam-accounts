@@ -1,12 +1,16 @@
 <?php
 
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\GenericUser;
+use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
+use Illuminate\Foundation\Auth\Access\Authorizable;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Http\ErrorPages;
 
@@ -93,12 +97,44 @@ it('does not replace a response somebody built on purpose', function () {
     $this->get('/boom/chosen', $this->inertia)->assertStatus(403)->assertSee('custom');
 });
 
-it('names the realm the refused request was in, so the page renders in that realm\'s shell', function () {
-    // A 403 under /operator rendered in the ACCOUNT shell: the page only knew signed-in vs guest
-    // (launch follow-ups 02). The realm comes from the route's own `realm` default when it carries one,
-    // else from the realm whose routeBase the path sits under; a request in no realm sends null.
-    $this->get('/operator/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', 'operator');
-    $this->get('/console/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', 'operator');
-    $this->get('/boom/policy', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', null);
+it('names the realm only when the viewer may enter it, so a refusal never loops back to the realm', function () {
+    // A 403 under /operator rendered in the ACCOUNT shell (launch follow-ups 02). The fix must not send a viewer who
+    // cannot enter the realm into that realm's shell, whose every way back (/operator) would refuse them again
+    // (owner decision 14: inside the host layout, with a way back). So the realm, from the route's own `realm`
+    // default or the realm whose routeBase the path sits under, is sent only when the viewer passes the realm's
+    // entry gate (RealmGateAbility), and never for a guest.
+    config()->set('beam.core.realm_gates', ['operator' => ['entitlement' => 'os.operate']]);
+    Gate::define('entitlement:os.operate', fn ($user) => $user->getAuthIdentifier() === 1);
+    $operator = errorPagesUser(1);
+    $member = errorPagesUser(2);
+
+    $this->actingAs($operator)->get('/operator/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', 'operator');
+    $this->actingAs($operator)->get('/console/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', 'operator');
+    $this->actingAs($member)->get('/operator/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', null);
+    $this->actingAs($member)->get('/console/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', null);
+    $this->actingAs($operator)->get('/boom/policy', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', null);
+});
+
+it('keeps the error page when the realm gate itself throws', function () {
+    config()->set('beam.core.realm_gates', ['operator' => ['entitlement' => 'os.operate']]);
+    Gate::define('entitlement:os.operate', fn () => throw new RuntimeException('gate down'));
+
+    $this->actingAs(errorPagesUser(1))->get('/operator/boom', $this->inertia)
+        ->assertStatus(403)
+        ->assertJsonPath('component', 'error')
+        ->assertJsonPath('props.realm', null);
+});
+
+it('names no realm for a guest', function () {
+    $this->get('/operator/boom', $this->inertia)->assertStatus(403)->assertJsonPath('props.realm', null);
     $this->get('/no/such/page', $this->inertia)->assertStatus(404)->assertJsonPath('props.realm', null);
 });
+
+/** A minimal signed-in viewer the Gate (and laravel-permission's before-hook) accepts. */
+function errorPagesUser(int $id): GenericUser
+{
+    return new class(['id' => $id]) extends GenericUser implements AuthorizableContract
+    {
+        use Authorizable;
+    };
+}
