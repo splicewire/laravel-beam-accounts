@@ -6,18 +6,18 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Password-reset link notification — the email peer of the Fortify
  * `ResetUserPassword` action, engine-owned so every beam host gets a working
  * SPA reset email out of the box.
  *
- * Unlike Laravel's default (which routes at a server-rendered `password.reset`
- * route), a beam host is an SPA: the link points at the React reset route
- * (default `/ui/reset-password`), carrying the broker token + email in the query
- * string so the SPA can read them and POST to `/api/v1/reset-password`. The URL
- * base is a config seam (`beam.accounts.password_reset_url`) so a non-standard SPA
- * host/path can be pointed at without touching this class; the brand is just
+ * The link points where THIS host resets passwords: the page a host declares in
+ * `beam.accounts.password_reset_url` (an SPA such as the flagship's `/ui/reset-password`,
+ * which reads the token + email from the query and POSTs to `/api/v1/reset-password`),
+ * else the named `password.reset` page (Fortify's, at the Inertia starters), else
+ * `/reset-password`. The package ships no app path. The brand is just
  * `app.name` — the universal, tenant-overridable carrier (a tenant maps it through
  * the tenancy config seam), never an accounts-scoped key.
  */
@@ -52,17 +52,22 @@ class ResetPasswordNotification extends Notification
     /**
      * The SPA reset URL carrying the broker token + email.
      *
-     * The base is config-driven (`beam.accounts.password_reset_url`) so a
-     * non-standard SPA host/path can be pointed at without touching this class.
+     * The host-declared page (`beam.accounts.password_reset_url`), else the named
+     * `password.reset` route, else `/reset-password`.
      */
     public function resetUrl(CanResetPassword $notifiable): string
     {
+        $email = $notifiable->getEmailForPasswordReset();
         $base = config('beam.accounts.password_reset_url');
-        $query = http_build_query([
-            'token' => $this->token,
-            'email' => $notifiable->getEmailForPasswordReset(),
-        ]);
 
-        return $base.'?'.$query;
+        if (is_string($base) && trim($base) !== '') {
+            return $base.'?'.http_build_query(['token' => $this->token, 'email' => $email]);
+        }
+
+        if (Route::has('password.reset')) {
+            return route('password.reset', ['token' => $this->token]).'?'.http_build_query(['email' => $email]);
+        }
+
+        return url('/reset-password').'?'.http_build_query(['token' => $this->token, 'email' => $email]);
     }
 }

@@ -66,10 +66,10 @@ return [
     // Sanctum, not Fortify — turns this off to keep its auth surface untouched.
     'bootstrap_fortify' => env('ACCOUNT_BOOTSTRAP_FORTIFY', true),
 
-    // The SPA reset route the reset-link email points at, carrying the broker token +
-    // email in the query string. Default targets the beam SPA under /ui; a host with a
-    // different SPA host/path overrides via env without touching the notification class.
-    'password_reset_url' => env('PASSWORD_RESET_URL', rtrim(env('APP_URL', 'http://localhost'), '/').'/ui/reset-password'),
+    // Where the reset-link email points, carrying the broker token + email in the query string. A host that resets
+    // in an SPA declares its page here (e.g. the flagship's `/ui/reset-password`). Unset → the named
+    // `password.reset` page (Fortify's), else `/reset-password` on the app URL. The package ships no app path.
+    'password_reset_url' => env('PASSWORD_RESET_URL'),
 
     // Prefix + route middleware for the settings surface.
     'routes' => [
