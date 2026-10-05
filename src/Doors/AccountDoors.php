@@ -53,7 +53,13 @@ final class AccountDoors
         };
     }
 
-    /** The one central User create: admitted through `$door`, or nothing is created. */
+    /**
+     * The one central User create: admitted through `$door`, or nothing is created.
+     *
+     * It admits but does not CONSUME: a caller creating through {@see Door::Invite} marks the invitation accepted in the
+     * same transaction (tower's claim does), and a caller creating through {@see Door::Operator} or {@see Door::Service}
+     * has already authorized its actor; admit() does not look at one (review-r1 on 56ea4f5).
+     */
     public function create(Door $door, NewUserData $user, ?string $invitationToken = null): Authenticatable
     {
         $admission = $this->admit($door, $user->email, $invitationToken);
