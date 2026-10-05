@@ -3,6 +3,9 @@
 namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Http\Request;
+use Illuminate\Cache\RateLimiting\Limit;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 
@@ -74,5 +77,44 @@ trait WiresRouteMacro
                 // deeper than the provider the macro was extracted from.
                 ->group(dirname(__DIR__, 2).'/routes/account-api.php');
         });
+
+        /*
+         * The accounts api/v1 surface (tower-is-splicewire D5′), as three per-capability INERT macros: no prefix, no name
+         * prefix and no guard of their own, because each half lives in a different host group. At the flagship that is the
+         * guest central group, the signed-in central group (`auth:sanctum`) and the tenant group. The package mounts none of
+         * them. Each one loads its route file through the one loader below.
+         */
+        // Every capability passes through this one loader (a plain closure: a macro closure is bound to the Router, so
+        // `static::` inside one would resolve against the Router, not this trait).
+        $requireApiV1Routes = function (string $file): void {
+            require dirname(__DIR__, 2).'/routes/'.$file;
+        };
+
+        Route::macro('splicewireAccountsAuthV1', function () use ($requireApiV1Routes) {
+            // The guest routes carry their own per-route throttles (each verb's brute-force ceiling is part of its
+            // contract). A host defines those limiters; a host that has not gets these defaults, never overriding its own.
+            $defaults = [
+                'login' => fn (Request $request) => [
+                    Limit::perMinute((int) config('auth.login_throttle.email_ip', 5))
+                        ->by('email:'.strtolower((string) $request->input('email')).'|'.$request->ip()),
+                    Limit::perMinute((int) config('auth.login_throttle.ip', 20))->by('login-ip:'.$request->ip()),
+                ],
+                'password-reset' => fn (Request $request) => Limit::perMinute((int) config('auth.password_reset_throttle', 6))
+                    ->by('pwreset:'.$request->ip()),
+                'passkey' => fn (Request $request) => Limit::perMinute((int) config('auth.passkey_throttle', 30))
+                    ->by('passkey:'.$request->ip()),
+            ];
+            foreach ($defaults as $name => $limit) {
+                if (RateLimiter::limiter($name) === null) {
+                    RateLimiter::for($name, $limit);
+                }
+            }
+
+            $requireApiV1Routes('api-v1-auth.php');
+        });
+
+        Route::macro('splicewireAccountsSessionV1', fn () => $requireApiV1Routes('api-v1-session.php'));
+
+        Route::macro('splicewireAccountsMeV1', fn () => $requireApiV1Routes('api-v1-me.php'));
     }
 }
