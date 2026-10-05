@@ -4,19 +4,15 @@ namespace Splicewire\Beam\Accounts\Http\Controllers;
 
 use Exception;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
-use Splicewire\Beam\Accounts\Auth\AuthTokenFactory;
-use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Doors\AccountDoors;
 use Splicewire\Beam\Accounts\Doors\Door;
 use Splicewire\Beam\Accounts\Doors\DoorClosed;
 use Splicewire\Beam\Accounts\Doors\NewUserData;
-use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 
 /**
@@ -30,28 +26,27 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
  *  - a NEW account is created only through `AccountDoors::create(Door::OAuth, …)`: an exact, declared domain and a
  *    verified email, read from config, never env();
  *  - every refusal and error returns to the sign-in page (`beam.accounts.doors.oauth.sign_in`, else the named
- *    `login`) with an `error` code.
+ *    `login`) with an `error` code;
+ *  - it signs in by SESSION only. There is no popup "opener" branch: one minted a bearer token for any request
+ *    that asked (`?opener=1`) and posted it to `window.opener` with target "*" (security row e5684baf). It also
+ *    never goes stateless(): the OAuth state is Socialite's, and it is checked.
  *
- * Needs `laravel/socialite`, which the host installs. A host using the popup "opener" flow provides the
- * `auth.callback` view.
+ * Needs `laravel/socialite`, which the host installs.
  */
 class OAuthController extends Controller
 {
-    public function handleRedirect(Request $request, string $provider)
+    /** Socialite sets and stores its own OAuth state; nothing a request carries may replace it. */
+    public function handleRedirect(string $provider)
     {
-        $driver = Socialite::driver($provider);
-
-        if ($request->input('opener')) {
-            $driver->with(['state' => 'opener']);
-        }
-
-        return $driver->redirect();
+        return Socialite::driver($provider)->redirect();
     }
 
-    public function handleCallback(Request $request, AccountDoors $doors, string $provider)
+    public function handleCallback(AccountDoors $doors, string $provider)
     {
         try {
-            $oauthUser = Socialite::driver($provider)->stateless()->user();
+            // NOT stateless(): Socialite checks the state it stored at the redirect, so a forged callback cannot sign a
+            // victim into someone else's linked account (login CSRF).
+            $oauthUser = Socialite::driver($provider)->user();
             $providerColumn = "{$provider}_id";
             $verified = Arr::get($oauthUser->getRaw(), 'email_verified') === true;
             $model = BeamAccounts::userModel();
@@ -79,13 +74,6 @@ class OAuthController extends Controller
                     verified: true,
                 ));
                 $user->forceFill([$providerColumn => $oauthUser->id])->save();
-            }
-
-            if ($request->input('state') === 'opener') {
-                $token = AuthTokenFactory::mint($user, $request->userAgent() ?? '', TokenProvenance::Session, $request->boolean('remember'));
-                $openerMessage = AuthUserData::fromUser($user, $token->plainTextToken)->toArray();
-
-                return view('auth.callback', compact('openerMessage'));
             }
 
             Auth::login($user);
