@@ -77,7 +77,7 @@ class Landing
             return null;
         }
 
-        $judged = parse_url($decoded);
+        $judged = parse_url(self::asciiOnly($decoded));
         if ($judged === false) {
             return null;
         }
@@ -102,7 +102,7 @@ class Landing
 
         // Safe as decoded, so return what the client SENT (review-r1 on 2c106e1): the parts of the original, with only the
         // backslashes normalised, so an encoded `&`, `#`, `?` or space keeps its meaning (`?q=a%26b` stays one value).
-        $sent = parse_url(str_replace('\\', '/', $intended));
+        $sent = parse_url(self::asciiOnly(str_replace('\\', '/', $intended)));
         if ($sent === false) {
             return null;
         }
@@ -110,6 +110,15 @@ class Landing
         return ($sent['path'] ?? '/')
             .(isset($sent['query']) ? '?'.$sent['query'] : '')
             .(isset($sent['fragment']) ? '#'.$sent['fragment'] : '');
+    }
+
+    /**
+     * Percent-encode every non-ASCII byte (build.qa on fc2d3ef): `parse_url()` replaces raw bytes it does not expect,
+     * so an unencoded `/café` would come back as broken UTF-8. Encoded, it means the same and parses intact.
+     */
+    private static function asciiOnly(string $url): string
+    {
+        return (string) preg_replace_callback('/[\x80-\xFF]/', fn (array $byte) => rawurlencode($byte[0]), $url);
     }
 
     /** @param  array<string, mixed>  $parts */

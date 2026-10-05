@@ -79,6 +79,8 @@ it('honours a safe intended URL first, as its normalised path', function (string
     // review-r1 on 2c106e1: judged decoded, returned exactly as sent, so an encoded value keeps its meaning.
     'an encoded query value' => ['/search?q=a%26b#x', '/search?q=a%26b#x'],
     'an encoded path' => ['/files/a%20b%3Fc', '/files/a%20b%3Fc'],
+    // build.qa on fc2d3ef: parse_url() mangles raw non-ASCII bytes; they are percent-encoded instead, same meaning.
+    'a raw non-ASCII path' => ["/caf\u{e9}/\u{3000}x", '/caf%C3%A9/%E3%80%80x'],
 ]);
 
 it('refuses an unsafe intended URL and lands on the role home', function (string $intended) {
