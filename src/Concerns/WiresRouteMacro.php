@@ -116,5 +116,22 @@ trait WiresRouteMacro
         Route::macro('splicewireAccountsSessionV1', fn () => $requireApiV1Routes('api-v1-session.php'));
 
         Route::macro('splicewireAccountsMeV1', fn () => $requireApiV1Routes('api-v1-me.php'));
+
+        // OAuth sign-in through the account doors (purchase-walkthrough M10): mounted only for the providers
+        // `beam.accounts.doors.oauth.providers` declares. None declared, nothing mounts: a closed door registers no route.
+        Route::macro('splicewireAccountsOAuth', function () {
+            $providers = array_values(array_filter((array) config('beam.accounts.doors.oauth.providers', []), 'is_string'));
+
+            if ($providers === []) {
+                return;
+            }
+
+            $pattern = implode('|', array_map(fn (string $p) => preg_quote($p, '/'), $providers));
+
+            Route::get('auth/{provider}/redirect', [\Splicewire\Beam\Accounts\Http\Controllers\OAuthController::class, 'handleRedirect'])
+                ->where('provider', $pattern)->name('oauth.redirect');
+            Route::get('auth/{provider}/callback', [\Splicewire\Beam\Accounts\Http\Controllers\OAuthController::class, 'handleCallback'])
+                ->where('provider', $pattern)->name('oauth.callback');
+        });
     }
 }

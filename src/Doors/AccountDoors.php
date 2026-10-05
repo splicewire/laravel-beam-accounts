@@ -19,6 +19,15 @@ final class AccountDoors
 {
     public function __construct(private readonly InvitationRedemption $invitations) {}
 
+    /**
+     * Whether this host has DECLARED its registration door. Until it does, Fortify's own feature list stands (adopting the
+     * package changes no live host), while the package's own registration action still admits nobody.
+     */
+    public function declared(): bool
+    {
+        return config('beam.accounts.doors.registration') !== null;
+    }
+
     public function policy(): AccountDoorsData
     {
         $doors = (array) config('beam.accounts.doors', []);
@@ -62,7 +71,9 @@ final class AccountDoors
      */
     public function create(Door $door, NewUserData $user, ?string $invitationToken = null): Authenticatable
     {
-        $admission = $this->admit($door, $user->email, $invitationToken);
+        $admission = $door === Door::OAuth && ! $user->verified
+            ? Admission::refuse('the provider has not verified this email.')
+            : $this->admit($door, $user->email, $invitationToken);
 
         if (! $admission->admitted) {
             throw DoorClosed::for($door, $admission);
@@ -79,6 +90,8 @@ final class AccountDoors
             $created->forceFill(['email_verified_at' => now()])->save();
         }
 
+        event(new AccountCreated($created, $door));
+
         return $created;
     }
 
@@ -90,6 +103,10 @@ final class AccountDoors
      */
     public function fortifyFeatures(array $features): array
     {
+        if (! $this->declared()) {
+            return $features;
+        }
+
         $without = array_values(array_filter($features, fn ($feature) => $feature !== Features::registration()));
 
         return $this->policy()->registration === 'open' ? [...$without, Features::registration()] : $without;

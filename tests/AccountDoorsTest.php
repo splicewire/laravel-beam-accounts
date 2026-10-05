@@ -109,6 +109,17 @@ it('drops Fortify registration from any feature list unless registration is open
     expect(doors()->fortifyFeatures([Features::resetPasswords()]))->toBe([Features::resetPasswords(), Features::registration()]);
 });
 
+it('leaves a host\'s own Fortify feature list alone while it has not declared its registration door', function () {
+    // A host that has not declared beam.accounts.doors.registration keeps exactly the features it lists, so adopting
+    // this package changes no live host until it declares (build-qa on 56ea4f5: the closed default reached them).
+    config(['beam.accounts.doors.registration' => null]);
+    $listed = [Features::registration(), Features::resetPasswords()];
+
+    expect(doors()->declared())->toBeFalse()
+        ->and(doors()->fortifyFeatures($listed))->toBe($listed)
+        ->and(doors()->admit(Door::Register, 'ada@acme.test')->admitted)->toBeFalse('Undeclared admits nothing through the package action.');
+});
+
 it('sets Fortify\'s registration feature from the policy at boot', function () {
     // This testbench boots with registration OPEN (TestCase); the closed path is covered by fortifyFeatures() above.
     expect(config('fortify.features'))->toContain(Features::registration());

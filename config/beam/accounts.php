@@ -72,11 +72,15 @@ return [
     // lets a Root operator add people. The invitation claim is its own door, always available where invitations
     // exist. The defaults keep every door shut but the operator's.
     'doors' => [
-        'registration' => env('ACCOUNT_REGISTRATION', 'closed'),
+        // Undeclared (null): the host's own Fortify feature list stands, and the package's registration action admits
+        // nobody. Declare 'open' or 'closed' (ACCOUNT_REGISTRATION) to let the policy set Fortify's registration feature.
+        'registration' => env('ACCOUNT_REGISTRATION'),
         'oauth' => [
             'providers' => [],
             'create' => 'never',
             'domains' => [],
+            // Where a refused or failed OAuth sign-in returns (with `?error=`). Null: the named `login` route.
+            'sign_in' => null,
         ],
         'operator' => true,
     ],

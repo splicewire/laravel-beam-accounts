@@ -44,6 +44,7 @@
         "wikimedia/composer-merge-plugin": "^2.1"
     },
     "suggest": {
+        "laravel/socialite": "Install where Route::splicewireAccountsOAuth() mounts OAuth sign-in (purchase-walkthrough M10).",
         "laravel/sanctum": "Install in a satellite to activate its own opt-in token 'api' guard seam alongside the engine's session/Fortify web guard.",
         "splicewire/laravel-beam-notifications": "Activates this package's `to_roles:` / `to_teams:` recipient kinds, which it registers into `beam.notifications.recipient_kinds` unconditionally \u2014 the entries are inert strings without the notify package and live with it, so nothing here probes whether it is installed."
     },
