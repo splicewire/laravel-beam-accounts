@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Gate;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Impersonation\Impersonation;
+use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
 
@@ -82,10 +83,9 @@ class ImpersonateUser
             : redirect()->to(self::landing());
     }
 
+    /** Where the operator lands AS the customer: where that customer would land (ux-walkthrough UX-11, IA-5). */
     private static function landing(): string
     {
-        $target = config('beam.accounts.impersonation.start_redirect', '/');
-
-        return \Illuminate\Support\Facades\Route::has($target) ? route($target) : $target;
+        return Landing::for(auth()->user());
     }
 }

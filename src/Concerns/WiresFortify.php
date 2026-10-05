@@ -37,7 +37,50 @@ trait WiresFortify
     {
         $this->app->booting(function (): void {
             config(['fortify.features' => $this->app->make(AccountDoors::class)->fortifyFeatures((array) config('fortify.features', []))]);
+
+            // ux-walkthrough UX-11 (IA-5, T3): every door lands through Landing::for(), so `fortify.home` decides nothing;
+            // it holds no literal path that could quietly start deciding again. Fortify's remaining readers carry their
+            // own defaults (password reset → login, logout → '/').
+            config(['fortify.home' => null]);
         });
+    }
+
+    /**
+     * `GET /logout` → a confirm page that POSTs (ux-walkthrough UX-11, IA-5). Registered at package boot, so it precedes
+     * a host's route files and their catch-alls; a host that declares its own `GET /logout` replaces it by registering
+     * later (the flagship sends it to its SPA's confirm). `beam.accounts.logout_confirm` = false opts out.
+     */
+    #[Chained('boot', order: 180)]
+    protected function bootLogoutConfirm(): void
+    {
+        if (! config('beam.accounts.logout_confirm', true)) {
+            return;
+        }
+
+        \Illuminate\Support\Facades\Route::middleware('web')
+            ->get('logout', \Splicewire\Beam\Accounts\Http\Controllers\LogoutConfirmController::class)
+            ->name('logout.confirm');
+    }
+
+    /**
+     * Every Fortify and passkey sign-in door lands through Landing::for() (ux-walkthrough UX-11, IA-5), whether or not
+     * this package bootstraps Fortify's actions: where a door lands is not part of a host's own auth stack (the flagship
+     * keeps `bootstrap_fortify` off and still serves Fortify's web login).
+     */
+    #[Chained('boot', order: 190)]
+    protected function bootLandingResponses(): void
+    {
+        $this->app->singleton(\Laravel\Fortify\Contracts\LoginResponse::class, \Splicewire\Beam\Accounts\Fortify\Responses\LandingLoginResponse::class);
+        $this->app->singleton(\Laravel\Fortify\Contracts\TwoFactorLoginResponse::class, \Splicewire\Beam\Accounts\Fortify\Responses\LandingTwoFactorLoginResponse::class);
+        $this->app->singleton(\Laravel\Fortify\Contracts\RegisterResponse::class, \Splicewire\Beam\Accounts\Fortify\Responses\LandingRegisterResponse::class);
+        $this->app->singleton(\Laravel\Fortify\Contracts\VerifyEmailResponse::class, \Splicewire\Beam\Accounts\Fortify\Responses\LandingVerifyEmailResponse::class);
+        $this->app->singleton(\Laravel\Fortify\Contracts\PasswordConfirmedResponse::class, \Splicewire\Beam\Accounts\Fortify\Responses\LandingPasswordConfirmedResponse::class);
+        $this->app->singleton(\Laravel\Passkeys\Contracts\PasskeyLoginResponse::class, \Splicewire\Beam\Accounts\Fortify\Responses\LandingPasskeyLoginResponse::class);
+        // Fortify's controllers build this one by class with a `name` (email-verification prompt and resend).
+        $this->app->bind(
+            \Laravel\Fortify\Http\Responses\RedirectAsIntended::class,
+            fn ($app, array $parameters) => new \Splicewire\Beam\Accounts\Fortify\Responses\LandingRedirectAsIntended((string) ($parameters['name'] ?? '')),
+        );
     }
 
     #[Chained('boot', order: 50)]

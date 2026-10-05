@@ -329,6 +329,9 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
      */
     public function packageRegistered(): void
     {
+        // ux-walkthrough UX-11 (IA-5): where a seated user lands. A host whose tenant is named by its URL binds its own.
+        $this->app->bindIf(Contracts\LandingSeats::class, Support\TeamLandingSeats::class);
+
         $this->registerFortifyFeaturesFromDoors();
 
         // The `central` connection alias is NOT registered here any more (beam-facade ticket 96) —

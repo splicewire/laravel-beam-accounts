@@ -12,6 +12,7 @@ use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Data\LoginInputData;
 use Splicewire\Beam\Accounts\Data\LoginResponseData;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
+use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Data\ResponseBody;
 use Splicewire\Beam\Http\Controller;
 
@@ -50,7 +51,11 @@ class LoginController extends Controller
                 (bool) $input->remember,
             );
 
-            return ResponseBody::from(['data' => AuthUserData::fromUser($user, $token->plainTextToken)]);
+            // ux-walkthrough UX-11 (IA-5): where to land, from the one resolver, so the SPA guesses no literal.
+            return ResponseBody::from([
+                'data' => AuthUserData::fromUser($user, $token->plainTextToken),
+                'meta' => ['landing' => Landing::for($user)],
+            ]);
         }
 
         $body = ResponseBody::from(['message' => 'Unauthorized.']);

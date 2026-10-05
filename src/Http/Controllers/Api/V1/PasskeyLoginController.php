@@ -10,6 +10,7 @@ use Splicewire\Beam\Accounts\Auth\AuthTokenFactory;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Data\PasskeyLoginInputData;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
+use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyAuthenticator;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyChallengeStore;
 use Splicewire\Beam\Accounts\Passkeys\ResolvesPasskeyCeremonies;
@@ -80,6 +81,10 @@ class PasskeyLoginController extends Controller
         // then project the pure identity core off it — the mint lives here, never inside the Data.
         $token = AuthTokenFactory::mint($user, $request->userAgent() ?? 'passkey', TokenProvenance::Passkey, $input->remember === true);
 
-        return ResponseBody::from(['data' => AuthUserData::fromUser($user, $token->plainTextToken)]);
+        // ux-walkthrough UX-11 (IA-5): the passkey door lands where the password door does.
+        return ResponseBody::from([
+            'data' => AuthUserData::fromUser($user, $token->plainTextToken),
+            'meta' => ['landing' => Landing::for($user)],
+        ]);
     }
 }

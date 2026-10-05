@@ -13,5 +13,12 @@ class LoginResponseData extends BeamData
         public ?int $limit = null,
         public ?int $offset = null,
         public ?int $total = null,
+        /**
+         * `landing`: where the signed-in user lands, from {@see \Splicewire\Beam\Accounts\Landing} (ux-walkthrough
+         * UX-11, IA-5). Absent on a refused sign-in.
+         *
+         * @var array{landing?: string}
+         */
+        public array $meta = [],
     ) {}
 }

@@ -194,9 +194,7 @@ return [
         // Deterministic credentials the DemoTeamSeeder provisions and login-as targets.
         'password' => env('ACCOUNT_DEMO_PASSWORD', 'password'),
         'email_domain' => env('ACCOUNT_DEMO_EMAIL_DOMAIN', 'example.test'),
-
-        // Where a successful demo login lands. Satellites point this at their home.
-        'redirect' => '/',
+        // A demo login lands through Landing::for() like every other door (ux-walkthrough UX-11): no redirect key.
     ],
 
     /*
@@ -223,10 +221,7 @@ return [
         // operator entitlement.
         'ability' => 'entitlement:os.operate',
 
-        // Where each half lands. A route NAME is preferred (survives URI moves) and is resolved when
-        // one exists; anything else is used as a literal path.
-        'start_redirect' => '/',
-        'stop_redirect' => '/',
+        // Both halves land through Landing::for() (ux-walkthrough UX-11): no redirect keys.
     ],
 
     // The "proprietary API layer" seam — a satellite's second door, for exposing its

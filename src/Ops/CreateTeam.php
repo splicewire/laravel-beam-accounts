@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Data\CreateTeamInputData;
 use Splicewire\Beam\Accounts\Data\TeamData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
 use Splicewire\Beam\Particle\OperationKind;
@@ -39,7 +40,7 @@ use Splicewire\Beam\Particle\Subject\NoSubject;
  *
  * The payload is the new team as {@see TeamData}, the `teams` resource's own read projection. A JSON
  * caller gets it enveloped; the Inertia form is redirected to the team page instead
- * (`beam.accounts.teams.created_redirect`, default `account.team`, falling back to `dashboard`) — the
+ * (through {@see \Splicewire\Beam\Accounts\Landing}, with `account.team` as the intended URL; UX-11) — the
  * pass-through `ParticleOperationController::finish()` gives an already-built response.
  */
 #[ParticleOp(
@@ -71,15 +72,13 @@ class CreateTeam
             : redirect()->to(self::landing())->with('status', 'team-created');
     }
 
-    /** Where the new owner lands: the team page, where they can invite their first teammate. */
+    /**
+     * Where the new owner lands: the team page, where they can invite their first teammate. Through the one resolver
+     * with the team page as the intended URL (ux-walkthrough UX-11, IA-5; lead ruling Q1), so a host without that page
+     * lands the owner where any other door would.
+     */
     public static function landing(): string
     {
-        foreach ([config('beam.accounts.teams.created_redirect', 'account.team'), 'dashboard'] as $target) {
-            if (is_string($target) && $target !== '' && Route::has($target)) {
-                return route($target);
-            }
-        }
-
-        return '/';
+        return Landing::for(auth()->user(), Route::has('account.team') ? route('account.team', [], false) : null);
     }
 }

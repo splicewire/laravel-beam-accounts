@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Splicewire\Beam\Accounts\Data\InvitationAcceptedData;
+use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
@@ -76,12 +77,10 @@ class RedeemInvitation
         return redirect()->to(self::landing())->with('status', 'invitation-accepted');
     }
 
-    /** Where the new member lands: the dashboard of the team they just joined. */
+    /** Where the new member lands: through the one resolver (ux-walkthrough UX-11, IA-5), now that they hold a seat. */
     public static function landing(): string
     {
-        $target = config('beam.accounts.invitations.accepted_redirect', 'dashboard');
-
-        return is_string($target) && Route::has($target) ? route($target) : '/';
+        return Landing::for(auth()->user());
     }
 
     private static function refuse(string $verdict, Request $request): never

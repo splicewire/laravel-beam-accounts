@@ -14,6 +14,7 @@ use Splicewire\Beam\Accounts\Doors\Door;
 use Splicewire\Beam\Accounts\Doors\DoorClosed;
 use Splicewire\Beam\Accounts\Doors\NewUserData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Landing;
 
 /**
  * OAuth sign-in through the account doors (purchase-walkthrough M10, rule BUY-9), mounted by the inert
@@ -78,7 +79,8 @@ class OAuthController extends Controller
 
             Auth::login($user);
 
-            return redirect('/');
+            // ux-walkthrough UX-11 (IA-5): the OAuth door lands through the one resolver, a safe intended URL included.
+            return redirect()->to(Landing::for($user, request()->session()->pull('url.intended')));
         } catch (DoorClosed) {
             return $this->toSignIn('oauth_registration_closed');
         } catch (Exception $e) {

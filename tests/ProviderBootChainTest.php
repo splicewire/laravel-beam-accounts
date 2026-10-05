@@ -63,6 +63,13 @@ const APPENDED_BOOT_ORDER = [
     // one container binding, reads nothing any earlier link produced, and nothing later reads it
     // (RecipientKindRegistry reads through to the config repository at SEND time, not at boot).
     'bootNotifyRecipients',
+    // ux-walkthrough UX-11 — the packaged `GET /logout` confirm route. Order-independent: it registers one route
+    // and reads nothing an earlier link produces; it only has to run at package boot, before a host's route files
+    // (and their catch-alls) load.
+    'bootLogoutConfirm',
+    // ux-walkthrough UX-11 — Fortify's and passkeys' sign-in responses bound to Landing. Order-independent: container
+    // bindings only, read when a door answers; outside bootFortify so a host with `bootstrap_fortify` off lands too.
+    'bootLandingResponses',
 ];
 
 it('resolves the boot chain in the order the hand-written block used, with later links appended', function () {

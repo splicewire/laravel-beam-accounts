@@ -9,6 +9,7 @@ use Splicewire\Beam\Accounts\Actions\LogInAs;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
+use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
 use Splicewire\Beam\Particle\OperationKind;
 
@@ -121,20 +122,14 @@ class LogInAsUser
     }
 
     /**
-     * The designated operator demo subject lands on the operator shell when one is routed (its own
-     * `bootOperatorShell()` default, or a host's `operator.home`) — the point of a different demo
-     * subject per role is landing somewhere that shows what that role can reach, not the same
-     * generic default every subject shares. Every other subject keeps `beam.accounts.demo.redirect`.
-     *
-     * Matched by EMAIL rather than by subject key, because the subject key is exactly what this op
-     * no longer takes; `BeamDemo::email()` is the same mapping the seeder used to provision it.
+     * Where a demo subject lands: exactly where the password door would land it (ux-walkthrough UX-11, IA-5), so a
+     * demo walk and a real sign-in reach the same URL per subject. An operator subject with no seat lands in Operator
+     * (Landing rule 3); one with a seat lands in App (OQ-1).
      */
     private static function redirectFor(Model $user): string
     {
-        $isOperator = $user->email === BeamDemo::email(BeamDemo::operatorKey());
-
-        return $isOperator && Route::has('operator.home')
-            ? route('operator.home')
-            : config('beam.accounts.demo.redirect', '/');
+        // ux-walkthrough UX-11 (IA-5): the demo door lands where the password door would, through the one resolver.
+        // The operator subject with a seat lands in App (OQ-1); Operator is one switcher click away.
+        return Landing::for($user);
     }
 }

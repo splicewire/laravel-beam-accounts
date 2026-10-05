@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Impersonation\Impersonation;
+use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
 
@@ -62,11 +63,9 @@ class StopImpersonating
             : redirect()->to(self::landing());
     }
 
-    /** Where the restored operator lands — their own console, not the customer's. */
+    /** Where the restored operator lands: where they would land signing in (ux-walkthrough UX-11, IA-5). */
     private static function landing(): string
     {
-        $target = config('beam.accounts.impersonation.stop_redirect', '/');
-
-        return Route::has($target) ? route($target) : $target;
+        return Landing::for(auth()->user());
     }
 }
