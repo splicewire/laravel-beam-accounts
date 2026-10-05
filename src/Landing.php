@@ -57,13 +57,19 @@ class Landing
             return null;
         }
 
+        // Judge the fully decoded form; refuse an input still changing after five rounds (only a hostile one does).
         $decoded = $intended;
+        $stable = false;
         for ($i = 0; $i < 5; $i++) {
             $next = rawurldecode($decoded);
             if ($next === $decoded) {
+                $stable = true;
                 break;
             }
             $decoded = $next;
+        }
+        if (! $stable) {
+            return null;
         }
         $decoded = str_replace('\\', '/', $decoded);
 
@@ -71,33 +77,39 @@ class Landing
             return null;
         }
 
-        $parts = parse_url($decoded);
-        if ($parts === false) {
+        $judged = parse_url($decoded);
+        if ($judged === false) {
             return null;
         }
 
-        if (isset($parts['scheme']) || isset($parts['host'])) {
-            if (! self::isThisOrigin($parts)) {
+        if (isset($judged['scheme']) || isset($judged['host'])) {
+            if (! self::isThisOrigin($judged)) {
                 return null;
             }
         } elseif (! str_starts_with($decoded, '/') || str_starts_with($decoded, '//')) {
             return null;
         }
 
-        $path = $parts['path'] ?? '/';
-        if ($path === '' || ! str_starts_with($path, '/') || str_starts_with($path, '//')) {
-            return null;
-        }
-        if (preg_match(self::REFUSED_PATHS, $path) === 1
+        $path = $judged['path'] ?? '/';
+        if ($path === '' || ! str_starts_with($path, '/') || str_starts_with($path, '//')
+            || preg_match('#(^|/)\.\.?(/|$)#', $path) === 1
+            || preg_match(self::REFUSED_PATHS, $path) === 1
             || preg_match('#^/api(/|$)#i', $path) === 1
             || preg_match('#/frame/manifest(/|$)#i', $path) === 1
             || str_ends_with(strtolower($path), '.json')) {
             return null;
         }
 
-        return $path
-            .(isset($parts['query']) ? '?'.$parts['query'] : '')
-            .(isset($parts['fragment']) ? '#'.$parts['fragment'] : '');
+        // Safe as decoded, so return what the client SENT (review-r1 on 2c106e1): the parts of the original, with only the
+        // backslashes normalised, so an encoded `&`, `#`, `?` or space keeps its meaning (`?q=a%26b` stays one value).
+        $sent = parse_url(str_replace('\\', '/', $intended));
+        if ($sent === false) {
+            return null;
+        }
+
+        return ($sent['path'] ?? '/')
+            .(isset($sent['query']) ? '?'.$sent['query'] : '')
+            .(isset($sent['fragment']) ? '#'.$sent['fragment'] : '');
     }
 
     /** @param  array<string, mixed>  $parts */

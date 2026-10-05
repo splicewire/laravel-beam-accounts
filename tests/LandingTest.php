@@ -76,6 +76,9 @@ it('honours a safe intended URL first, as its normalised path', function (string
 })->with([
     'a deep link' => ['/reports/42?tab=usage#top', '/reports/42?tab=usage#top'],
     'the same origin, absolute' => ['http://localhost/reports/42', '/reports/42'],
+    // review-r1 on 2c106e1: judged decoded, returned exactly as sent, so an encoded value keeps its meaning.
+    'an encoded query value' => ['/search?q=a%26b#x', '/search?q=a%26b#x'],
+    'an encoded path' => ['/files/a%20b%3Fc', '/files/a%20b%3Fc'],
 ]);
 
 it('refuses an unsafe intended URL and lands on the role home', function (string $intended) {
@@ -98,6 +101,9 @@ it('refuses an unsafe intended URL and lands on the role home', function (string
     'an api path' => ['/api/v1/me'],
     'a frame manifest' => ['/api/operator/frame/manifest'],
     'json' => ['/reports/42.json'],
+    'a dot-dot walk into a refused path' => ['/%2e%2e/api/v1/me'],
+    // '/' percent-encoded six times over: still changing after five decoding rounds.
+    'still decoding after five rounds' => ['/%'.str_repeat('25', 6).'2F/evil.com'],
 ]);
 
 it('leaves fortify.home holding no literal path once the doors land through Landing (T3)', function () {
