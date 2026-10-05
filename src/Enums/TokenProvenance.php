@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Enums;
 
+use Schemastud\DataSchemas\Contracts\ProvidesEnumLabel;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
@@ -12,7 +13,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * defensive null-fallback), never as the read-time source of truth.
  */
 #[TypeScript]
-enum TokenProvenance: string
+enum TokenProvenance: string implements ProvidesEnumLabel
 {
     /** A token the user deliberately created on the Tokens page (incl. the `*-satellite` PATs). */
     case Api = 'api';

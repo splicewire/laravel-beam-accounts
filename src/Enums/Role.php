@@ -2,6 +2,8 @@
 
 namespace Splicewire\Beam\Accounts\Enums;
 
+use Schemastud\DataSchemas\Contracts\ProvidesEnumLabel;
+
 /**
  * The single source of truth for the team roles the account runtime understands.
  *
@@ -12,7 +14,7 @@ namespace Splicewire\Beam\Accounts\Enums;
  * anywhere: the "which roles are invitable" and "which are assignable" nuances are
  * expressed as constraint methods over this one enum, not as second definitions.
  */
-enum Role: string
+enum Role: string implements ProvidesEnumLabel
 {
     case Owner = 'owner';
 
