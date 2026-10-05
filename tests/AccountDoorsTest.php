@@ -158,3 +158,12 @@ it('lets only a Root operator create users, and only while the operator door is 
     config(['beam.accounts.doors.operator' => false]);
     expect(app(UserPolicy::class)->create($root->fresh()))->toBeFalse();
 });
+
+it('answers a closed door as not found, never a 500', function () {
+    // build-qa on ac2a9ed: an undeclared host that still lists registration and uses this package's action mounts
+    // POST /register, whose door is closed. A closed door is a 404 (rule BUY-9).
+    config(['beam.accounts.doors.registration' => 'closed']);
+    \Illuminate\Support\Facades\Route::post('door-probe', fn () => doors()->create(Door::Register, newUser()));
+
+    $this->post('door-probe')->assertNotFound();
+});
