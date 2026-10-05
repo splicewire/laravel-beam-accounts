@@ -142,6 +142,11 @@ final class AccountDoors
         if ($this->invitations->expiresAt($invitation)->isPast()) {
             return Admission::refuse('the invitation has expired.');
         }
+        // As redemption: a team that is gone makes the invitation invalid. A host with no beam team model (its team is a
+        // tenant, provisioned elsewhere) has nothing to look up, so this check does not apply there.
+        if (BeamAccounts::teamModel() !== null && $this->invitations->team($invitation) === null) {
+            return Admission::refuse('the invitation\'s team no longer exists.');
+        }
 
         return Admission::admit();
     }

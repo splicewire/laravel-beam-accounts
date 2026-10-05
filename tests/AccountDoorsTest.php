@@ -80,6 +80,15 @@ it('admits an invitation claim only for the invited address, unused and unexpire
     expect(doors()->admit(Door::Invite, 'ada@acme.test', 'tok')->admitted)->toBeFalse();
 });
 
+it('admits no claim on an invitation whose team is gone, as redemption refuses it', function () {
+    $owner = User::create(['name' => 'Owner', 'email' => 'owner@acme.test', 'password' => 'x']);
+    $team = Team::create(['user_id' => $owner->id, 'name' => 'T', 'personal_team' => true]);
+    Invitation::create(['team_id' => $team->id, 'email' => 'ada@acme.test', 'role' => 'member', 'token' => 'orphan']);
+    $team->delete();
+
+    expect(doors()->admit(Door::Invite, 'ada@acme.test', 'orphan')->admitted)->toBeFalse();
+});
+
 it('admits the operator door per policy, and a service user always', function () {
     expect(doors()->admit(Door::Operator, 'ada@acme.test')->admitted)->toBeTrue();
     config(['beam.accounts.doors.operator' => false]);
