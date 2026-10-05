@@ -1,14 +1,13 @@
 <?php
 
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 beforeEach(function () {
     $this->withoutMiddleware(ValidateCsrfToken::class);
 });
 
-it('registers a user through Fortify and provisions their team-of-one', function () {
+it('registers a user through Fortify, door-checked, with no team at registration', function () {
     $response = $this->post('/register', [
         'name' => 'Ada',
         'email' => 'ada@example.test',
@@ -21,8 +20,9 @@ it('registers a user through Fortify and provisions their team-of-one', function
 
     $user = User::firstWhere('email', 'ada@example.test');
     expect($user)->not->toBeNull();
-    expect($user->personalTeam())->not->toBeNull();
-    expect($user->memberships()->value('role'))->toBe(Role::Owner->value);
+    // purchase-walkthrough M10, lead ruling 2026-10-05: registration provisions no team (a host may, in afterCreating).
+    expect($user->personalTeam())->toBeNull();
+    expect($user->memberships()->count())->toBe(0);
 });
 
 it('logs an existing user in through Fortify', function () {

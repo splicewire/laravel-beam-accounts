@@ -13,6 +13,7 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
 use Splicewire\Beam\Accounts\Models\Invitation;
+use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Accounts\Tests\Fixtures\HostTeam;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Facades\Beam;
@@ -86,6 +87,9 @@ it('lets a bound resolver win over the default branch, and proves the callable r
         'password' => 'password-1234',
         'password_confirmation' => 'password-1234',
     ]);
+    // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
+    app(TeamProvisioner::class)->personalTeamFor($owner);
+    $owner = $owner->fresh();
     Auth::login($owner);
 
     // The user HAS a personal team, so the default branch has a non-null answer available. The
@@ -110,6 +114,9 @@ it('honours a resolver that returns null instead of falling through to the perso
         'password' => 'password-1234',
         'password_confirmation' => 'password-1234',
     ]);
+    // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
+    app(TeamProvisioner::class)->personalTeamFor($owner);
+    $owner = $owner->fresh();
     Auth::login($owner);
 
     ($this->bindResolver)(null);
@@ -127,6 +134,9 @@ it('REJECTS a bare invokable class-string and silently falls through to the defa
         'password' => 'password-1234',
         'password_confirmation' => 'password-1234',
     ]);
+    // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
+    app(TeamProvisioner::class)->personalTeamFor($owner);
+    $owner = $owner->fresh();
     Auth::login($owner);
 
     InvokableResolverStub::$calls = 0;

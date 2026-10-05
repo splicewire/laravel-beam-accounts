@@ -97,6 +97,11 @@ abstract class TestCase extends Orchestra
 
         $config->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
 
+        // This suite models a host whose public registration is OPEN (purchase-walkthrough M10): its registration,
+        // onboarding and team tests drive Fortify's register door. The package DEFAULT is closed; AccountDoorsTest
+        // asserts the shipped defaults from the config file, and its closed-boot case runs under its own environment.
+        $config->set('beam.accounts.doors.registration', 'open');
+
         $config->set('database.default', 'testing');
         $config->set('database.connections.testing', [
             'driver' => 'sqlite',

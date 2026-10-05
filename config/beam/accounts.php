@@ -66,6 +66,21 @@ return [
     // Sanctum, not Fortify — turns this off to keep its auth surface untouched.
     'bootstrap_fortify' => env('ACCOUNT_BOOTSTRAP_FORTIFY', true),
 
+    // Who may become a user here (purchase-walkthrough M10, rule BUY-9), declared ONCE. `Doors\AccountDoors` decides
+    // every door from it and is the only central User create. Fortify's registration feature follows `registration`
+    // (a closed door mounts no route). OAuth creates an account only for an exact, declared email domain. `operator`
+    // lets a Root operator add people. The invitation claim is its own door, always available where invitations
+    // exist. The defaults keep every door shut but the operator's.
+    'doors' => [
+        'registration' => env('ACCOUNT_REGISTRATION', 'closed'),
+        'oauth' => [
+            'providers' => [],
+            'create' => 'never',
+            'domains' => [],
+        ],
+        'operator' => true,
+    ],
+
     // Where the reset-link email points, carrying the broker token + email in the query string. A host that resets
     // in an SPA declares its page here (e.g. the flagship's `/ui/reset-password`). Unset → the named
     // `password.reset` page (Fortify's), else `/reset-password` on the app URL. The package ships no app path.

@@ -6,6 +6,7 @@ use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 beforeEach(function () {
@@ -15,6 +16,9 @@ beforeEach(function () {
         'password' => 'password-1234',
         'password_confirmation' => 'password-1234',
     ]);
+    // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
+    app(TeamProvisioner::class)->personalTeamFor($this->owner);
+    $this->owner = $this->owner->fresh();
     $this->team = $this->owner->personalTeam();
     $this->member = User::create(['name' => 'Member', 'email' => 'member@example.test', 'password' => 'password-1234']);
 });

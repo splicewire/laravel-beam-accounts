@@ -6,6 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Splicewire\Beam\Accounts\Data\UserData;
+use Splicewire\Beam\Accounts\Doors\AccountDoors;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
 
@@ -41,13 +42,12 @@ class UserPolicy
     }
 
     /**
-     * Users arrive by REGISTRATION and by accepting an invitation, never from an admin create form —
-     * minting credentials, dispatching verification mail, and seeding the personal team are all
-     * registration's, and none of them is expressible as a generic create.
+     * A Root operator may add people while the host's operator door is open (`beam.accounts.doors.operator`,
+     * purchase-walkthrough M10). Everyone else arrives by a door: registration, OAuth or an invitation claim.
      */
     public function create(?Authenticatable $actor): bool
     {
-        return false;
+        return BeamAccounts::isRoot($actor) && app(AccountDoors::class)->policy()->operator;
     }
 
     public function update(?Authenticatable $actor, Model $user): bool

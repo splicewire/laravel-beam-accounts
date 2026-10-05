@@ -7,21 +7,23 @@ use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
-use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Doors\AccountDoors;
+use Splicewire\Beam\Accounts\Doors\Door;
+use Splicewire\Beam\Accounts\Doors\NewUserData;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 
 /**
- * The shared registration action: validate, create the satellite's user, and
- * provision a team-of-one. Satellites extend this and override afterCreating()
- * for app-specific side effects (gift redemption, invite claims, …) instead of
- * copy-pasting the whole action.
+ * The shared registration action, door-checked (purchase-walkthrough M10): validate, then create the user through
+ * {@see AccountDoors::create()} at the registration door, which refuses unless `beam.accounts.doors.registration` is
+ * open. No team is provisioned (lead ruling 2026-10-05, the starters' behaviour): a host that wants a personal team
+ * calls `TeamProvisioner::personalTeamFor()` from afterCreating(). Hosts extend this rather than copying it.
  */
 class CreateNewUser implements CreatesNewUsers
 {
     use PasswordValidationRules;
     use ProfileValidationRules;
 
-    public function __construct(protected TeamProvisioner $teams) {}
+    public function __construct(protected TeamProvisioner $teams, protected AccountDoors $doors) {}
 
     /**
      * @param  array<string, string>  $input
@@ -35,8 +37,6 @@ class CreateNewUser implements CreatesNewUsers
 
         $user = $this->createUser($input);
 
-        $this->teams->personalTeamFor($user);
-
         $this->afterCreating($user, $input);
 
         return $user;
@@ -47,13 +47,11 @@ class CreateNewUser implements CreatesNewUsers
      */
     protected function createUser(array $input): Authenticatable
     {
-        $model = BeamAccounts::userModel();
-
-        return $model::create([
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'password' => $input['password'],
-        ]);
+        return $this->doors->create(Door::Register, new NewUserData(
+            name: $input['name'],
+            email: $input['email'],
+            password: $input['password'],
+        ));
     }
 
     /**

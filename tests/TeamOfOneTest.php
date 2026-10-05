@@ -7,13 +7,17 @@ use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
-it('provisions a team-of-one when creating a user', function () {
+it('registers a user with no team, and the provisioner gives them a team-of-one', function () {
     $user = app(CreateNewUser::class)->create([
         'name' => 'Ada',
         'email' => 'ada@example.test',
         'password' => 'password-1234',
         'password_confirmation' => 'password-1234',
     ]);
+    // Registration provisions no team (purchase-walkthrough M10, lead ruling 2026-10-05); the provisioner does.
+    expect($user->personalTeam())->toBeNull();
+    app(TeamProvisioner::class)->personalTeamFor($user);
+    $user = $user->fresh();
 
     expect($user)->toBeInstanceOf(User::class);
 
@@ -33,6 +37,9 @@ it('assigns the spatie owner role scoped to the personal team', function () {
         'password' => 'password-1234',
         'password_confirmation' => 'password-1234',
     ]);
+    // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
+    app(TeamProvisioner::class)->personalTeamFor($user);
+    $user = $user->fresh();
 
     app(PermissionRegistrar::class)->setPermissionsTeamId($user->personalTeam()->id);
     $user->unsetRelation('roles');
@@ -47,6 +54,9 @@ it('adds a member with a role through the provisioner', function () {
         'password' => 'password-1234',
         'password_confirmation' => 'password-1234',
     ]);
+    // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
+    app(TeamProvisioner::class)->personalTeamFor($owner);
+    $owner = $owner->fresh();
 
     $team = $owner->personalTeam();
     $member = User::create(['name' => 'Member', 'email' => 'member@example.test', 'password' => 'password-1234']);

@@ -329,6 +329,8 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
      */
     public function packageRegistered(): void
     {
+        $this->registerFortifyFeaturesFromDoors();
+
         // The `central` connection alias is NOT registered here any more (beam-facade ticket 96) —
         // it lives in {@see \Splicewire\Beam\BeamServiceProvider::registerCentralConnectionAlias()},
         // which this package requires, so {@see Models\User}'s pin is covered exactly as before.
