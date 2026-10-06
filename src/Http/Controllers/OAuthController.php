@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Http\Controllers;
 
 use Exception;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -36,9 +37,20 @@ use Splicewire\Beam\Accounts\Landing;
  */
 class OAuthController extends Controller
 {
-    /** Socialite sets and stores its own OAuth state; nothing a request carries may replace it. */
-    public function handleRedirect(string $provider)
+    /**
+     * Socialite sets and stores its own OAuth state; nothing a request carries may replace it.
+     *
+     * The one thing the request may carry is where to return: a `?intended=` the resolver judges safe
+     * ({@see Landing::safeIntended()}) is kept as `url.intended`, which the callback lands through, so a signed-out
+     * deep link survives the Google door as it does the password one (ux-walkthrough UX-13). Anything it refuses is
+     * not stored.
+     */
+    public function handleRedirect(Request $request, string $provider)
     {
+        if ($request->hasSession() && ($intended = Landing::safeIntended($request->query('intended'))) !== null) {
+            $request->session()->put('url.intended', $intended);
+        }
+
         return Socialite::driver($provider)->redirect();
     }
 
