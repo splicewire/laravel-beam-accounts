@@ -5,38 +5,16 @@ use Splicewire\Beam\Particle\ParticleResource;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 
 /**
- * ## This package seats NO nav section, and that is the measurement rather than an oversight
+ * ## This package seats ONE nav section: People (ux-walkthrough UX-09, IA-10; lead 09:01Z ruling 1)
  *
- * `NavSectionRegistry` (beam 68289d4) lets a package seat the top-level nav section its own
- * `#[ParticleResource(section:)]` declarations name. beam-ux seats `ops` and `authoring` through it;
- * beam-calendars seats `calendars`. The obvious next question was which sections beam-accounts should
- * seat, and the answer measured 2026-09-05 is **none**: not one of the seven resources this package
- * registers — `users`, `tokens`, `teams`, `invitations`, `access-grants`, `view-requests`, `members` —
- * declares a `section:` at all.
+ * Until UX-09 it seated none, measured 2026-09-05: no resource here declared a `section:`, and a seat with nothing to
+ * collect is a declaration that does nothing. That test named the honest future: declare `section:` on the resources
+ * that belong in a nav section AND seat it here, never one without the other. The operator rail's People task section
+ * is that: `users` and `teams` declare `section: people`, and this package seats `people` in the operator realm for every
+ * host. A host with `collapse_user_realm` (the flagship) lists neither resource in its operator realm, so the seat
+ * collects nothing there and the projection drops it.
  *
- * What four of them declare instead is `group:` (`Settings`, `Platform`). That is a DIFFERENT mechanism:
- * `group` labels a resource inside Frame's resource index, `section` is the nav join key
- * `FrameResourcesInvocable` matches on. Reading one for the other is exactly how a seat gets invented
- * for a page nobody serves.
- *
- * So a `settings` seat here would be a nav entry this package cannot fill. `FrameResourcesInvocable`
- * attaches children by `$def->nav->section === $section`; with no resource naming a section, the seat
- * collects nothing, `FrameNavContribution` drops it as an empty contributed seat, and the only thing
- * shipped is a declaration that reads as intent and does nothing. Hand-authored `static:` rows would not
- * save it either — `FrameNavContribution::pruneUnbound()` drops a contributed child whose `routeName` is
- * not in the host's RouteContext, and `/settings/profile` + `/settings/security`
- * (`routes/account.php:12-20`) are controller pages, not realm resources, so they are never in it.
- *
- * That leaves two honest futures, and BOTH are somebody's deliberate decision rather than this test's:
- * declare `section:` on the resources that belong in a nav section and seat it here, or leave the
- * settings surface as the host IA it is today (the flagship renders it through `realm_resource_overrides`
- * under its own shell, and `tokens`/`members`/`invitations` are realm members there already). This test
- * exists so the first of those cannot happen by half — a `section:` added with no seat behind it is the
- * defect the seam was built to close, and it would otherwise be silent.
- *
- * ⚠️ It asserts an EMPTY population, so it must first prove it looked. A registry that came back empty
- * would satisfy "no resource declares a section" for the wrong reason, which is this estate's signature
- * failure mode.
+ * Still asserted: no OTHER resource declares a section, because a section with no seat behind it is invisible.
  */
 /**
  * THIS package's registered resources, scoped by the namespace of the Data class that declares each.
@@ -65,7 +43,7 @@ it('registers resources at all, so the assertion below is measuring something', 
     expect(accountsResources())->toHaveCount(8);
 });
 
-it('declares no `section:` on any resource, so there is no section for it to seat', function () {
+it('declares section `people` on users and teams and on nothing else', function () {
     $withSection = [];
 
     foreach (accountsResources() as $resource) {
@@ -74,20 +52,19 @@ it('declares no `section:` on any resource, so there is no section for it to sea
             $withSection[$resource->key] = $resource->section;
         }
     }
+    ksort($withSection);
 
-    expect($withSection)->toBe([], 'A resource now declares a section. Seat it from '
-        .'BeamAccountsServiceProvider through NavSectionRegistry, or the section is declared and '
-        .'invisible — see the docblock at the top of this file.');
+    expect($withSection)->toBe(['teams' => 'people', 'users' => 'people'], 'Only users and teams sit in a nav section. '
+        .'Seat any other section from BeamAccountsServiceProvider through NavSectionRegistry, or it is invisible.');
 });
 
-it('seats nothing into the nav-section registry, which is the consequence of the line above', function () {
-    $registry = app(NavSectionRegistry::class);
-
+it('seats People in the operator realm as a product task section, and nothing else', function () {
     $seated = array_values(array_filter(
-        $registry->all(),
+        app(NavSectionRegistry::class)->all(),
         fn ($section): bool => str_starts_with($section->key, 'account')
-            || in_array($section->key, ['settings', 'users', 'teams', 'tokens'], true),
+            || in_array($section->key, ['settings', 'users', 'teams', 'tokens', 'people'], true),
     ));
 
-    expect($seated)->toBe([]);
+    expect(array_map(fn ($s): array => [$s->realm, $s->key, $s->label, $s->audience->value], $seated))
+        ->toBe([['operator', 'people', 'People', 'product']]);
 });

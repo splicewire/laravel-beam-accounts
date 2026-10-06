@@ -31,6 +31,8 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     key: 'teams',
     backing: Team::class,
     label: 'Teams',
+    section: 'people',
+    navOrder: 2,
     group: 'Platform',
     icon: 'building',
     form: 'bare',

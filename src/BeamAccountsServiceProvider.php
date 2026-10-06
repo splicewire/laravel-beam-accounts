@@ -474,6 +474,19 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // `ordered_traits` fixer resorts alphabetically.
         $this->chainTraitMethods('boot');
 
+        // ux-walkthrough UX-09 (IA-10; lead 09:01Z): the operator rail's People task section. `users` and `teams` declare
+        // `section: people`; this seat is what they join. A host whose operator realm lists neither (collapse_user_realm,
+        // the flagship) gets an empty seat, which the projection drops.
+        if ($this->app->bound(\Splicewire\Beam\Nav\NavSectionRegistry::class)) {
+            $this->app->make(\Splicewire\Beam\Nav\NavSectionRegistry::class)->register(
+                new \Splicewire\Beam\Nav\NavSection(
+                    key: 'people', realm: 'operator', label: 'People', icon: 'Users', href: '/people', order: 20,
+                    entitlement: null, permission: null, audience: \Splicewire\Beam\Nav\NavAudience::Product,
+                ),
+                by: 'splicewire/laravel-beam-accounts',
+            );
+        }
+
         // Self-register into beam-core's install manifest (order 5: users/permission_tables are
         // foundational — publish early, ahead of the default-order-100 packages that FK into them)
         // so `splicewire:beam:install` publishes this package's shared/central/tenant/teams

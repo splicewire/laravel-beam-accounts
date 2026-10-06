@@ -96,6 +96,8 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     key: 'users',
     backing: ConfiguredUserBacking::class,
     label: 'Users',
+    section: 'people',
+    navOrder: 1,
     group: 'Settings',
     icon: 'users',
     form: 'bare',
