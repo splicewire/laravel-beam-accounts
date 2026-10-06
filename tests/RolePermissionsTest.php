@@ -144,8 +144,11 @@ it('leaves a role the host defined itself alone', function () {
 it('grants a reserved model to no role by default', function () {
     $perms = app(RolePermissions::class);
 
+    // `toContain`, not an exact list: beam itself reserves GitRepo and BeamSchema since ux-walkthrough UX-08c (laravel-beam
+    // f215e7b), so the harness's reserved set is the fixture plus beam's own, and an exact list pinned beam's set here.
     expect($perms->policedModels())->not->toContain(ReservedWidget::class)
-        ->and($perms->reservedModels())->toBe([ReservedWidget::class]);
+        ->and($perms->reservedModels())->toContain(ReservedWidget::class)
+        ->and($perms->reservedModels())->toContain(\Splicewire\Beam\Models\GitRepo::class, \Splicewire\Beam\Models\BeamSchema::class);
 
     foreach (Role::cases() as $role) {
         expect(array_filter($perms->tokensFor($role), fn (string $t) => str_starts_with($t, 'reserved-widget.')))->toBe([]);
