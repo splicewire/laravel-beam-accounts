@@ -104,11 +104,17 @@ class TokenData extends BeamData
     {
         $seam = config('beam.accounts.tokens.scope');
 
-        if (is_callable($seam)) {
-            return $seam($query, Auth::user());
-        }
+        $query = is_callable($seam)
+            ? $seam($query, Auth::user())
+            : TokensQuery::scopeToOwner($query, Auth::user());
 
-        return TokensQuery::scopeToOwner($query, Auth::user());
+        // UX-10 (IA-7): `connector:<label>` tokens are managed on the Connected sites hub, not the plain
+        // token list, so they are filtered OUT here by name prefix. Host-safe: every other token still
+        // lists exactly as before; only connector rows are hidden. (A null name — which Sanctum never
+        // mints — is kept, never swept, so the exclusion can only ever REMOVE a connector row.)
+        return $query->where(function (Builder $q): void {
+            $q->whereNull('name')->orWhere('name', 'not like', 'connector:%');
+        });
     }
 
     /**
