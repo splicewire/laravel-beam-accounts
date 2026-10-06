@@ -47,8 +47,12 @@ class OAuthController extends Controller
      */
     public function handleRedirect(Request $request, string $provider)
     {
-        if ($request->hasSession() && ($intended = Landing::safeIntended($request->query('intended'))) !== null) {
-            $request->session()->put('url.intended', $intended);
+        if ($request->hasSession()) {
+            // This redirect's own target, or none: a stale one from an earlier attempt never rides along (build.qa).
+            $request->session()->forget('url.intended');
+            if (($intended = Landing::safeIntended($request->query('intended'))) !== null) {
+                $request->session()->put('url.intended', $intended);
+            }
         }
 
         return Socialite::driver($provider)->redirect();
