@@ -42,6 +42,21 @@ class UserPolicy
     }
 
     /**
+     * Listing EVERY user is central Root's and staff's: the operator back office (audiostud's `operator-customers`) is
+     * what such a list exists for, and staff is the one vocabulary {@see self::impersonate()} names. The list read asks
+     * this only when nothing narrower answered: a scoped user list (`users`, {@see UsersQuery::scopeToSharedTeams()}) is
+     * allowed before it. Without it, a model-backed user list with no scope was open to any signed-in actor by the
+     * method's absence (follow-on to launch security row 51a71469).
+     */
+    public function viewAny(?Authenticatable $actor): bool
+    {
+        // The staff lookup reads the actor's realm grants; an actor that cannot answer it (no team relation) is reported
+        // and is not staff, rather than turning a list or its filter schema into a 500.
+        return $actor !== null && (BeamAccounts::isRoot($actor)
+            || rescue(fn () => Gate::forUser($actor)->allows('entitlement:os.operate'), false));
+    }
+
+    /**
      * A Root operator may add people while the host's operator door is open (`beam.accounts.doors.operator`,
      * purchase-walkthrough M10). Everyone else arrives by a door: registration, OAuth or an invitation claim.
      */

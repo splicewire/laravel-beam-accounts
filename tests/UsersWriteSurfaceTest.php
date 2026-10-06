@@ -52,6 +52,29 @@ it('gates login-as to root, so an ordinary user cannot assume an identity', func
     expect($this->policy->loginAs($this->ada, $this->grace))->toBeFalse();
 });
 
+it('lists every user only to central Root, so an unscoped user list never opens by a missing viewAny', function () {
+    // Follow-on to launch security row 51a71469: the list read asks a bound policy's viewAny, and a policy WITHOUT one was
+    // an open pass. A scoped user list (`users`: shared teams) and a realm-entitled one (an operator's customers) are
+    // allowed before viewAny is asked, so this decides only a list with neither: Root's.
+    app(Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId(null);
+    $root = User::create(['name' => 'Root', 'email' => 'root@example.test', 'password' => 'password-1234']);
+    $root->assignRole(app(config('permission.models.role'))::create(['name' => 'Root', 'guard_name' => 'web', 'team_id' => null]));
+
+    expect($this->policy->viewAny($root))->toBeTrue()
+        ->and($this->policy->viewAny($this->ada))->toBeFalse()
+        ->and($this->policy->viewAny(null))->toBeFalse();
+});
+
+it('lists every user to staff too, the operator back office the list exists for', function () {
+    // Measured at audiostud: its operator socket admits staff by middleware, not by a realm entitlement, so its staff
+    // reached `operator-customers` (11 rows) only through the missing viewAny. Staff is the one vocabulary
+    // impersonate() already names: `entitlement:os.operate`.
+    Illuminate\Support\Facades\Gate::define('entitlement:os.operate', fn ($user) => $user->email === 'grace@example.test');
+
+    expect($this->policy->viewAny($this->grace))->toBeTrue()
+        ->and($this->policy->viewAny($this->ada))->toBeFalse();
+});
+
 // ── The login-as op ───────────────────────────────────────────────────────────────────────────
 
 it('declares login-as as a write op on the users resource', function () {
