@@ -20,7 +20,7 @@ use Splicewire\Beam\Accounts\Http\Controllers\OAuthController;
  */
 function fakeSocialite(): void
 {
-    if (interface_exists(\Laravel\Socialite\Contracts\Factory::class)) {
+    if (interface_exists(Laravel\Socialite\Contracts\Factory::class)) {
         return;
     }
     require_once __DIR__.'/Support/socialite-facade-stub.php';
@@ -71,7 +71,7 @@ it('keeps a safe intended path across the OAuth redirect, and nothing it refuses
     Route::middleware('web')->group(fn () => Route::splicewireAccountsOAuth());
     app('router')->getRoutes()->refreshNameLookups();
     fakeSocialite();
-    \Laravel\Socialite\Facades\Socialite::shouldReceive('driver->redirect')->andReturn(redirect('https://accounts.example/o/oauth2'));
+    Laravel\Socialite\Facades\Socialite::shouldReceive('driver->redirect')->andReturn(redirect('https://accounts.example/o/oauth2'));
 
     $this->get('/auth/google/redirect?intended='.urlencode('/ui/studio/abc?tab=cells'))->assertRedirect();
     expect(session('url.intended'))->toBe('/ui/studio/abc?tab=cells');
@@ -98,14 +98,14 @@ it('lands the Google callback on the composed picker target, the deep link still
     app('router')->getRoutes()->refreshNameLookups();
     fakeSocialite();
 
-    $model = \Splicewire\Beam\Accounts\Facades\BeamAccounts::userModel();
+    $model = Splicewire\Beam\Accounts\Facades\BeamAccounts::userModel();
     $user = $model::query()->forceCreate(['name' => 'Ada', 'email' => 'ada@acme.test', 'password' => bcrypt('x'), 'google_id' => 'g-1']);
     $composed = '/ui/tenants?intended='.rawurlencode('/studio/abc?tab=cells');
 
-    \Laravel\Socialite\Facades\Socialite::shouldReceive('driver->redirect')->andReturn(redirect('https://accounts.example/o/oauth2'));
+    Laravel\Socialite\Facades\Socialite::shouldReceive('driver->redirect')->andReturn(redirect('https://accounts.example/o/oauth2'));
     $this->get('/auth/google/redirect?intended='.rawurlencode($composed))->assertRedirect();
 
-    \Laravel\Socialite\Facades\Socialite::shouldReceive('driver->user')->andReturn(new class
+    Laravel\Socialite\Facades\Socialite::shouldReceive('driver->user')->andReturn(new class
     {
         public string $id = 'g-1';
 
