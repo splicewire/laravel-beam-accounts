@@ -57,6 +57,13 @@ it('places logout and passkey management in the host\'s signed-in group', functi
     }
 });
 
+it('lets a host mount the interim session to bearer mint behind its own web guard', function () {
+    mountInHost('splicewireAccountsSessionTokenV1', ['web', 'auth']);
+
+    expect(routeNamed('api.v1.session-token.store')->uri())->toBe('api/v1/session-token')
+        ->and(routeNamed('api.v1.session-token.store')->gatherMiddleware())->toContain('web', 'auth');
+});
+
 it('places me in the host\'s tenant group and declares it Public', function () {
     // inResource('me') builds MeController at registration, which needs the host's schema registry; a host binds one.
     $directory = sys_get_temp_dir().'/beam-accounts-api-v1-macros';

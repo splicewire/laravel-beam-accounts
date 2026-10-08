@@ -2,10 +2,10 @@
 
 namespace Splicewire\Beam\Accounts\Concerns;
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Http\Request;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 
@@ -114,6 +114,10 @@ trait WiresRouteMacro
         });
 
         Route::macro('splicewireAccountsSessionV1', fn () => $requireApiV1Routes('api-v1-session.php'));
+
+        // Interim bridge for a host whose existing entry door is Fortify/session-authenticated. Kept separate from
+        // the bearer-authenticated session surface so the host must deliberately place it behind `web` + `auth`.
+        Route::macro('splicewireAccountsSessionTokenV1', fn () => $requireApiV1Routes('api-v1-session-token.php'));
 
         Route::macro('splicewireAccountsMeV1', fn () => $requireApiV1Routes('api-v1-me.php'));
 
