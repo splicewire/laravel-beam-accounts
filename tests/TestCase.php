@@ -11,6 +11,7 @@ use Orchestra\Testbench\TestCase as Orchestra;
 use Rushing\PermissionCascade\PermissionCascadeServiceProvider;
 use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 use Spatie\LaravelData\LaravelDataServiceProvider;
+use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\Permission\PermissionServiceProvider;
 use Spatie\Sluggable\SluggableServiceProvider;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
@@ -146,6 +147,7 @@ abstract class TestCase extends Orchestra
         // null/absent and trip a TypeError when a Data class is transformed (->toArray) or hydrated
         // (::from). Load the package's full default config so both work in the isolated test app.
         $config->set('data', require dirname(__DIR__).'/vendor/spatie/laravel-data/config/data.php');
+        $config->set('data.name_mapping_strategy.input', CamelCaseMapper::class);
         $config->set('data.max_transformation_depth', null);
         $config->set('data.throw_when_max_transformation_depth_reached', true);
 
