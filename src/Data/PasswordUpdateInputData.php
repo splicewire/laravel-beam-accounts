@@ -2,10 +2,11 @@
 
 namespace Splicewire\Beam\Accounts\Data;
 
-use Spatie\LaravelData\Attributes\MapInputName;
+use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 use Splicewire\Beam\Data\BeamData;
+use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
 
 /**
  * The self-service password-change body — current password plus the new one.
@@ -16,23 +17,22 @@ use Splicewire\Beam\Data\BeamData;
  * sourced from {@see PasswordValidationRules} so the web change-password form and any future API
  * twin cannot drift apart.
  *
- * `password` carries Laravel's `confirmed` rule (via `passwordRules()`), so the wire also accepts
- * `password_confirmation`; it is deliberately NOT a promoted property, since it is a validation-only
- * companion the controller never reads.
- *
- * `#[MapInputName('current_password')]` because the wire name is a fixed
- * existing contract — Laravel's `current_password` validation rule and the shipped change-password
- * form both use it — while the PHP side stays camelCase like every other DTO here. The property-level
- * literal takes precedence over a host's global input mapper; a class-level mapper does not.
+ * `passwordConfirmation` is promoted even though the controller never reads it: it is part of the
+ * HTTP contract, and strict input must recognize exactly that camel wire key while refusing the old
+ * snake companion. Every multi-word field carries an explicit camel `#[MapName]` so host mappers
+ * cannot change the published contract.
  */
 class PasswordUpdateInputData extends BeamData
 {
     use PasswordValidationRules;
+    use RejectsUnknownInputKeys;
 
     public function __construct(
-        #[MapInputName('current_password')]
+        #[MapName('currentPassword')]
         public string $currentPassword,
         public string $password,
+        #[MapName('passwordConfirmation')]
+        public string $passwordConfirmation,
     ) {}
 
     /**
@@ -41,8 +41,9 @@ class PasswordUpdateInputData extends BeamData
     public static function rules(ValidationContext $context): array
     {
         return [
-            'current_password' => self::currentPasswordRules(),
-            'password' => self::passwordRules(),
+            'currentPassword' => self::currentPasswordRules(),
+            'password' => self::passwordRules('passwordConfirmation'),
+            'passwordConfirmation' => ['required', 'string'],
         ];
     }
 }

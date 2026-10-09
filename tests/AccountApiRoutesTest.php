@@ -267,18 +267,24 @@ it('clamps a requested scope to permissions the minting principal holds', functi
     expect(PersonalAccessToken::firstWhere('name', 'full')->abilities)->toBe(['*']);
 });
 
-it('takes the wire spelling expires_in_days, not the camelCase property name', function () {
+it('accepts expiresInDays and refuses the old snake spelling without minting a token', function () {
     apiOwner();
 
-    $this->postJson('/beam/accounts/tokens', ['name' => 'dated', 'expires_in_days' => 7])->assertCreated();
+    $this->postJson('/beam/accounts/tokens', ['name' => 'dated', 'expiresInDays' => 7])->assertCreated();
 
     expect(PersonalAccessToken::firstWhere('name', 'dated')->expires_at)->not->toBeNull();
+
+    $this->postJson('/beam/accounts/tokens', ['name' => 'snake', 'expires_in_days' => 7])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('expires_in_days');
+
+    expect(PersonalAccessToken::firstWhere('name', 'snake'))->toBeNull();
 });
 
 /**
  * A host that configures immutable dates (`Date::use(CarbonImmutable::class)`) makes `now()` return a
  * CarbonImmutable. The expiry helper was typed `?Illuminate\Support\Carbon`, so create, renew and rotate with
- * `expires_in_days` all answered 500 (TOWER-05's fresh-clone journey, 2026-10-09). Every path must work
+ * `expiresInDays` all answered 500 (TOWER-05's fresh-clone journey, 2026-10-09). Every path must work
  * whichever date class the host picks, and store the right expiry.
  */
 it('creates, renews and rotates an expiring token when the host uses immutable dates', function () {
@@ -286,19 +292,39 @@ it('creates, renews and rotates an expiring token when the host uses immutable d
     Date::use(CarbonImmutable::class);
 
     try {
-        $this->postJson('/beam/accounts/tokens', ['name' => 'immutable', 'expires_in_days' => 1])->assertCreated();
+        $this->postJson('/beam/accounts/tokens', ['name' => 'immutable', 'expiresInDays' => 1])->assertCreated();
         $token = PersonalAccessToken::firstWhere('name', 'immutable');
         expect(abs($token->expires_at->getTimestamp() - now()->addDay()->getTimestamp()))->toBeLessThan(120);
 
-        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/renew", ['expires_in_days' => 2])->assertOk();
+        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/renew", ['expiresInDays' => 2])->assertOk();
         expect(abs($token->fresh()->expires_at->getTimestamp() - now()->addDays(2)->getTimestamp()))->toBeLessThan(120);
 
-        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/rotate", ['expires_in_days' => 3])->assertSuccessful();
+        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/rotate", ['expiresInDays' => 3])->assertSuccessful();
         $rotated = PersonalAccessToken::where('name', 'immutable')->whereNull('archived_at')->sole();
         expect(abs($rotated->expires_at->getTimestamp() - now()->addDays(3)->getTimestamp()))->toBeLessThan(120);
     } finally {
         Date::useDefault();
     }
+});
+
+it('refuses the old snake expiry spelling on renew and rotate without changing the token', function () {
+    apiOwner();
+
+    $created = $this->postJson('/beam/accounts/tokens', ['name' => 'strict-expiry', 'expiresInDays' => 5])
+        ->assertCreated()
+        ->json('data');
+    $token = PersonalAccessToken::findOrFail($created['id']);
+    $expiry = $token->expires_at->toISOString();
+
+    $this->postJson("/beam/accounts/tokens/{$token->getKey()}/renew", ['expires_in_days' => 10])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('expires_in_days');
+    $this->postJson("/beam/accounts/tokens/{$token->getKey()}/rotate", ['expires_in_days' => 10])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('expires_in_days');
+
+    expect($token->fresh()->expires_at->toISOString())->toBe($expiry)
+        ->and(PersonalAccessToken::where('name', 'strict-expiry')->count())->toBe(1);
 });
 
 it('sweeps other SESSION tokens and leaves deliberate API tokens working', function () {

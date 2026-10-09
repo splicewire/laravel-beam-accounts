@@ -44,14 +44,27 @@ it('keeps email verification when the email is unchanged', function () {
 it('updates the password from the security surface', function () {
     $this->actingAs($this->user)
         ->put('/settings/password', [
-            'current_password' => 'password-1234',
+            'currentPassword' => 'password-1234',
             'password' => 'new-password-5678',
-            'password_confirmation' => 'new-password-5678',
+            'passwordConfirmation' => 'new-password-5678',
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect();
 
     expect(Hash::check('new-password-5678', $this->user->fresh()->password))->toBeTrue();
+});
+
+it('refuses the old snake password keys without changing the password', function () {
+    $this->actingAs($this->user)
+        ->putJson('/settings/password', [
+            'current_password' => 'password-1234',
+            'password' => 'new-password-5678',
+            'password_confirmation' => 'new-password-5678',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['current_password', 'password_confirmation']);
+
+    expect(Hash::check('password-1234', $this->user->fresh()->password))->toBeTrue();
 });
 
 it('deletes the profile with the correct current password', function () {

@@ -46,7 +46,7 @@ it('mints a bearer for the interim Fortify session and answers the same landing'
         ->assertOk()
         ->assertJsonPath('data.email', 'ada@example.test')
         ->assertJsonPath('meta.landing', '/dashboard')
-        ->assertJsonPath('data.access_token', fn (mixed $token): bool => is_string($token) && str_contains($token, '|'));
+        ->assertJsonPath('data.accessToken', fn (mixed $token): bool => is_string($token) && str_contains($token, '|'));
 
     expect($user->tokens()->sole()->provenance)->toBe(TokenProvenance::Session);
 });

@@ -70,7 +70,7 @@ trait WiresMeResource
             },
             // `AuthUserData` is not `AuthUserData::from($user)`: the identity core branches on tenancy
             // (tenant-scoped roles vs. the central tenants list) and mirrors the caller's bearer back as
-            // `access_token`. `project:` is legal residue under ticket 12 §A4's rule — it does something
+            // `accessToken`. `project:` is legal residue under ticket 12 §A4's rule — it does something
             // `data::from($record)` provably cannot — and the bearer is read off the live request because
             // the closure is handed only the record.
             project: fn (Model $user): AuthUserData => AuthUserData::fromUser($user, request()?->bearerToken()),

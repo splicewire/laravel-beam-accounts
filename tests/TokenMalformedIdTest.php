@@ -81,7 +81,7 @@ describe('uuid-keyed host', function () {
     it('answers 404 for a non-uuid string id on archive/rotate/renew/destroy', function () {
         $this->deleteJson('/beam/accounts/tokens/999999')->assertNotFound();
         $this->postJson('/beam/accounts/tokens/999999/rotate')->assertNotFound();
-        $this->postJson('/beam/accounts/tokens/999999/renew', ['expires_in_days' => 30])->assertNotFound();
+        $this->postJson('/beam/accounts/tokens/999999/renew', ['expiresInDays' => 30])->assertNotFound();
         $this->deleteJson('/beam/accounts/tokens/999999/permanent')->assertNotFound();
     });
 

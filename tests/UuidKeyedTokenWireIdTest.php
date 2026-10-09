@@ -119,7 +119,7 @@ it('archives the token the roster addressed, and refuses its bearer afterwards',
 it('rotates and renews through the same uuid id', function () {
     $created = $this->postJson('/beam/accounts/tokens', ['name' => 'rot'])->json('data');
 
-    $renewed = $this->postJson("/beam/accounts/tokens/{$created['id']}/renew", ['expires_in_days' => 30])
+    $renewed = $this->postJson("/beam/accounts/tokens/{$created['id']}/renew", ['expiresInDays' => 30])
         ->assertOk()->json('data');
     expect($renewed['id'])->toBe($created['id']);
 

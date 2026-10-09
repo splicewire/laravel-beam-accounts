@@ -64,7 +64,7 @@ use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
  * filter surface. All three are tower facts — a beam host has no central guard, no activity log and
  * no saved filters on this key — so this is the domain-neutral sibling, not a move. The WIRE is
  * deliberately identical (`{api_root}/tokens`, `beam.accounts.tokens.*`, the `{data: …}` envelope, the
- * `expires_in_days` spelling), because `@splicewire/beam-accounts`' `TokensClient` is written against
+ * `expiresInDays` spelling), because `@splicewire/beam-accounts`' `TokensClient` is written against
  * it and must keep working at either host.
  */
 class ApiTokenController extends Controller
@@ -519,7 +519,7 @@ class ApiTokenController extends Controller
     }
 
     /**
-     * Turn the optional `expires_in_days` input into an absolute expiry (null = never).
+     * Turn the optional `expiresInDays` input into an absolute expiry (null = never).
      *
      * Typed to `CarbonInterface`, not `Illuminate\Support\Carbon`: `now()` follows the host's `Date::use(...)`, and a
      * host on immutable dates gets a `CarbonImmutable`, which the narrower type turned into a 500 on create, renew

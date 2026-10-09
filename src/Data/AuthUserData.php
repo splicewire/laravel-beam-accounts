@@ -3,7 +3,7 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Spatie\LaravelData\Attributes\MapOutputName;
+use Spatie\LaravelData\Attributes\MapName;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Data\BeamData;
@@ -40,10 +40,8 @@ class AuthUserData extends BeamData
         public string $id,
         public string $name,
         public string $email,
-        // Wire parity with the retired AuthUserResource (HTTP-07): the token serializes as the
-        // snake `access_token` the SPA has always read, though the property is camel. Global output
-        // mapping is off (config/data.php), so the map is declared per-property here.
-        #[MapOutputName('access_token')]
+        // The product-owned identity projection pins camelCase regardless of a host mapper.
+        #[MapName('accessToken')]
         public ?string $accessToken,
         /** @var string[] */
         public array $roles,
@@ -59,15 +57,10 @@ class AuthUserData extends BeamData
         // `isDemo` in ui/src/app/shell/SectionBar.tsx and sectionMeta.ts). Nothing anywhere reads
         // `is_root`/`is_demo`.
         //
-        // So do NOT "tidy" these to snake to match `access_token` above or the wider estate: that
-        // sibling is snake because the retired resource published it snake (HTTP-07), and these are
-        // camel because this projection published them camel. Both attributes are pinning what is
-        // ALREADY on the wire — which is the wire-name convention's actual rule (declare the wire,
-        // and the PHP spelling becomes free), not a house preference for either casing. Changing
-        // either argument is a breaking API change to an authenticated response, not a cleanup.
-        #[MapOutputName('isRoot')]
+        // These are camel on the wire and explicitly pinned, like accessToken above.
+        #[MapName('isRoot')]
         public bool $isRoot,
-        #[MapOutputName('isDemo')]
+        #[MapName('isDemo')]
         public ?bool $isDemo,
         public ?string $tenant,
     ) {}

@@ -191,7 +191,7 @@ class MeFrameResourceTest extends TestCase
         ));
         $this->actingAs($ada)->withToken('controlled-caller-bearer');
         $list = $this->getJson('/frame/resources/me')->assertOk()->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.access_token', 'controlled-caller-bearer');
+            ->assertJsonPath('data.0.accessToken', 'controlled-caller-bearer');
         $detail = $this->getJson('/frame/resources/me/records/'.$ada->getKey())->assertOk()
             ->assertJsonPath('data.profile-note.email', $ada->email);
         $singleton = $this->getJson('/identity')->assertOk();
@@ -200,7 +200,7 @@ class MeFrameResourceTest extends TestCase
         $this->getJson('/frame/resources/me/records/'.$bo->getKey())->assertNotFound();
         $this->assertSame(array_fill(0, 3, [$ada->getKey(), $ada->getKey()]), $projected);
         $this->withoutHeader('Authorization')->getJson('/frame/resources/me')->assertOk()
-            ->assertJsonPath('data.0.access_token', null);
+            ->assertJsonPath('data.0.accessToken', null);
     }
 
     public static function identityReads(): array

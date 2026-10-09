@@ -10,9 +10,11 @@ trait PasswordValidationRules
     /**
      * @return array<int, Password|ValidationRule|array<mixed>|string>
      */
-    public static function passwordRules(): array
+    public static function passwordRules(?string $confirmation = null): array
     {
-        return ['required', 'string', Password::default(), 'confirmed'];
+        $confirmed = $confirmation === null ? 'confirmed' : "confirmed:{$confirmation}";
+
+        return ['required', 'string', Password::default(), $confirmed];
     }
 
     /**
