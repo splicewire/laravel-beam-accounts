@@ -117,6 +117,31 @@ class InvitationActiveMemberTest extends TestCase
         $this->assertNull($rows[0]->accepted_at);
     }
 
+    /**
+     * Round 3 (build-qa HIGH on d32310e): legacy case-variant duplicates already exist (`unique(team_id, email)` is
+     * case-sensitive). A re-invite refreshes the OLDEST of them in place and keeps its stored spelling, so no rewrite
+     * can collide with the other row; the others are left untouched.
+     */
+    #[DataProvider('transports')]
+    public function test_a_re_invite_over_legacy_case_variant_duplicates_refreshes_the_oldest_without_rewriting_its_email(string $url): void
+    {
+        $older = Invitation::create(['team_id' => $this->team->id, 'email' => 'Legacy@example.test', 'role' => 'member', 'token' => str_repeat('b', 64), 'invited_by' => $this->owner->id]);
+        $newer = Invitation::create(['team_id' => $this->team->id, 'email' => 'legacy@example.test', 'role' => 'member', 'token' => str_repeat('c', 64), 'invited_by' => $this->owner->id]);
+
+        // the exact spelling of the NEWER row: rewriting the older row to it is what collided
+        $this->postJson($url, ['email' => 'legacy@example.test', 'role' => 'admin'])->assertSuccessful();
+        // and a third casing
+        $this->postJson($url, ['email' => 'LEGACY@EXAMPLE.TEST', 'role' => 'member'])->assertSuccessful();
+
+        $o = $older->fresh();
+        $n = $newer->fresh();
+        $this->assertSame('Legacy@example.test', $o->email, 'the refreshed row keeps its stored spelling');
+        $this->assertNotSame(str_repeat('b', 64), $o->token, 'the oldest row is the one refreshed');
+        $this->assertSame('member', (string) $o->role);
+        $this->assertSame(['legacy@example.test', str_repeat('c', 64), 'member'], [$n->email, $n->token, (string) $n->role], 'the other duplicate is untouched');
+        $this->assertSame(2, Invitation::whereRaw('lower(email) = ?', ['legacy@example.test'])->count(), 'no third row');
+    }
+
     public function test_frame_create_still_invites_a_new_address(): void
     {
         $this->postJson('/frame/resources/invitations', ['email' => 'New@Example.test', 'role' => 'member'])->assertSuccessful();

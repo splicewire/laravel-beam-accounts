@@ -129,7 +129,17 @@ class InvitationData extends BeamData
         }
 
         $invitation->team_id = $teamKey;
-        $invitation->email = $input->email;
+        // A refresh keeps the row's STORED spelling: rewriting it to this request's casing could collide with a legacy
+        // case-variant duplicate on `unique(team_id, email)` (build-qa r3). Legacy duplicates resolve to the OLDEST row
+        // (`orderBy('id')` above); the rest are left untouched. Only a new invitation takes the submitted address.
+        if ($existing === null) {
+            $invitation->email = $input->email;
+        } else {
+            // Frame's generic writer fills the DTO's own fields AFTER prepare() (ParticleFrameResourceHandler::store:
+            // prepare($model, $parsed) then write($model, toAttributes($parsed))), so the same object must carry the
+            // stored spelling too, or that fill would rewrite it and collide.
+            $input->email = (string) $existing->email;
+        }
         // A 64-character `Str::random`, not a uuid. The estate's redemption route takes the token as a
         // PATH SEGMENT (`POST invitations/{token}/accept`, {@see \Splicewire\Tower\Tenancy\Invitations\AcceptTenantInvitation}),
         // so it is a bearer secret standing alone in a URL — a v4 uuid carries 122 bits and advertises
