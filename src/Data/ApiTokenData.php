@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Data;
 
+use Spatie\LaravelData\Attributes\MapName;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Data\BeamData;
@@ -21,7 +22,7 @@ class ApiTokenData extends BeamData
          * and the package's bigint default is why every existing assertion agreed with itself.
          *
          * The sibling particle projection `TokenData::$id` had always been a string, and
-         * `is_current` on this very class compares `(string) $token->getKey()`. This brings the REST
+         * `isCurrent` on this very class compares `(string) $token->getKey()`. This brings the REST
          * DTO to the settled rule `ImpersonationTest` states for a shared shape: string keys, so a
          * uuid-keyed and a bigint-keyed host share one shape.
          */
@@ -36,13 +37,18 @@ class ApiTokenData extends BeamData
          * @var string[]|null
          */
         public ?array $abilities,
-        public ?string $created_at,
-        public ?string $last_used_at,
+        #[MapName('createdAt')]
+        public ?string $createdAt,
+        #[MapName('lastUsedAt')]
+        public ?string $lastUsedAt,
         /** When the token stops working, or null for a token that never expires. */
-        public ?string $expires_at,
+        #[MapName('expiresAt')]
+        public ?string $expiresAt,
         /** When the token was archived (soft-revoked, retained for audit), or null if live. */
-        public ?string $archived_at,
+        #[MapName('archivedAt')]
+        public ?string $archivedAt,
         /** True for the session token authenticating the current request — never swept/lockout. */
-        public bool $is_current,
+        #[MapName('isCurrent')]
+        public bool $isCurrent,
     ) {}
 }

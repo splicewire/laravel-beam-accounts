@@ -127,8 +127,11 @@ it('mints a token and reveals the plaintext exactly once', function () {
     expect($row->token)->not->toBe($plain)
         ->and($row->provenance)->toBe(TokenProvenance::Api);
 
-    // The list never carries it again.
-    expect($this->getJson('/beam/accounts/tokens')->json('data.0'))->not->toHaveKey('token');
+    // The list never carries it again, and the public read model is camel-only.
+    $listed = $this->getJson('/beam/accounts/tokens')->json('data.0');
+    expect($listed)->not->toHaveKey('token')
+        ->toHaveKeys(['createdAt', 'lastUsedAt', 'expiresAt', 'archivedAt', 'isCurrent'])
+        ->not->toHaveKeys(['created_at', 'last_used_at', 'expires_at', 'archived_at', 'is_current']);
 });
 
 it('mints a token Sanctum can resolve back to its owner', function () {

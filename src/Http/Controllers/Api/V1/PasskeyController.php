@@ -136,8 +136,8 @@ class PasskeyController extends Controller
         return [
             'id' => $passkey->id,
             'name' => $passkey->name,
-            'last_used_at' => $passkey->last_used_at?->toIso8601String(),
-            'created_at' => $passkey->created_at?->toIso8601String(),
+            'lastUsedAt' => $passkey->last_used_at?->toIso8601String(),
+            'createdAt' => $passkey->created_at?->toIso8601String(),
         ];
     }
 }

@@ -69,7 +69,7 @@ it('hydrates enabled passkeys and keeps credential material out of the page shap
         'twoFactorEnabled' => false,
         'passkeys' => [[
             'id' => 3, 'name' => 'Laptop', 'authenticator' => null,
-            'created_at_diff' => 'a minute ago', 'last_used_at_diff' => null,
+            'createdAtDiff' => 'a minute ago', 'lastUsedAtDiff' => null,
             'credential' => 'must-not-leak',
         ]],
     ]);

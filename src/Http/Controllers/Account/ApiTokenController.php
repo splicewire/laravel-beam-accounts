@@ -446,11 +446,11 @@ class ApiTokenController extends Controller
             name: (string) $token->name,
             provenance: $provenance,
             abilities: $this->scopeFor($token->abilities),
-            created_at: $token->created_at?->toIso8601String(),
-            last_used_at: $token->last_used_at?->toIso8601String(),
-            expires_at: $token->expires_at?->toIso8601String(),
-            archived_at: $token->archived_at?->toIso8601String(),
-            is_current: $currentId !== null && (string) $token->getKey() === $currentId,
+            createdAt: $token->created_at?->toIso8601String(),
+            lastUsedAt: $token->last_used_at?->toIso8601String(),
+            expiresAt: $token->expires_at?->toIso8601String(),
+            archivedAt: $token->archived_at?->toIso8601String(),
+            isCurrent: $currentId !== null && (string) $token->getKey() === $currentId,
         );
     }
 
