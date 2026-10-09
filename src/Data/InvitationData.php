@@ -6,6 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
@@ -97,6 +98,17 @@ class InvitationData extends BeamData
         $team = self::assertManages($actor);
 
         $teamKey = (string) $team->getKey();
+
+        // An address that is already an ACTIVE member of this team is not invitable: the re-invite below would
+        // re-open their accepted invitation (`accepted_at = null`) and the roster would show them Active AND
+        // Pending (TOWER-05 gate, ticket 00 51702c40). Asked through the TEAM CONTRACT, so a host team counts the
+        // same as beam's own. A removed member is no longer a member, so they stay invitable.
+        $user = BeamAccounts::userModel()::query()->where('email', $input->email)->first();
+        if ($user instanceof Authenticatable && $team->hasMember($user)) {
+            throw ValidationException::withMessages([
+                'email' => "{$input->email} is already a member of this team.",
+            ]);
+        }
 
         $existing = Invitation::query()
             ->where('team_id', $teamKey)

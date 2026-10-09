@@ -436,6 +436,45 @@ it('resends a pending invitation with a fresh token', function () {
     expect(Invitation::find($id)->token)->not->toBe($before);
 });
 
+// TOWER-05 gate LOW (ticket 00 51702c40): inviting someone who is ALREADY an active member of the team was accepted, and
+// `prepare()` re-opened their accepted invitation (`accepted_at = null`), so the roster showed them Active AND Pending.
+it('refuses inviting an active member of the team with a 422 on email, and re-opens nothing', function () {
+    [$owner, $team] = apiOwner();
+    $solo = apiSeat($team, 'solo@example.test', Role::Member);
+    $accepted = Invitation::create(['team_id' => $team->id, 'email' => 'solo@example.test', 'role' => 'member', 'token' => str_repeat('a', 64), 'invited_by' => $owner->id, 'accepted_at' => now()->subDay()]);
+
+    $this->postJson('/beam/accounts/invitations', ['email' => 'solo@example.test', 'role' => 'member'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['email' => 'already a member of this team']);
+    $this->postJson('/beam/accounts/invitations', ['email' => $owner->email, 'role' => 'admin'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['email']);
+
+    $row = Invitation::find($accepted->id);
+    expect($row->accepted_at)->not->toBeNull()
+        ->and($row->token)->toBe(str_repeat('a', 64))
+        ->and(Invitation::where('email', 'solo@example.test')->count())->toBe(1)
+        ->and(collect($this->getJson('/beam/accounts/invitations')->json('data'))->pluck('email')->all())->toBe([])
+        ->and($team->fresh()->hasMember($solo))->toBeTrue();
+});
+
+it('still invites a removed (former) member, and an active member of ANOTHER team', function () {
+    [, $team] = apiOwner();
+    $former = apiSeat($team, 'former@example.test', Role::Member);
+    $team->removeMember($former);
+
+    $this->postJson('/beam/accounts/invitations', ['email' => 'former@example.test', 'role' => 'member'])->assertCreated();
+
+    $elsewhere = User::create(['name' => 'Elsewhere', 'email' => 'elsewhere@example.test', 'password' => 'x']);
+    $other = Team::create(['user_id' => $elsewhere->id, 'name' => 'Other', 'personal_team' => true]);
+    Membership::create(['team_id' => $other->id, 'user_id' => $elsewhere->id, 'role' => Role::Owner->value]);
+
+    $this->postJson('/beam/accounts/invitations', ['email' => 'elsewhere@example.test', 'role' => 'member'])->assertCreated();
+
+    expect(collect($this->getJson('/beam/accounts/invitations')->json('data'))->pluck('email')->sort()->values()->all())
+        ->toBe(['elsewhere@example.test', 'former@example.test']);
+});
+
 it('refuses a member sending, resending or revoking an invitation', function () {
     [, $team] = apiOwner();
     $id = $this->postJson('/beam/accounts/invitations', ['email' => 'x@example.test', 'role' => 'member'])
