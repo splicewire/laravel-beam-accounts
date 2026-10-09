@@ -48,6 +48,7 @@ it('updates the password from the security surface', function () {
             'password' => 'new-password-5678',
             'password_confirmation' => 'new-password-5678',
         ])
+        ->assertSessionHasNoErrors()
         ->assertRedirect();
 
     expect(Hash::check('new-password-5678', $this->user->fresh()->password))->toBeTrue();

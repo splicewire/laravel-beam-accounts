@@ -3,7 +3,6 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 use Splicewire\Beam\Data\BeamData;
@@ -21,17 +20,17 @@ use Splicewire\Beam\Data\BeamData;
  * `password_confirmation`; it is deliberately NOT a promoted property, since it is a validation-only
  * companion the controller never reads.
  *
- * `#[MapInputName(SnakeCaseMapper::class)]` because the wire name `current_password` is a fixed
+ * `#[MapInputName('current_password')]` because the wire name is a fixed
  * existing contract — Laravel's `current_password` validation rule and the shipped change-password
- * form both use it — while the PHP side stays camelCase like every other DTO here. The mapper is the
- * seam between the two; renaming either side would have been a breaking change for no gain.
+ * form both use it — while the PHP side stays camelCase like every other DTO here. The property-level
+ * literal takes precedence over a host's global input mapper; a class-level mapper does not.
  */
-#[MapInputName(SnakeCaseMapper::class)]
 class PasswordUpdateInputData extends BeamData
 {
     use PasswordValidationRules;
 
     public function __construct(
+        #[MapInputName('current_password')]
         public string $currentPassword,
         public string $password,
     ) {}
