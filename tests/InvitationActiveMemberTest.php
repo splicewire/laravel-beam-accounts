@@ -95,6 +95,28 @@ class InvitationActiveMemberTest extends TestCase
         $this->assertSame(0, Invitation::whereNull('accepted_at')->count(), 'no Pending row');
     }
 
+    public static function transports(): array
+    {
+        return ['rest' => ['/beam/accounts/invitations'], 'frame' => ['/frame/resources/invitations']];
+    }
+
+    /** The PENDING lookup is case-insensitive too: a case-variant re-invite REFRESHES the one row, never adds a second. */
+    #[DataProvider('transports')]
+    public function test_a_case_variant_re_invite_of_a_pending_address_refreshes_the_one_pending_row(string $url): void
+    {
+        $this->postJson($url, ['email' => 'pending@example.test', 'role' => 'member'])->assertSuccessful();
+        $first = Invitation::whereRaw('lower(email) = ?', ['pending@example.test'])->sole();
+
+        $this->postJson($url, ['email' => ' Pending@EXAMPLE.test ', 'role' => 'admin'])->assertSuccessful();
+
+        $rows = Invitation::whereRaw('lower(trim(email)) = ?', ['pending@example.test'])->get();
+        $this->assertCount(1, $rows, 'one pending row per address, whatever its letter case');
+        $this->assertSame($first->id, $rows[0]->id);
+        $this->assertSame('admin', (string) $rows[0]->role);
+        $this->assertNotSame($first->token, $rows[0]->token, 'a refresh mints a fresh token');
+        $this->assertNull($rows[0]->accepted_at);
+    }
+
     public function test_frame_create_still_invites_a_new_address(): void
     {
         $this->postJson('/frame/resources/invitations', ['email' => 'New@Example.test', 'role' => 'member'])->assertSuccessful();

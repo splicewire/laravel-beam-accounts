@@ -114,9 +114,13 @@ class InvitationData extends BeamData
             ]);
         }
 
+        // The same case-insensitive, trimmed match: a re-invite of `Pending@Example.test` REFRESHES the pending
+        // `pending@example.test` row instead of adding a second one beside it (`unique(team_id, email)` is
+        // case-sensitive on Postgres, so the database would not stop it).
         $existing = Invitation::query()
             ->where('team_id', $teamKey)
-            ->where('email', $input->email)
+            ->whereRaw('lower(trim(email)) = ?', [$address])
+            ->orderBy('id')
             ->first();
 
         if ($existing !== null) {
