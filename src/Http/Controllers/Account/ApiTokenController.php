@@ -2,13 +2,13 @@
 
 namespace Splicewire\Beam\Accounts\Http\Controllers\Account;
 
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
@@ -313,7 +313,7 @@ class ApiTokenController extends Controller
      * @param  array<int, string>  $abilities
      * @return array{0: Model, 1: string}
      */
-    protected function mint(Authenticatable $user, string $name, array $abilities, ?Carbon $expiresAt): array
+    protected function mint(Authenticatable $user, string $name, array $abilities, ?CarbonInterface $expiresAt): array
     {
         $model = BeamAccounts::tokenModel();
 
@@ -518,8 +518,14 @@ class ApiTokenController extends Controller
         return $user->getAllPermissions()->pluck('name')->all();
     }
 
-    /** Turn the optional `expires_in_days` input into an absolute expiry (null = never). */
-    protected function expiresAtFor(?int $days): ?Carbon
+    /**
+     * Turn the optional `expires_in_days` input into an absolute expiry (null = never).
+     *
+     * Typed to `CarbonInterface`, not `Illuminate\Support\Carbon`: `now()` follows the host's `Date::use(...)`, and a
+     * host on immutable dates gets a `CarbonImmutable`, which the narrower type turned into a 500 on create, renew
+     * and rotate.
+     */
+    protected function expiresAtFor(?int $days): ?CarbonInterface
     {
         return $days ? now()->addDays($days) : null;
     }

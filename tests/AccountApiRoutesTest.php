@@ -1,9 +1,11 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Splicewire\Beam\Accounts\Data\TokenData;
@@ -271,6 +273,32 @@ it('takes the wire spelling expires_in_days, not the camelCase property name', f
     $this->postJson('/beam/accounts/tokens', ['name' => 'dated', 'expires_in_days' => 7])->assertCreated();
 
     expect(PersonalAccessToken::firstWhere('name', 'dated')->expires_at)->not->toBeNull();
+});
+
+/**
+ * A host that configures immutable dates (`Date::use(CarbonImmutable::class)`) makes `now()` return a
+ * CarbonImmutable. The expiry helper was typed `?Illuminate\Support\Carbon`, so create, renew and rotate with
+ * `expires_in_days` all answered 500 (TOWER-05's fresh-clone journey, 2026-10-09). Every path must work
+ * whichever date class the host picks, and store the right expiry.
+ */
+it('creates, renews and rotates an expiring token when the host uses immutable dates', function () {
+    apiOwner();
+    Date::use(CarbonImmutable::class);
+
+    try {
+        $this->postJson('/beam/accounts/tokens', ['name' => 'immutable', 'expires_in_days' => 1])->assertCreated();
+        $token = PersonalAccessToken::firstWhere('name', 'immutable');
+        expect(abs($token->expires_at->getTimestamp() - now()->addDay()->getTimestamp()))->toBeLessThan(120);
+
+        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/renew", ['expires_in_days' => 2])->assertOk();
+        expect(abs($token->fresh()->expires_at->getTimestamp() - now()->addDays(2)->getTimestamp()))->toBeLessThan(120);
+
+        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/rotate", ['expires_in_days' => 3])->assertSuccessful();
+        $rotated = PersonalAccessToken::where('name', 'immutable')->whereNull('archived_at')->sole();
+        expect(abs($rotated->expires_at->getTimestamp() - now()->addDays(3)->getTimestamp()))->toBeLessThan(120);
+    } finally {
+        Date::useDefault();
+    }
 });
 
 it('sweeps other SESSION tokens and leaves deliberate API tokens working', function () {
