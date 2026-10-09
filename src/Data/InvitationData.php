@@ -103,8 +103,12 @@ class InvitationData extends BeamData
         // re-open their accepted invitation (`accepted_at = null`) and the roster would show them Active AND
         // Pending (TOWER-05 gate, ticket 00 51702c40). Asked through the TEAM CONTRACT, so a host team counts the
         // same as beam's own. A removed member is no longer a member, so they stay invitable.
-        $user = BeamAccounts::userModel()::query()->where('email', $input->email)->first();
-        if ($user instanceof Authenticatable && $team->hasMember($user)) {
+        // Emails compare case-insensitively and trimmed, as redemption does (`strcasecmp(trim(…))`): an exact,
+        // database-default equality let `Solo@Example.test` past an active `solo@example.test` (build-qa r2).
+        // Every user the address could name is asked, since a host may hold case variants as separate rows.
+        $address = mb_strtolower(trim($input->email));
+        $users = BeamAccounts::userModel()::query()->whereRaw('lower(email) = ?', [$address])->get();
+        if ($users->contains(fn ($user) => $user instanceof Authenticatable && $team->hasMember($user))) {
             throw ValidationException::withMessages([
                 'email' => "{$input->email} is already a member of this team.",
             ]);
