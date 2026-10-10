@@ -50,7 +50,7 @@ it('provisions a team-of-one on registration', function () {
         ->fill('input[name="name"]', 'Team Of One')
         ->fill('input[name="email"]', $email)
         ->fill('input[name="password"]', 'password-1234')
-        ->fill('input[name="password_confirmation"]', 'password-1234')
+        ->fill('input[name="passwordConfirmation"]', 'password-1234')
         ->click('[data-test="register-user-button"]')
         ->assertPathIsNot('/register')
         ->assertNoConsoleLogs()
