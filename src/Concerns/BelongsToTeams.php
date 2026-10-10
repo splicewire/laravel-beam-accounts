@@ -28,7 +28,10 @@ trait BelongsToTeams
 
     public function teams(): BelongsToMany
     {
-        return $this->belongsToMany(Team::class, Beam::table('memberships'))
+        // The membership schema owns these column names. Letting Eloquent infer the
+        // parent side from the concrete user class breaks host models with a custom
+        // class name or primary key (for example `me_string_key_user_user_ref`).
+        return $this->belongsToMany(Team::class, Beam::table('memberships'), 'user_id', 'team_id')
             ->withPivot('role')
             ->withTimestamps();
     }
