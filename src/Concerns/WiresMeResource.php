@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\Authorization\MePolicy;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Http\Controllers\Api\V1\MeController;
@@ -63,6 +64,7 @@ trait WiresMeResource
             key: MeController::KEY,
             backing: BeamAccounts::userModel(),
             data: AuthUserData::class,
+            readPolicy: MePolicy::class,
             scope: function (Builder $query): Builder {
                 $id = request()->user()?->getAuthIdentifier();
 
