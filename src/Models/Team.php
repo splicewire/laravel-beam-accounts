@@ -121,7 +121,7 @@ class Team extends Model implements TeamContract
 
     public function members()
     {
-        return $this->belongsToMany(BeamAccounts::userModel(), Beam::table('memberships'))
+        return $this->belongsToMany(BeamAccounts::userModel(), Beam::table('memberships'), 'team_id', 'user_id')
             ->withPivot('role')
             ->withTimestamps();
     }

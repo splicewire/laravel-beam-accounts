@@ -17,7 +17,9 @@ use Schemastud\Frame\Registry\CompositeResourceRegistry;
 use Spatie\LaravelData\Data;
 use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Http\Controllers\Api\V1\MeController;
+use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Permission;
+use Splicewire\Beam\Accounts\Models\Team;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Frame\ParticleResourceRegistryAdapter;
 use Splicewire\Beam\Particle\Contribution\ResourceContribution;
@@ -91,6 +93,24 @@ class MeFrameResourceTest extends TestCase
             $this->assertSame([$actor->getKey()], array_column($response->json('data'), 'id'));
             $response->assertJsonPath('total', 1)->assertJsonPath('data.0.email', $actor->email);
         }
+    }
+
+    public function test_string_key_users_use_the_declared_membership_pivot_keys_in_both_directions(): void
+    {
+        $ada = $this->user('Ada');
+        $team = Team::create([
+            'user_id' => $ada->getKey(),
+            'name' => 'String keys',
+            'personal_team' => false,
+        ]);
+        Membership::create([
+            'team_id' => $team->getKey(),
+            'user_id' => $ada->getKey(),
+            'role' => 'member',
+        ]);
+
+        $this->assertSame([$team->getKey()], $ada->teams()->pluck('beam_teams.id')->all());
+        $this->assertSame([$ada->getKey()], $team->members()->pluck('me_users.user_ref')->all());
     }
 
     public function test_a_foreign_identity_cannot_be_resolved_by_its_known_key(): void
