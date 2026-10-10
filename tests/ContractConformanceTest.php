@@ -14,7 +14,7 @@ beforeEach(function () {
         'name' => 'Owner',
         'email' => 'owner@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
     // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
     app(TeamProvisioner::class)->personalTeamFor($this->owner);

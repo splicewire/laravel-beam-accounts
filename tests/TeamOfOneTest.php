@@ -12,7 +12,7 @@ it('registers a user with no team, and the provisioner gives them a team-of-one'
         'name' => 'Ada',
         'email' => 'ada@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
     // Registration provisions no team (purchase-walkthrough M10, lead ruling 2026-10-05); the provisioner does.
     expect($user->personalTeam())->toBeNull();
@@ -35,7 +35,7 @@ it('assigns the spatie owner role scoped to the personal team', function () {
         'name' => 'Grace',
         'email' => 'grace@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
     // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
     app(TeamProvisioner::class)->personalTeamFor($user);
@@ -52,7 +52,7 @@ it('adds a member with a role through the provisioner', function () {
         'name' => 'Owner',
         'email' => 'owner@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
     // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
     app(TeamProvisioner::class)->personalTeamFor($owner);
@@ -73,6 +73,6 @@ it('rejects a duplicate email at registration', function () {
         'name' => 'B',
         'email' => 'dupe@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
 })->throws(ValidationException::class);

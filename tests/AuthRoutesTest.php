@@ -12,7 +12,7 @@ it('registers a user through Fortify, door-checked, with no team at registration
         'name' => 'Ada',
         'email' => 'ada@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
 
     $response->assertRedirect();
@@ -23,6 +23,18 @@ it('registers a user through Fortify, door-checked, with no team at registration
     // purchase-walkthrough M10, lead ruling 2026-10-05: registration provisions no team (a host may, in afterCreating).
     expect($user->personalTeam())->toBeNull();
     expect($user->memberships()->count())->toBe(0);
+});
+
+it('refuses the old snake registration confirmation key', function () {
+    $this->post('/register', [
+        'name' => 'Ada',
+        'email' => 'snake@example.test',
+        'password' => 'password-1234',
+        'password_confirmation' => 'password-1234',
+    ])->assertSessionHasErrors('password_confirmation');
+
+    $this->assertGuest();
+    expect(User::where('email', 'snake@example.test')->exists())->toBeFalse();
 });
 
 it('logs an existing user in through Fortify', function () {
