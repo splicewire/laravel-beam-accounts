@@ -136,7 +136,7 @@ it('sets Fortify\'s registration feature from the policy at boot', function () {
 
 it('binds Fortify registration to the door-checked action', function () {
     $action = app(CreatesNewUsers::class);
-    $input = ['name' => 'Ada', 'email' => 'ada@acme.test', 'password' => 'a-long-password-1', 'password_confirmation' => 'a-long-password-1'];
+    $input = ['name' => 'Ada', 'email' => 'ada@acme.test', 'password' => 'a-long-password-1', 'passwordConfirmation' => 'a-long-password-1'];
     config(['beam.accounts.doors.registration' => 'closed']);
 
     expect(fn () => $action->create($input))->toThrow(DoorClosed::class);
@@ -163,7 +163,7 @@ it('answers a closed door as not found, never a 500', function () {
     // build-qa on ac2a9ed: an undeclared host that still lists registration and uses this package's action mounts
     // POST /register, whose door is closed. A closed door is a 404 (rule BUY-9).
     config(['beam.accounts.doors.registration' => 'closed']);
-    \Illuminate\Support\Facades\Route::post('door-probe', fn () => doors()->create(Door::Register, newUser()));
+    Illuminate\Support\Facades\Route::post('door-probe', fn () => doors()->create(Door::Register, newUser()));
 
     $this->post('door-probe')->assertNotFound();
 });

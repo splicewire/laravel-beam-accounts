@@ -55,7 +55,7 @@ it('refuses an intended URL smuggled past a shape check', function () {
 
 it('lands a registration through Landing too', function () {
     $this->post('/register', [
-        'name' => 'Bo', 'email' => 'bo@example.test', 'password' => 'password-1234', 'password_confirmation' => 'password-1234',
+        'name' => 'Bo', 'email' => 'bo@example.test', 'password' => 'password-1234', 'passwordConfirmation' => 'password-1234',
     ])->assertRedirect('/dashboard');
 });
 

@@ -85,7 +85,7 @@ it('lets a bound resolver win over the default branch, and proves the callable r
         'name' => 'Owner',
         'email' => 'owner@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
     // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
     app(TeamProvisioner::class)->personalTeamFor($owner);
@@ -112,7 +112,7 @@ it('honours a resolver that returns null instead of falling through to the perso
         'name' => 'Owner',
         'email' => 'owner-null@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
     // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
     app(TeamProvisioner::class)->personalTeamFor($owner);
@@ -132,7 +132,7 @@ it('REJECTS a bare invokable class-string and silently falls through to the defa
         'name' => 'Owner',
         'email' => 'owner-invokable@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ]);
     // A team-of-one, provisioned explicitly: registration provisions no team (purchase-walkthrough M10).
     app(TeamProvisioner::class)->personalTeamFor($owner);

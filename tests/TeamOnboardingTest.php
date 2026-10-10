@@ -270,7 +270,7 @@ it('registers a new invitee, returns them to the link, and seats them with the i
         'name' => 'Ivy Invitee',
         'email' => 'invitee@example.test',
         'password' => 'password-1234',
-        'password_confirmation' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
     ])->assertRedirect($link);
 
     $this->withHeaders($this->inertia)->get($link)
