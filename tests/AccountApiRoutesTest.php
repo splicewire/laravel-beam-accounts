@@ -373,7 +373,16 @@ it('lists members and the server-derived role vocabulary', function () {
 
     $roles = $this->getJson('/beam/accounts/members/roles')->json('data');
     expect(collect($roles['assignable'])->pluck('value')->all())->toBe(Role::values())
-        ->and(collect($roles['invitable'])->pluck('value')->all())->toBe(Role::invitableValues());
+        ->and(collect($roles['invitable'])->pluck('value')->all())->toBe(Role::invitableValues())
+        ->and(collect($roles['assignable'])->pluck('label', 'value')->all())->toBe([
+            'owner' => 'Owner',
+            'admin' => 'Admin',
+            'member' => 'Member',
+        ])
+        ->and(collect($roles['invitable'])->pluck('label', 'value')->all())->toBe([
+            'admin' => 'Admin',
+            'member' => 'Member',
+        ]);
 });
 
 it('lets an owner change a member\'s role and refuses a member doing the same', function () {
