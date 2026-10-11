@@ -12,12 +12,12 @@ use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
 use Schemastud\Frame\Attributes\NotInList;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
+use Splicewire\Beam\Accounts\Authorization\InvitationReadPolicy;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationMailer;
-use Splicewire\Beam\Authorization\ModelOrOperatorReadPolicy;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
@@ -53,7 +53,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     editData: CreateInvitationData::class,
     editable: false,
     showable: false,
-    readPolicy: ModelOrOperatorReadPolicy::class,
+    readPolicy: InvitationReadPolicy::class,
 )]
 #[TypeScript]
 class InvitationData extends BeamData
@@ -210,15 +210,21 @@ class InvitationData extends BeamData
         // relation only beam's `Team` has. Both arms named beam's own schema while the guard pretended
         // to be neutral — measured 2026-09-01 against `~/Herd/splicewire-app`, whose team is a
         // string-keyed `Tenant` over `tenant_users`. The contract method is the neutral question.
-        $role = $actor instanceof Authenticatable ? $team->memberRole($actor) : null;
-
         abort_unless(
-            in_array($role, [Role::Owner, Role::Admin], true),
+            self::managesTeam($actor, $team),
             403,
             'Only owners and admins can manage invitations.'
         );
 
         return $team;
+    }
+
+    /** The one current-team membership predicate shared by invitation writes and list admission. */
+    public static function managesTeam(?object $actor, TeamContract $team): bool
+    {
+        $role = $actor instanceof Authenticatable ? $team->memberRole($actor) : null;
+
+        return in_array($role, [Role::Owner, Role::Admin], true);
     }
 
     /**
