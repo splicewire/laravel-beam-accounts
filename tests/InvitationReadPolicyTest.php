@@ -88,11 +88,55 @@ it('admits real current-team owners and admins without widening the invitation r
         ->and(InvitationData::scope(Invitation::query())->pluck('email')->all())->toBe(['a@example.test']);
 })->with([Role::Owner, Role::Admin]);
 
+it('keeps a foreign-team owner out of team A rows and denies a plain member of A', function () {
+    $ownerA = User::create(['name' => 'Owner A', 'email' => 'owner-a@example.test', 'password' => 'x']);
+    $teamA = Team::create(['user_id' => $ownerA->id, 'name' => 'Team A']);
+    Membership::create(['team_id' => $teamA->id, 'user_id' => $ownerA->id, 'role' => Role::Owner->value]);
+    $memberA = User::create(['name' => 'Member A', 'email' => 'member-a@example.test', 'password' => 'x']);
+    Membership::create(['team_id' => $teamA->id, 'user_id' => $memberA->id, 'role' => Role::Member->value]);
+    $memberA->switchTeam($teamA);
+
+    $ownerB = User::create(['name' => 'Owner B', 'email' => 'owner-b@example.test', 'password' => 'x']);
+    $teamB = Team::create(['user_id' => $ownerB->id, 'name' => 'Team B']);
+    Membership::create(['team_id' => $teamB->id, 'user_id' => $ownerB->id, 'role' => Role::Owner->value]);
+    $ownerB->switchTeam($teamB);
+
+    Invitation::create([
+        'team_id' => $teamA->id,
+        'email' => 'a@example.test',
+        'role' => Role::Member->value,
+        'token' => str_repeat('a', 64),
+        'invited_by' => $ownerA->id,
+    ]);
+    Invitation::create([
+        'team_id' => $teamB->id,
+        'email' => 'b@example.test',
+        'role' => Role::Member->value,
+        'token' => str_repeat('b', 64),
+        'invited_by' => $ownerB->id,
+    ]);
+
+    Gate::policy(Invitation::class, InvitationReadFixturePolicy::class);
+    $resource = app(ParticleResourceRegistry::class)->get('invitations');
+    $request = Request::create('/');
+    $route = new Route('GET', '/', fn () => null);
+    $route->defaults('realm', 'tenant');
+    $request->setRouteResolver(fn () => $route);
+    $policy = app(InvitationReadPolicy::class);
+
+    Auth::login($ownerB = $ownerB->fresh());
+    expect($policy->inspect($ownerB, $resource, $request)->allowed())->toBeTrue()
+        ->and(InvitationData::scope(Invitation::query())->pluck('email')->all())->toBe(['b@example.test']);
+
+    Auth::login($memberA = $memberA->fresh());
+    expect($policy->inspect($memberA, $resource, $request)->denied())->toBeTrue();
+});
+
 class InvitationReadFixturePolicy
 {
-    public function viewAny(InvitationReadActor $actor): bool
+    public function viewAny(AuthUser $actor): bool
     {
-        return $actor->modelReader;
+        return $actor instanceof InvitationReadActor && $actor->modelReader;
     }
 }
 
