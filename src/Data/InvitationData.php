@@ -17,6 +17,7 @@ use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationMailer;
+use Splicewire\Beam\Authorization\ModelOrOperatorReadPolicy;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
@@ -52,6 +53,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     editData: CreateInvitationData::class,
     editable: false,
     showable: false,
+    readPolicy: ModelOrOperatorReadPolicy::class,
 )]
 #[TypeScript]
 class InvitationData extends BeamData
