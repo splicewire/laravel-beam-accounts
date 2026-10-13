@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
+use Splicewire\Beam\Authorization\AuthenticatedReadPolicy;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
@@ -17,7 +18,13 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * binds a different grant_model registers its own read resource.
  * This ledger is list-only: grant creation and revocation belong to target-authorized sharing operations.
  */
-#[ParticleResource(key: 'access-grants', backing: AccessGrant::class, readOnly: true, showable: false)]
+#[ParticleResource(
+    key: 'access-grants',
+    backing: AccessGrant::class,
+    readPolicy: AuthenticatedReadPolicy::class,
+    readOnly: true,
+    showable: false,
+)]
 class AccessGrantData extends BeamData
 {
     public function __construct(

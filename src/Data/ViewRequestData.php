@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Splicewire\Beam\Accounts\Models\ViewRequest;
+use Splicewire\Beam\Authorization\AuthenticatedReadPolicy;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Particle\Attributes\ParticleResource;
 
@@ -15,7 +16,13 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * status, as a declarative particle resource. Owner-side (incoming) requests stay per-resource.
  * This ledger is list-only: requesting and deciding access belong to the sharing operations.
  */
-#[ParticleResource(key: 'view-requests', backing: ViewRequest::class, readOnly: true, showable: false)]
+#[ParticleResource(
+    key: 'view-requests',
+    backing: ViewRequest::class,
+    readPolicy: AuthenticatedReadPolicy::class,
+    readOnly: true,
+    showable: false,
+)]
 class ViewRequestData extends BeamData
 {
     public function __construct(
