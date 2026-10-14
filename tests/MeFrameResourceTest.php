@@ -253,6 +253,17 @@ class MeStringKeyUser extends User
     protected $table = 'me_users';
 
     protected $primaryKey = 'user_ref';
+
+    protected $keyType = 'string';
+
+    public $incrementing = false;
+
+    // The shared User fixture uses HasUuids. These deliberately non-UUID identity keys
+    // must not inherit that declaration: Beam's RecordKey guard (86197d66) enforces it.
+    public function uniqueIds(): array
+    {
+        return [];
+    }
 }
 
 class MeProfileNoteData extends Data
