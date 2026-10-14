@@ -130,7 +130,7 @@ return new class extends Migration
     private function hasSlugIndex(string $teams): bool
     {
         foreach (Schema::getIndexes($teams) as $index) {
-            if (($index['unique'] ?? false) && ($index['columns'] ?? []) === ['slug']) {
+            if ($index['unique'] && $index['columns'] === ['slug']) {
                 return true;
             }
         }

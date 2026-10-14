@@ -78,8 +78,8 @@ return new class extends Migration
     private function landingUrlIsAlreadyNullable(): bool
     {
         foreach (Schema::getColumns('guest_tokens') as $column) {
-            if (($column['name'] ?? null) === 'landing_url') {
-                return (bool) ($column['nullable'] ?? false);
+            if ($column['name'] === 'landing_url') {
+                return (bool) $column['nullable'];
             }
         }
 
