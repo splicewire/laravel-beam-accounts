@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Data;
 
+use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
@@ -27,6 +28,7 @@ class ResetPasswordInputData extends BeamData
         public string $email,
         public string $password,
         #[MapName('passwordConfirmation')]
+        #[Description('The new password again; it must match `password` exactly.')]
         public string $passwordConfirmation,
     ) {}
 
