@@ -14,8 +14,10 @@ use Splicewire\Beam\Facades\Particle;
 |--------------------------------------------------------------------------
 |
 | Mounted by `Route::splicewireTeamRoutes()`. The package mounts it itself when
-| `beam.accounts.register_routes` is on; a host that turns that off (every beam starter does, and
-| mounts its own settings routes) calls the macro from its route file.
+| `beam.accounts.register_routes` AND `beam.accounts.teams.pages` are on (the pages live in
+| `@splicewire/beam-inertia`'s page map, so a host opts in once its resolver reaches it); a host that
+| turns `register_routes` off (every beam starter does, and mounts its own settings routes) calls the
+| macro from its route file, which is itself the opt-in.
 |
 |   GET  teams/create                teams.create         the form            (auth)
 |   POST teams/create                teams.store          CreateTeam op       (auth)

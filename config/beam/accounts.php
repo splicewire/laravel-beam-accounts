@@ -329,9 +329,18 @@ return [
     // beam's `Models\Team`, or nothing when `publish_migrations` is `'absent'`. Bind a `Team` subclass
     // to extend it; `false` (or the host's own team class) turns those flows off, and the macro then
     // mounts none of its routes. Read through `BeamAccounts::teamModel()`.
+    //
+    // `pages` opts the package's auto-mount into the team PAGES — `teams.create` and the emailed
+    // `invitations.accept` link (with their two ops). Both render Inertia pages that ship in
+    // `@splicewire/beam-inertia`'s page map, not in the host, so they are off until the host's page
+    // resolver can reach that map; a host resolving only its own `resources/js/pages` would otherwise
+    // render a blank page or a 500. A host that calls `Route::splicewireTeamRoutes()` itself has opted
+    // in already. With the names absent, `DashboardWelcome` offers neither "Create a team" nor the
+    // invitation hint, and no invitation mail is sent (there is no link that could work).
     'teams' => [
         'resolver' => null,
         'model' => null,
+        'pages' => (bool) env('BEAM_ACCOUNTS_TEAM_PAGES', false),
     ],
 
     // What each team role may DO to a cascade-policed model — the permission rows

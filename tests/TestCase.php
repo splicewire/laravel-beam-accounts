@@ -103,6 +103,10 @@ abstract class TestCase extends Orchestra
         // asserts the shipped defaults from the config file, and its closed-boot case runs under its own environment.
         $config->set('beam.accounts.doors.registration', 'open');
 
+        // The same host has opted into the team pages (its resolver reaches beam-inertia's page map). The package
+        // DEFAULT is off; TeamPagesOptInTest asserts it from the config file under its own environment.
+        $config->set('beam.accounts.teams.pages', true);
+
         $config->set('database.default', 'testing');
         $config->set('database.connections.testing', [
             'driver' => 'sqlite',
