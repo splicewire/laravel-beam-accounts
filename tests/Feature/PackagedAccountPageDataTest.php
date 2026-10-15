@@ -79,6 +79,21 @@ it('hydrates enabled passkeys and keeps credential material out of the page shap
         ->and($page->toArray()['twoFactorEnabled'])->toBeFalse();
 });
 
+it('carries the registration-door policy as canRegister (Optional, like canResetPassword)', function () {
+    // The login Sign up affordance must follow the SAME source the /register route reads
+    // (Features::enabled(Features::registration())). The host shares that policy as `canRegister` on
+    // the auth entry; absent means "the host did not say" and the affordance stays hidden — exactly
+    // the Optional contract canResetPassword already uses.
+    $open = AuthEntryPageData::from(['slug' => 'login', 'entry' => null, 'body' => null, 'canRegister' => true]);
+    $closed = AuthEntryPageData::from(['slug' => 'login', 'entry' => null, 'body' => null, 'canRegister' => false]);
+    $silent = AuthEntryPageData::from(['slug' => 'login', 'entry' => null, 'body' => null]);
+
+    expect($open->toArray())->toHaveKey('canRegister')
+        ->and($open->toArray()['canRegister'])->toBeTrue()
+        ->and($closed->toArray()['canRegister'])->toBeFalse()
+        ->and($silent->toArray())->not->toHaveKey('canRegister');
+});
+
 it('preserves non-scalar reset input until the submitted form validates it', function () {
     $page = ResetPasswordPageData::from([
         'slug' => 'reset-password', 'entry' => null, 'body' => null,

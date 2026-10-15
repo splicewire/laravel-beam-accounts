@@ -23,6 +23,10 @@ final class AuthEntryPageData extends Data
         #[ArrayItems('object')]
         public ?array $body,
         public bool|Optional $canResetPassword,
+        // The registration-door policy (Features::enabled(Features::registration()) — the same source
+        // the /register route reads), so the login Sign up affordance follows it. Optional: absent is
+        // "the host did not say", and the affordance stays hidden — the same contract as canResetPassword.
+        public bool|Optional $canRegister,
         public string|Optional|null $status,
         #[DataCollectionOf(DemoAccountLinkData::class)]
         public array|Optional $demoAccounts,
