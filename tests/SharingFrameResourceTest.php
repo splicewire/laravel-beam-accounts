@@ -18,6 +18,7 @@ use Splicewire\Beam\Accounts\Sharing\AccessGrants;
 use Splicewire\Beam\Accounts\Sharing\ViewRequests;
 use Splicewire\Beam\Accounts\Tests\Fixtures\Shareable;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Authorization\AuthenticatedReadPolicy;
 use Splicewire\Beam\Frame\ParticleResourceRegistryAdapter;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 
@@ -86,6 +87,9 @@ class SharingFrameResourceTest extends TestCase
     public function test_the_discovered_ledger_has_only_list_lifecycle(string $key, string $model, string $data, string $owner): void
     {
         $definition = app(ResourceRegistry::class)->get($key);
+        $resource = app(ParticleResourceRegistry::class)->get($key);
+
+        $this->assertSame(AuthenticatedReadPolicy::class, $resource->readPolicy);
         $this->assertFalse($definition->creatable);
         $this->assertFalse($definition->editable);
         $this->assertFalse($definition->deletable);
