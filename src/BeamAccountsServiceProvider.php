@@ -33,6 +33,7 @@ use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsRetiredMigrationAudit;
 use Splicewire\Beam\Accounts\Doctor\PermissionModelPairingAudit;
 use Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit;
+use Splicewire\Beam\Accounts\Doctor\TeamScopeWiringAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
@@ -579,6 +580,14 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
             $this->app->make(BeamDoctorManifest::class)->register(
                 'splicewire/laravel-beam-accounts',
                 PermissionModelPairingAudit::class,
+            );
+
+            // The one mandatory host line, finally checked (fail-closed-guards 02): zero team-scope
+            // adapters wired = silent total denial = FAIL. See the audit's docblock for the two
+            // adapters and the starter comment it quotes.
+            $this->app->make(BeamDoctorManifest::class)->register(
+                'splicewire/laravel-beam-accounts',
+                TeamScopeWiringAudit::class,
             );
         }
     }
