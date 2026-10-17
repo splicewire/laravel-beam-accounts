@@ -172,9 +172,12 @@ return new class extends Migration
         // declared column, and this covers the ones the Blueprint above only declares conditionally.
         $this->addTeamColumnsIfMissing($tableNames, $columnNames);
 
-        app('cache')
-            ->store(config('permission.cache.store') != 'default' ? config('permission.cache.store') : null)
-            ->forget(config('permission.cache.key'));
+        // Do not clear the permission cache from inside this schema transaction. When `migrate`
+        // has just created a missing PostgreSQL database, Laravel purges the default connection;
+        // resolving a database-backed cache store here opens a fresh connection while the
+        // migrator still owns the transaction handle. The migration can then report success and
+        // be recorded while these five tables are rolled back. A new database cannot contain a
+        // permission payload predating its permission schema, so there is nothing to invalidate.
     }
 
     /**
