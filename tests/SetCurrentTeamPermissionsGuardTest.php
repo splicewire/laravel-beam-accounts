@@ -61,3 +61,19 @@ it('prefers the account guard when the session has a user', function () {
 it('binds no team when no guard has a user', function () {
     expect(teamBoundFor(null))->toBeNull();
 });
+
+// orch-peer HIGH on f7c720c: the registrar is a singleton, so a request that resolves no team must not keep the last one.
+it('clears a stale team when no guard has a user', function () {
+    app(PermissionRegistrar::class)->setPermissionsTeamId('previous-team');
+
+    expect(teamBoundFor(null))->toBeNull();
+});
+
+it('clears a stale team when the user has no team', function () {
+    $loner = User::create(['name' => 'Loner', 'email' => 'loner@example.test', 'password' => 'x']);
+    Auth::guard('token_probe')->setUser($loner);
+    app(PermissionRegistrar::class)->setPermissionsTeamId('previous-team');
+
+    expect($loner->currentTeamOrPersonal())->toBeNull()
+        ->and(teamBoundFor('token_probe'))->toBeNull();
+});

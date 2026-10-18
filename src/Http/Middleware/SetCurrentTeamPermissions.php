@@ -19,16 +19,14 @@ class SetCurrentTeamPermissions
         // The account guard first (a session sign-in), then whichever guard authenticated this request: `auth:sanctum`
         // makes Sanctum the default, and a bearer request has no session user, so reading the account guard alone left
         // the team unset and every team-scoped role invisible on a token-authenticated route (L3 ticket 09 C4: a seated
-        // owner refused the UX builder). With neither, no team is bound: the cascade fails closed.
+        // owner refused the UX builder).
         $user = $request->user(BeamAccounts::guard()) ?? $request->user();
+        $team = $user && method_exists($user, 'currentTeamOrPersonal') ? $user->currentTeamOrPersonal() : null;
 
-        if ($user && method_exists($user, 'currentTeamOrPersonal')) {
-            $team = $user->currentTeamOrPersonal();
-
-            if ($team) {
-                app(PermissionRegistrar::class)->setPermissionsTeamId($team->getKey());
-            }
-        }
+        // Set on EVERY request, null included: the registrar is a singleton, so in a long-running worker a request
+        // that resolves no user or no team would otherwise keep the previous request's team (orch-peer HIGH on
+        // f7c720c). No team means no team-scoped role applies: the cascade fails closed.
+        app(PermissionRegistrar::class)->setPermissionsTeamId($team?->getKey());
 
         return $next($request);
     }
