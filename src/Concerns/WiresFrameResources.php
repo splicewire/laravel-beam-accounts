@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Concerns;
 
 use Rushing\Popcorn\Concerns\Chained;
+use Splicewire\Beam\Accounts\Authorization\TeamMemberReadPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
@@ -114,6 +115,7 @@ trait WiresFrameResources
             group: 'Settings',
             icon: 'users',
             readOnly: true,
+            readPolicy: TeamMemberReadPolicy::class,
             deletable: false,
             editable: false,
         ));

@@ -2,8 +2,10 @@
 
 use Illuminate\Config\Repository;
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\PermissionRegistrar;
+use Splicewire\Beam\Accounts\Authorization\TeamMemberReadPolicy;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
@@ -188,6 +190,19 @@ it('the member source is empty when there is no active team', function () {
     expect($page->items())->toHaveCount(0);
 });
 
+it('admits only a member of the current team to the members resource', function () {
+    [$owner] = ownerWithTeam();
+    $resource = app(ParticleResourceRegistry::class)->get('members');
+    $policy = app(TeamMemberReadPolicy::class);
+
+    expect($policy->inspect($owner, $resource, Request::create('/frame/resources/members'))->allowed())->toBeTrue();
+
+    $stray = User::create(['name' => 'Stray', 'email' => 'policy-stray@example.test', 'password' => 'x']);
+    Auth::login($stray);
+
+    expect($policy->inspect($stray, $resource, Request::create('/frame/resources/members'))->denied())->toBeTrue();
+});
+
 // ── Teams (the domain-neutral tenant-admin list) ──────────────────────────────────────────────
 
 it('projects a team into the admin list row', function () {
@@ -327,6 +342,7 @@ it('registers tokens/invitations/members/teams/users onto the Frame registries w
     // `sourceKind` left frame's contract with particle-contribution-seam 13; the backing is a type
     // now, asserted off beam's registry rather than a string on the manifest.
     expect($registry->get('members')->backing)->toBe(MembershipSource::class)
+        ->and($registry->get('members')->readPolicy)->toBe('Splicewire\\Beam\\Accounts\\Authorization\\TeamMemberReadPolicy')
         ->and($registry->definition('members')->deletable)->toBeFalse()
         ->and($registry->definition('invitations')->editable)->toBeFalse()
         ->and($registry->definition('tokens')->deletable)->toBeTrue();
