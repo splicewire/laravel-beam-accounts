@@ -53,7 +53,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
  * ✅ This DTO is now the sole `tokens` declaration in the estate (particle-manifest-repatriation 06).
  * `splicewire/tower`'s `Data\Frame\TokenResourceData` — the ancestor this class was promoted from — is
  * deleted, and `~/Herd/splicewire-app`'s inline re-registration is retired onto
- * `beam.accounts.tokens.{model,scope}` plus a `frame.realm_resource_overrides` presentation overlay.
+ * `beam.accounts.tokens.{model,scope}` plus a `beam.core.realm_resource_overrides` presentation overlay.
  * `superseded('tokens')` is empty at both hosts. The tower fossil was worth deleting on its own
  * account: it declared no `scope()` convention method at all, so had tower ever scanned
  * `src/Data/Frame` the winning `tokens` resource would have carried **no row-level boundary** on a
