@@ -425,4 +425,16 @@ return [
     'users' => [
         'scope' => null,
     ],
+
+    // The package's `/operator` home (`operator.home`): the user, team and pending-invitation counts,
+    // and links to the operator pages this host mounts. `enabled` false leaves `/operator` entirely to
+    // the host (so does a host route already named `operator.home`). The links are read off the router:
+    // every GET route named `operator.*` with no required parameter whose `can:` gates the viewer
+    // passes. `areas` names or hides them by route name, e.g.
+    // `['operator.admin' => 'Everything else', 'operator.debug' => false]`; an unnamed one is labelled
+    // from its route name in plain words.
+    'operator_shell' => [
+        'enabled' => true,
+        'areas' => [],
+    ],
 ];

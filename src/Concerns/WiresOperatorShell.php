@@ -8,7 +8,7 @@ use Inertia\Inertia;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
-use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Support\OperatorHome;
 
 /**
  * One concern of {@see BeamAccountsServiceProvider}, contributed to its `boot` chain by the trait that
@@ -58,23 +58,22 @@ trait WiresOperatorShell
 
         Route::middleware(['web', 'auth', 'can:entitlement:os.operate'])
             ->get('/operator', function (Request $request) {
-                $user = $request->user();
-                $model = BeamAccounts::userModel();
-                $props = [
-                    'staff' => ['name' => $user->name, 'email' => $user->email],
-                    'stats' => ['users' => $model::count()],
-                ];
+                // The figures this package owns and the operator pages the host mounts (owner re-walk WS-05).
+                $page = OperatorHome::pageFor($request->user());
 
                 // Opaque by default: no host file required at all, server-rendered Blade, always
                 // available the moment the package is installed. The moment a host publishes (or
                 // hand-authors) resources/js/pages/operator/dashboard.tsx — ejecting into a real,
                 // editable Inertia page — this prefers THAT instead, with no route change needed.
                 if (is_file(resource_path('js/pages/operator/dashboard.tsx'))) {
-                    return Inertia::render('operator/dashboard', $props);
+                    return Inertia::render('operator/dashboard', $page);
                 }
 
-                return view('beam-accounts::operator-shell', $props);
+                return view('beam-accounts::operator-shell', [
+                    'page' => $page,
+                    'developerNote' => OperatorHome::showsDeveloperNote(),
+                ]);
             })
-            ->name('operator.home');
+            ->name(OperatorHome::HOME_ROUTE);
     }
 }
