@@ -13,7 +13,9 @@ use Splicewire\Beam\Facades\Beam;
  * Owner re-walk WS-05 (2026-10-19): the package's `/operator` home showed the site owner a developer's note ("basic on
  * purpose… Publish resources/js/pages/operator/dashboard.tsx (vendor:publish …) to eject"). It is now a real operator
  * home: the user, team and pending-invitation counts, and links to the operator pages the host mounts. The eject note
- * is kept for local or debug mode only. Asserted on the rendered page, the package's interface for this route.
+ * is a developer's, so it shows only when the host turns `beam.accounts.operator_shell.developer_note` on: not in
+ * production, and not merely because the site runs locally or with debug on, where the owner is the one signed in
+ * (review nit). Asserted on the rendered page, the package's interface for this route.
  */
 
 beforeEach(function () {
@@ -93,24 +95,47 @@ it('shows a site owner the counts and the operator pages, and no developer note'
         ->not->toContain('Developer note');
 });
 
-it('keeps the eject note for a developer in local mode', function () {
+it('does not show the developer note on its own, whether the site runs locally or with debug on', function () {
+    // Local, debug on: the owner browsing their own site locally is the operator who is signed in.
     app()->detectEnvironment(fn () => 'local');
-    config(['app.debug' => false]);
+    config(['app.debug' => true]);
 
-    $page = $this->actingAs($this->operator)->get('/operator')->assertOk()->getContent();
+    expect($this->actingAs($this->operator)->get('/operator')->assertOk()->getContent())
+        ->not->toContain('Developer note')
+        ->not->toContain('vendor:publish')
+        ->not->toContain('dashboard.tsx')
+        ->not->toContain('operator_shell');
+});
 
-    expect($page)
+it('shows the developer note when the host turns the flag on, and says it is a developer-only note behind that flag', function () {
+    asProduction();
+    config(['beam.accounts.operator_shell.developer_note' => true]);
+
+    expect($this->actingAs($this->operator)->get('/operator')->assertOk()->getContent())
         ->toContain('Developer note')
+        ->toContain('<code>beam.accounts.operator_shell.developer_note</code>')
+        ->toContain('not for operators')
         ->toContain('vendor:publish --tag=beam-accounts-operator-shell')
         ->toContain('resources/js/pages/operator/dashboard.tsx');
 });
 
-it('keeps the eject note in debug mode', function () {
-    app()->detectEnvironment(fn () => 'production');
-    config(['app.debug' => true]);
+it('leaves out an operator page whose domain needs a value this home does not have, rather than failing the home', function () {
+    asProduction();
+    mountHostOperatorPages();
+    // A page mounted for a workspace's own host: no link to it can be built from /operator, which is on no workspace.
+    Route::domain('{workspace}.example.test')
+        ->middleware(['web', 'auth', 'can:entitlement:os.operate'])
+        ->get('/operator/workspace-tools', fn () => 'tools')
+        ->name('operator.workspace-tools');
+    Route::getRoutes()->refreshNameLookups();
 
-    expect($this->actingAs($this->operator)->get('/operator')->assertOk()->getContent())
-        ->toContain('vendor:publish --tag=beam-accounts-operator-shell');
+    $page = $this->actingAs($this->operator)->get('/operator')->assertOk()->getContent();
+
+    expect($page)
+        ->toContain('<a href="/operator/entries">Entries</a>')
+        ->toContain('<a href="/operator/customers">Customers</a>')
+        ->not->toContain('workspace-tools')
+        ->not->toContain('Workspace tools');
 });
 
 it('says what belongs under Manage when the host mounts no operator pages', function () {

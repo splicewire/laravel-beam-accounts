@@ -22,15 +22,15 @@ use Splicewire\Beam\Accounts\Models\Invitation;
 /**
  * What the package's `/operator` home shows ({@see WiresOperatorShell}): the figures this package owns, and links to
  * the operator pages the host mounts. Owner re-walk WS-05 (2026-10-19): the page used to be a developer's eject note
- * shown to the site owner. That note is now for local or debug only ({@see showsDeveloperNote()}).
+ * shown to the site owner. That note is now opt-in for a developer ({@see showsDeveloperNote()}).
  *
  * ## Where the links come from
  *
  * The package resolves no host page of its own, so it reads the host's router: every GET route named in the operator
- * realm (`operator.*`) other than this home, with no required parameter, outside the API, whose `can:` gates the
- * viewer passes. A host names or hides an area through `beam.accounts.operator_shell.areas` (route name => label, or
- * `false`); an undeclared one is labelled from its route name in plain words (`operator.customers.index` reads
- * "Customers").
+ * realm (`operator.*`) other than this home, with no required parameter (in its path or its domain), outside the API,
+ * whose `can:` gates the viewer passes. A host names or hides an area through `beam.accounts.operator_shell.areas`
+ * (route name => label, or `false`); an undeclared one is labelled from its route name in plain words
+ * (`operator.customers.index` reads "Customers").
  */
 final class OperatorHome
 {
@@ -48,10 +48,15 @@ final class OperatorHome
         );
     }
 
-    /** The eject note is a developer's instruction: shown in local or debug mode, never to a site owner in production. */
+    /**
+     * The eject note is a developer's instruction, so it shows only when the host asks for it with
+     * `beam.accounts.operator_shell.developer_note`, never as a side effect of the environment. A local site or one with
+     * `app.debug` on is where the owner browses their own site, signed in as the operator, and WS-05 was the owner
+     * reading this note.
+     */
     public static function showsDeveloperNote(): bool
     {
-        return app()->isLocal() || (bool) config('app.debug');
+        return (bool) config('beam.accounts.operator_shell.developer_note', false);
     }
 
     /** @return list<OperatorHomeAreaData> */
@@ -99,13 +104,18 @@ final class OperatorHome
         return Schema::connection($model->getConnectionName())->hasTable($model->getTable());
     }
 
-    /** A page a link can open: a GET with no required parameter that is not an API door. */
+    /**
+     * A page a link can open: a GET with no required parameter that is not an API door. A domain parameter
+     * (`{workspace}.example.test`) is a required value like a path one, and a link cannot be built without it: the URL
+     * generator throws, and the whole home answered 500 for a host with one such operator route.
+     */
     private static function isPage(RouteDefinition $route): bool
     {
         $uri = ltrim($route->uri(), '/');
 
         return in_array('GET', $route->methods(), true)
             && preg_match('/\{\w+\}/', $uri) !== 1
+            && ! str_contains((string) $route->getDomain(), '{')
             && ! str_starts_with($uri, 'api/');
     }
 

@@ -1,6 +1,7 @@
 {{--
     The operator home (`operator.home`), server-rendered by splicewire/laravel-beam-accounts. Data:
-    `$page` (Splicewire\Beam\Accounts\Data\Pages\OperatorHomePageData) and `$developerNote` (local or debug only).
+    `$page` (Splicewire\Beam\Accounts\Data\Pages\OperatorHomePageData) and `$developerNote` (only when the host sets
+    `beam.accounts.operator_shell.developer_note`).
 --}}
 <!doctype html>
 <html lang="en">
@@ -54,7 +55,8 @@
 
         @if ($developerNote)
             <aside class="note" aria-label="Developer note">
-                Developer note, shown only in local or debug mode. This page is the default rendered by
+                Developer note, not for operators: it shows because
+                <code>beam.accounts.operator_shell.developer_note</code> is on. This page is the default rendered by
                 <code>splicewire/laravel-beam-accounts</code> (server-rendered, no build step, no host file). Publish
                 <code>resources/js/pages/operator/dashboard.tsx</code>
                 (<code>vendor:publish --tag=beam-accounts-operator-shell</code>) to eject into an Inertia page you own;

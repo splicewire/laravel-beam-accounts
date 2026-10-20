@@ -430,11 +430,14 @@ return [
     // and links to the operator pages this host mounts. `enabled` false leaves `/operator` entirely to
     // the host (so does a host route already named `operator.home`). The links are read off the router:
     // every GET route named `operator.*` with no required parameter whose `can:` gates the viewer
-    // passes. `areas` names or hides them by route name, e.g.
-    // `['operator.admin' => 'Everything else', 'operator.debug' => false]`; an unnamed one is labelled
-    // from its route name in plain words.
+    // passes (a parameter in its domain counts: a link cannot be built without it). `areas` names or hides
+    // them by route name, e.g. `['operator.admin' => 'Everything else', 'operator.debug' => false]`; an
+    // unnamed one is labelled from its route name in plain words. `developer_note` draws a developer's
+    // note about ejecting the page at its foot. It is off, and a local environment or `app.debug` does not
+    // turn it on: the owner browsing their own site locally is the operator who is signed in.
     'operator_shell' => [
         'enabled' => true,
         'areas' => [],
+        'developer_note' => false,
     ],
 ];
