@@ -70,6 +70,13 @@ return new class extends Migration
         $teams = Beam::table('teams');
 
         if (Schema::hasColumn($teams, 'slug')) {
+            // SQLite cannot drop a column while its unique index still names it.
+            if ($this->hasSlugIndex($teams)) {
+                Schema::table($teams, function (Blueprint $table): void {
+                    $table->dropUnique(['slug']);
+                });
+            }
+
             Schema::table($teams, function (Blueprint $table): void {
                 $table->dropColumn('slug');
             });
