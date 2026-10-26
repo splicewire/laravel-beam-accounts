@@ -15,6 +15,12 @@ use PHPUnit\Framework\TestCase;
 use Splicewire\Beam\Accounts\Concerns\WiresTeamsMigrations;
 use Stancl\Tenancy\Tenancy;
 
+// Pest does not set PHPUnit's Composer entrypoint constant. Its isolated-process runner
+// needs this path before it can load the configured bootstrap or Configuration Registry.
+if (! defined('PHPUNIT_COMPOSER_INSTALL')) {
+    define('PHPUNIT_COMPOSER_INSTALL', dirname(__DIR__).'/vendor/autoload.php');
+}
+
 /** The migration-registration boundary; no database connection or host provider is booted. */
 class TeamsMigrationFallbackTest extends TestCase
 {
