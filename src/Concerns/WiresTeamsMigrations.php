@@ -23,19 +23,18 @@ trait WiresTeamsMigrations
      * even `splicewire:beam:install`, whose own verify-provisioning pass has no trap for this) got
      * "Nothing to migrate" silently — the whole accounts/teams estate never landed.
      *
-     * Mirrors beam-core's `sharedMigrationsOwnedByTenancy()` guard exactly: GUARDED on the tenancy
-     * provider not being present, so this never double-registers on a multi-tenant host (that
-     * package owns routing `tenant/` into its per-tenant pass, and `teams/` into whichever side
-     * `config/beam/accounts.php`'s multitenancy placement calls for). A single-tenant host — every
-     * host today; no consumer has ever placed this estate per-tenant (see
-     * `teams/create_visibilities_table`'s docblock) — runs both on its one central connection.
-     * `loadMigrationsFrom` over an empty/missing directory is a harmless no-op, so this is safe
-     * before the first publish too.
+     * Beam tenancy owns these paths when its provider is installed. Hosts with their own
+     * tenancy routing can disable `beam.accounts.central_migration_fallback` instead: the
+     * presence of Stancl's classes alone cannot identify such a host, because Accounts also
+     * requires Stancl on single-tenant installs. This only controls the central fallback;
+     * publishing stubs and paths registered by other providers remain unchanged.
+     * Missing directories are harmless before the first publish.
      */
     #[Chained('boot', order: 150)]
     protected function bootTeamsMigrations(): void
     {
-        if (class_exists('Splicewire\Beam\Tenancy\BeamTenancyServiceProvider')) {
+        if (class_exists('Splicewire\Beam\Tenancy\BeamTenancyServiceProvider')
+            || ! config('beam.accounts.central_migration_fallback', true)) {
             return;
         }
 

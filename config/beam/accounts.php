@@ -22,6 +22,11 @@ return [
     // wants to wire the macro itself.
     'register_routes' => env('ACCOUNT_REGISTER_ROUTES', true),
 
+    // Register published teams/ and tenant/ migrations on the central connection when
+    // beam-tenancy is absent. Hosts with their own tenancy migration routing set false;
+    // shared/ paths and stub publishing are unaffected. Default preserves single-host use.
+    'central_migration_fallback' => true,
+
     // Gate what configurePackage() declares via ->hasMigrations(). These control PUBLISH
     // (vendor:publish / splicewire:beam:install) — copying a .stub onto the host's disk — and never
     // runtime registration, which publish-only stubs do not do regardless of these flags. They were
