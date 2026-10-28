@@ -88,6 +88,11 @@
             "include": [
                 "composer.local.json"
             ]
+        },
+        "typescript-transformer": {
+            "directories": {
+                "src/Data/Pages": "Inertia page props that host controllers render (ProfilePageData, SecurityPageData, …); no particle declaration names them"
+            }
         }
     },
     "repositories": [
