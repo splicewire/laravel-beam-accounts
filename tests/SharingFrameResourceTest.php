@@ -44,10 +44,12 @@ class SharingFrameResourceTest extends TestCase
         $this->assertSame(':memory:', DB::connection()->getDatabaseName());
         $this->assertSame(DB::connection()->getPdo(), DB::connection('central')->getPdo());
 
-        // Use the actual discovered declarations through Frame's existing producer slot.
-        // Presentation eligibility remains unchanged until the separate registration cutover.
+        // Use the actual discovered declarations through Frame's existing producer slot. Since the registration
+        // cutover (laravel-beam a43875e, herd-frame-convergence ticket 17) the adapter answers for every typed read
+        // declaration; presentation eligibility is unchanged: a ledger is still not framed.
         foreach (array_keys(self::ledgers()) as $key) {
-            $this->assertFalse(app(ParticleResourceRegistryAdapter::class)->has($key));
+            $this->assertTrue(app(ParticleResourceRegistryAdapter::class)->has($key));
+            $this->assertFalse(app(ParticleResourceRegistry::class)->hasFramedResource($key));
             $resource = app(ParticleResourceRegistry::class)->get($key);
             app(CompositeResourceRegistry::class)->register($resource->toResourceDefinition());
             $this->assertTrue(app(ResourceRegistry::class)->has($key));
