@@ -18,6 +18,16 @@ use Splicewire\Beam\Facades\Beam;
  * The reference implementation of {@see TeamContract} — a single-DB team over beam's
  * own `beam_memberships` table. Behavior is unchanged from before the contract was
  * introduced; the interface just names the surface the account runtime already used.
+ *
+ * @property int $id
+ * @property string $user_id
+ * @property string $name
+ * @property string $slug
+ * @property bool $personal_team
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Relations\Pivot&object{role: string, created_at: \Illuminate\Support\Carbon|null, updated_at: \Illuminate\Support\Carbon|null} $pivot
+ *     set when loaded through a user's teams() (withPivot('role'), withTimestamps())
  */
 class Team extends Model implements TeamContract
 {

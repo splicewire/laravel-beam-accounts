@@ -16,16 +16,19 @@ use Splicewire\Beam\Facades\Beam;
  */
 trait BelongsToTeams
 {
+    /** @return HasMany<Team, $this> */
     public function ownedTeams(): HasMany
     {
         return $this->hasMany(Team::class, 'user_id');
     }
 
+    /** @return HasMany<Membership, $this> */
     public function memberships(): HasMany
     {
         return $this->hasMany(Membership::class, 'user_id');
     }
 
+    /** @return BelongsToMany<Team, $this> */
     public function teams(): BelongsToMany
     {
         // The membership schema owns these column names. Letting Eloquent infer the
@@ -36,6 +39,7 @@ trait BelongsToTeams
             ->withTimestamps();
     }
 
+    /** @return BelongsTo<Team, $this> */
     public function currentTeam(): BelongsTo
     {
         return $this->belongsTo(Team::class, 'current_team_id');
