@@ -2,13 +2,15 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
  * Reclassified from the old host-placed `teams/` directory into SHARED, alongside
  * `create_teams_table` (see that file's docblock) — this ALTER touches `users`, which is already
- * shared/, so it must land in every schema `users` does. The old "central-only, identity spans
- * tenants" reasoning assumed teams lived on exactly one side of a host; under shared/, every schema
+ * shared/, so it must land in every schema `users` does. A central-only auth host can omit
+ * `users` from tenants; the current-schema guard leaves those tenant schemas untouched.
+ * The old "central-only, identity spans tenants" reasoning assumed teams lived on exactly one side of a host; under shared/, every schema
  * gets its own self-consistent picture (its own users, its own teams, its own current_team_id
  * pointer), matching how `users`/`permission_tables` already work. `hasColumn`-guarded for
  * idempotency, matching the sibling shared/ ALTER pattern (`create_users_table`'s `google_id`
@@ -18,6 +20,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! $this->usersInCurrentSchema()) {
+            return;
+        }
+
         if (! Schema::hasColumn('users', 'current_team_id')) {
             Schema::table('users', function (Blueprint $table): void {
                 $table->unsignedBigInteger('current_team_id')->nullable()->after('id');
@@ -27,10 +33,26 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! $this->usersInCurrentSchema()) {
+            return;
+        }
+
         if (Schema::hasColumn('users', 'current_team_id')) {
             Schema::table('users', function (Blueprint $table): void {
                 $table->dropColumn('current_team_id');
             });
         }
+    }
+
+    private function usersInCurrentSchema(): bool
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            return Schema::hasTable('users');
+        }
+
+        return DB::selectOne(
+            'select 1 from information_schema.tables where table_schema = current_schema() and table_name = ?',
+            ['users'],
+        ) !== null;
     }
 };
