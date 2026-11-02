@@ -44,9 +44,11 @@ class SharingFrameResourceTest extends TestCase
         $this->assertSame(':memory:', DB::connection()->getDatabaseName());
         $this->assertSame(DB::connection()->getPdo(), DB::connection('central')->getPdo());
 
-        // Use the actual discovered declarations through Frame's existing producer slot. Since the registration
-        // cutover (laravel-beam a43875e, herd-frame-convergence ticket 17) the adapter answers for every typed read
-        // declaration; presentation eligibility is unchanged: a ledger is still not framed.
+        // Use the actual discovered declarations through Frame's existing producer slot. Ruling A (root be8c9f95,
+        // 2026-11-01) rolled back the a43875e cutover (herd-frame-convergence ticket 17) to restore the explicit
+        // `frame: false` opt-out — but the sharing ledgers (access-grants, view-requests) are UNLABELLED typed
+        // resources that did NOT declare `frame: false`, so under the restored opt-out they REMAIN addressable:
+        // has($key) stays true; only an explicit `frame: false` (e.g. `me`) opts out. A ledger is still not framed.
         foreach (array_keys(self::ledgers()) as $key) {
             $this->assertTrue(app(ParticleResourceRegistryAdapter::class)->has($key));
             $this->assertFalse(app(ParticleResourceRegistry::class)->hasFramedResource($key));

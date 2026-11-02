@@ -83,9 +83,11 @@ class MeFrameResourceTest extends TestCase
         $this->assertSame('sqlite', DB::connection()->getDriverName());
         $this->assertSame(':memory:', DB::connection()->getDatabaseName());
         $this->assertSame(DB::connection()->getPdo(), DB::connection('central')->getPdo());
-        // Since the registration cutover (laravel-beam a43875e, herd-frame-convergence ticket 17) the adapter answers
-        // for the typed `me` read declaration; presentation eligibility is unchanged: `me` is still not framed.
-        $this->assertTrue(app(ParticleResourceRegistryAdapter::class)->has('me'));
+        // Ruling A (root be8c9f95, 2026-11-01) rolls back af273e2's post-cutover premise: laravel-beam restored
+        // the explicit `frame: false` opt-out that a43875e (herd-frame-convergence ticket 17) had dropped. `me` is
+        // `frame: false` (WiresMeResource), so the Frame adapter does NOT address it — has('me') is false again.
+        // Presentation eligibility (hasFramedResource) was, and stays, false.
+        $this->assertFalse(app(ParticleResourceRegistryAdapter::class)->has('me'));
         $this->assertFalse(app(ParticleResourceRegistry::class)->hasFramedResource('me'));
         $this->assertTrue(app(ResourceRegistry::class)->has('me'));
 
