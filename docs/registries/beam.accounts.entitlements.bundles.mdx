@@ -1,0 +1,73 @@
+---
+title: Entitlement bundles
+segment: beam.accounts.entitlements.bundles
+nav_order: 100
+excerpt: Named sets of entitlement keys that a plan maps to, declared once in config.
+---
+
+# Entitlement bundles
+
+`beam.accounts.entitlements.bundles` holds the **entitlement bundles**: named sets of entitlement
+keys, the reusable product-facing unit a plan maps to. A plan usually grants exactly one bundle's
+keys, so a host declares `own-a-song` or `go-songwriter` once and never re-derives what each tier
+includes.
+
+{/* registry-facts:start — generated from the #[IsRegistry] declaration by `splicewire:beam:docs:registries:scaffold`. Rerun the command; do not edit between these markers. */}
+
+- **Root:** `beam.accounts.entitlements.bundles`
+- **Entries:** `list<string>`
+- **Duplicate keys:** Supersede — a later registration under a taken key replaces the earlier entry, in its place
+- **Population:** Optional — an empty registry is normal
+- **Order:** `100` (display order, ascending)
+- **Declared by:** `Splicewire\Beam\Accounts\Entitlements\BundleRegistry`
+
+{/* registry-facts:end */}
+
+## Declaring bundles
+
+Bundles live in your published `config/beam/accounts.php`. That array is the registry's storage, not
+a seed copied elsewhere:
+
+```php
+'entitlements' => [
+    'bundles' => [
+        'own-a-song' => ['own-a-song', 'publish'],
+        'go-songwriter' => ['own-a-song', 'go-songwriter', 'publish', 'generate'],
+    ],
+],
+```
+
+Each entry is a list of entitlement keys. Every read goes back to config, so a bundle added later in
+boot, or by a test, is seen at once.
+
+The registry ships **empty**. An unconfigured host holds no bundles, and every bundle name resolves
+to the empty set.
+
+## Who reads it
+
+The `EntitlementComposer`. A host's entitlement resolver works out which bundles a principal's plan
+grants, plus any per-principal grants and denies, and the composer folds them into one set:
+
+```text
+plan bundles ∪ grants − denies
+```
+
+Denies win over both. `keysForMany()` unions several bundles for a plan that grants more than one.
+An unknown bundle name gives the empty set rather than an error, because a plan may name a tier that
+has no bundle yet.
+
+This is the consumer path, for a host whose principal is a user on a plan. The multi-tenant commerce
+cascade resolves a tenant's entitlements separately, through its own plan defaults and per-tenant
+overrides.
+
+## Overriding a bundle
+
+The duplicate policy is **supersede**: a later declaration of a bundle name replaces its key list.
+
+## Going deeper
+
+The source is
+[`BundleRegistry`](https://github.com/splicewire/laravel-beam-accounts/blob/main/src/Entitlements/BundleRegistry.php),
+and the set algebra is
+[`EntitlementComposer`](https://github.com/splicewire/laravel-beam-accounts/blob/main/src/Entitlements/EntitlementComposer.php).
+[Beam accounts](/beam/docs/laravel/beam-accounts) covers the package as a whole.
