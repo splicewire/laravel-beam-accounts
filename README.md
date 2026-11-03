@@ -120,6 +120,33 @@ Session/Fortify web guard by default. The opt-in token `api` guard seam
 (`splicewire.account.api.enabled`, default-off, Sanctum) is prepared for a satellite that
 exposes its own proprietary API — never Passport.
 
+## Registries
+
+This package declares one registry:
+
+- [`beam.accounts.entitlements.bundles`](docs/registries/beam.accounts.entitlements.bundles.mdx): named sets
+  of entitlement keys that a plan maps to, declared in config.
+
+It registers into registries it doesn't own:
+
+- [`beam.install.steps`](https://github.com/splicewire/laravel-beam/blob/main/docs/registries/beam.install.steps.mdx),
+  owned by `splicewire/laravel-beam`: the accounts install step.
+- [`beam.doctor.audits`](https://github.com/splicewire/laravel-beam/blob/main/docs/registries/beam.doctor.audits.mdx),
+  owned by `splicewire/laravel-beam`: the migration, retired-migration, publish-gate coverage and permission-model
+  pairing audits.
+- [`beam.seed.steps`](https://github.com/splicewire/laravel-beam/blob/main/docs/registries/beam.seed.steps.mdx),
+  owned by `splicewire/laravel-beam`: the role-permissions seeder and the demo-team seeder, which runs only while
+  demo users are on.
+- [`beam.nav.sections`](https://github.com/splicewire/laravel-beam/blob/main/docs/registries/beam.nav.sections.mdx),
+  owned by `splicewire/laravel-beam`: the operator `people` section.
+- [`beam.particle.resources`](https://github.com/splicewire/laravel-beam/blob/main/docs/registries/beam.particle.resources.mdx),
+  owned by `splicewire/laravel-beam`: every attributed resource under `src/Data`, plus `members` and `me`.
+- [`beam.particle.operations`](https://github.com/splicewire/laravel-beam/blob/main/docs/registries/beam.particle.operations.mdx),
+  owned by `splicewire/laravel-beam`: the team, invitation, sharing and demo log-in operations, registered when
+  their routes are mounted.
+- [`beam.notifications.recipient_kinds`](https://github.com/splicewire/laravel-beam-notifications/blob/main/docs/registries/beam.notifications.recipient_kinds.mdx),
+  owned by `splicewire/laravel-beam-notifications`: the `to_roles` and `to_teams` recipient kinds.
+
 ## Conventions
 
 Matches the Laravel/Spatie house style — no `declare(strict_types)`, no `final`, no
