@@ -22,6 +22,7 @@ use Splicewire\Beam\Accounts\Data\SessionsRevokedData;
 use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Keys\TokenLastFour;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
 
 /**
@@ -330,7 +331,9 @@ class ApiTokenController extends Controller
             'expires_at' => $expiresAt,
             // Deliberately-created token — the provenance this surface exists to keep a stable list of.
             'provenance' => TokenProvenance::Api->value,
-        ])->save();
+            // The plaintext is in hand only here, so this is the one place its last four can be kept
+            // (owner-review-20261102 K-28). Empty where the host has not migrated the column yet.
+        ] + TokenLastFour::attributesFor($token, $plainText))->save();
 
         return [$token, $token->getKey().'|'.$plainText];
     }
@@ -451,6 +454,7 @@ class ApiTokenController extends Controller
             expiresAt: $token->expires_at?->toIso8601String(),
             archivedAt: $token->archived_at?->toIso8601String(),
             isCurrent: $currentId !== null && (string) $token->getKey() === $currentId,
+            lastFour: TokenLastFour::read($token),
         );
     }
 

@@ -17,12 +17,13 @@ it('publishes token and passkey output DTOs with only camel wire keys', function
         expiresAt: null,
         archivedAt: null,
         isCurrent: true,
+        lastFour: 'wxyz',
     );
     $passkey = new PasskeyData(1, 'Laptop', null, '2026-10-09T00:00:00Z');
     $pagePasskey = new SecurityPasskeyData(1, 'Laptop', null, 'today', null);
 
-    expect($token->toArray())->toHaveKeys(['createdAt', 'lastUsedAt', 'expiresAt', 'archivedAt', 'isCurrent'])
-        ->not->toHaveKeys(['created_at', 'last_used_at', 'expires_at', 'archived_at', 'is_current'])
+    expect($token->toArray())->toHaveKeys(['lastFour', 'createdAt', 'lastUsedAt', 'expiresAt', 'archivedAt', 'isCurrent'])
+        ->not->toHaveKeys(['last_four', 'created_at', 'last_used_at', 'expires_at', 'archived_at', 'is_current'])
         ->and($passkey->toArray())->toHaveKeys(['lastUsedAt', 'createdAt'])
         ->not->toHaveKeys(['last_used_at', 'created_at'])
         ->and($pagePasskey->toArray())->toHaveKeys(['createdAtDiff', 'lastUsedAtDiff'])

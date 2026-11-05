@@ -399,8 +399,9 @@ abstract class TestCase extends Orchestra
     /**
      * The `personal_access_tokens` fixture, shaped the way this package's own
      * `database/migrations/create_personal_access_tokens_table.php.stub` shapes it, PLUS the two
-     * columns `add_provenance_and_archived_to_personal_access_tokens_table.php.stub` adds — a host
-     * that runs this package's migrations has both, so a fixture with only the create is modelling
+     * columns `add_provenance_and_archived_to_personal_access_tokens_table.php.stub` adds and the
+     * `last_four` that `add_last_four_to_personal_access_tokens_table.php.stub` adds — a host that
+     * runs this package's migrations has all three, so a fixture with only the create is modelling
      * a host that does not exist.
      *
      * NOT created by {@see setUp()}: this table is Sanctum's, adopted rather than owned, and the
@@ -413,7 +414,7 @@ abstract class TestCase extends Orchestra
      * the claim that this harness models a bigint-keyed holder; running the stubs onto a hand-built
      * bigint `users` proves they emit `uuidMorphs` regardless — the shipped code adapts to nothing.
      *
-     * Every column is the stub's, and that test executes the two stubs into a scratch schema
+     * Every column is the stubs', and that test executes the stubs into a scratch schema
      * and diffs the column types both ways. Change either side alone and it goes red naming the
      * column.
      */
@@ -427,6 +428,8 @@ abstract class TestCase extends Orchestra
             // `string` until nothing compared the two (beam-docs-satellite 26).
             $table->text('name');
             $table->string('token', 64)->unique();
+            // From the last-four ALTER stub (owner-review-20261102 K-28), not the create.
+            $table->string('last_four', 8)->nullable();
             $table->text('abilities')->nullable();
             $table->timestamp('last_used_at')->nullable();
             $table->timestamp('expires_at')->nullable();

@@ -201,7 +201,7 @@ it('warns, never fails, when a host declaring an estate absent has member stems 
 
     expect(array_filter($findings, fn ($f) => $f->status === DoctorStatus::Fail))->toBeEmpty()
         ->and($findings[0]->status)->toBe(DoctorStatus::Warn)
-        ->and($findings[0]->detail)->toContain('2 of 9')
+        ->and($findings[0]->detail)->toContain('2 of 10')
         ->and($findings[0]->detail)->toContain('create_users_table');
 });
 
@@ -218,7 +218,7 @@ it('still fails every spelling that is NOT the third state', function (mixed $va
 
     expect(BeamAccountsServiceProvider::estateDeclaredAbsent('auth_migrations'))->toBeFalse()
         ->and($fails)->toHaveCount(1)
-        ->and($fails[0]->detail)->toContain('9 of 9');
+        ->and($fails[0]->detail)->toContain('10 of 10');
 })->with([
     'the tower shape' => false,
     'an unset env var' => null,

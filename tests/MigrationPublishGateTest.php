@@ -93,7 +93,11 @@ it('declares both estates by default', function () {
     // create for the same stamping reason as the PAT pair above.
     expect(array_search('tenant/create_guest_tokens_table', $declared, true))
         ->toBeLessThan(array_search('tenant/relax_guest_token_landing_url_nullability', $declared, true));
-    expect($declared)->toHaveCount(17);
+    // 18th: add_last_four_to_personal_access_tokens_table (owner-review-20261102 K-28), a new ALTER
+    // after the provenance one rather than an edit to either published stub.
+    expect(array_search('add_provenance_and_archived_to_personal_access_tokens_table', $declared, true))
+        ->toBeLessThan(array_search('add_last_four_to_personal_access_tokens_table', $declared, true));
+    expect($declared)->toHaveCount(18);
 });
 
 /**

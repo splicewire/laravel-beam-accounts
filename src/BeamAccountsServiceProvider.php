@@ -163,6 +163,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
                 // through its hasTable guard, silently, forever.
                 'create_personal_access_tokens_table',
                 'add_provenance_and_archived_to_personal_access_tokens_table',
+                // A NEW ALTER after the two published ones it extends, never an edit to either
+                // (owner-review-20261102 K-28): `last_four`, captured at mint. A host with this gate
+                // `false` must commit it too, and PublishGateCoverageAudit says so until it does.
+                'add_last_four_to_personal_access_tokens_table',
                 'tenant/create_userables_table',
                 'tenant/create_guest_tokens_table',
                 // The ALTER immediately after its own create, for the same reason

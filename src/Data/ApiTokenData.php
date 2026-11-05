@@ -50,5 +50,22 @@ class ApiTokenData extends BeamData
         /** True for the session token authenticating the current request — never swept/lockout. */
         #[MapName('isCurrent')]
         public bool $isCurrent,
+        /**
+         * The last four characters of the token's plaintext, captured at mint, so tokens that share
+         * a name can be told apart (owner-review-20261102 K-28).
+         *
+         * Null for every token minted before the `last_four` column existed, at a host that has not
+         * migrated it yet, and for the mint paths that do not stamp it (sign-in sessions, federation
+         * grants, deterministic service keys). The plaintext of those rows is gone, so the client
+         * shows the tail of {@see self::$id} instead and labels it as the id.
+         *
+         * Last, and defaulted to null, on purpose: `splicewire/tower` builds this DTO in its own
+         * controller, and its live checkout follows this package's through a path link. A required
+         * argument would 500 tower's token list from the moment this package moved until tower did.
+         * A host that has not been updated lists `null`, which the roster already renders as the id
+         * tail.
+         */
+        #[MapName('lastFour')]
+        public ?string $lastFour = null,
     ) {}
 }

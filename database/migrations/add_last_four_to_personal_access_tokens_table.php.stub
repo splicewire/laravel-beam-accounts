@@ -1,0 +1,59 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * `personal_access_tokens.last_four`: the last four characters of a token's plaintext, captured at
+ * mint so a list of tokens with the same name can be told apart (owner-review-20261102 K-28).
+ *
+ * A NEW ALTER, not an edit to `create_personal_access_tokens_table` or to the provenance ALTER:
+ * both are published and already ran at every host, and editing a published stub reaches only a
+ * fresh database.
+ *
+ * NO BACKFILL, and there cannot be one: the row keeps a SHA-256 of the plaintext, so the last four
+ * of a token minted before this column is gone. Those rows stay null, and the roster shows the tail
+ * of the token id instead. The id is the `{id}|` half of the string the holder already has, so it is
+ * not secret material.
+ *
+ * What is stored here IS a fragment of the secret, and a small one: Sanctum's plaintext is
+ * `{token_prefix}{40 random characters}{crc32b of those 40}`, so the last four characters are 16 bits
+ * of the checksum, never the random part. The precedent is `splicewire/laravel-beam-embed`'s
+ * `embed_keys.last_four`, the same `string(8)` column.
+ *
+ * Writers stamp it through {@see \Splicewire\Beam\Accounts\Keys\TokenLastFour}, which skips the write
+ * on a host that has not run this migration yet. So a mint never depends on the order a host
+ * publishes and migrates in.
+ *
+ * CENTRAL-ONLY and ALTER-ONLY, like the provenance ALTER it is listed after: the table does not exist
+ * on the tenant estate.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Guarded on the TABLE, as the provenance ALTER is: a host with neither this package's create
+        // nor a published Sanctum copy has no table, and an unguarded ALTER would fatal its
+        // `migrate:fresh`. Guarded on the COLUMN too, so a host that already added it by hand runs this
+        // as a no-op instead of failing on a duplicate column.
+        if (! Schema::hasTable('personal_access_tokens') || Schema::hasColumn('personal_access_tokens', 'last_four')) {
+            return;
+        }
+
+        Schema::table('personal_access_tokens', function (Blueprint $table) {
+            $table->string('last_four', 8)->nullable()->after('token');
+        });
+    }
+
+    public function down(): void
+    {
+        if (! Schema::hasTable('personal_access_tokens') || ! Schema::hasColumn('personal_access_tokens', 'last_four')) {
+            return;
+        }
+
+        Schema::table('personal_access_tokens', function (Blueprint $table) {
+            $table->dropColumn('last_four');
+        });
+    }
+};

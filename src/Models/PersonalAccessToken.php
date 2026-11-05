@@ -20,8 +20,10 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
     /**
-     * `provenance` is stamped by the minting site (never by a tokenable's mass assignment),
-     * so it joins the fillable set alongside Sanctum's own token attributes.
+     * `provenance` and `last_four` are stamped by the minting site (never by a tokenable's mass
+     * assignment), so they join the fillable set alongside Sanctum's own token attributes.
+     * `last_four` is written through {@see \Splicewire\Beam\Accounts\Keys\TokenLastFour}, which
+     * leaves it out on a host whose table has no such column yet.
      */
     protected $fillable = [
         'name',
@@ -29,6 +31,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
         'abilities',
         'expires_at',
         'provenance',
+        'last_four',
     ];
 
     protected $casts = [
