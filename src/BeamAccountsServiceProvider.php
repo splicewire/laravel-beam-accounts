@@ -9,6 +9,7 @@ use Laravel\Fortify\Fortify;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Rushing\Popcorn\Concerns\ChainsTraitMethods;
 use Rushing\Popcorn\Contracts\ChainsTraitMethods as ChainsTraitMethodsContract;
+use Rushing\Popcorn\Registries\ScopesRegistrant;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Splicewire\Beam\Accounts\Concerns\WiresApiGuard;
@@ -64,6 +65,7 @@ use Splicewire\Beam\Realm\RealmRegistry;
 class BeamAccountsServiceProvider extends PackageServiceProvider implements ChainsTraitMethodsContract
 {
     use ChainsTraitMethods;
+    use ScopesRegistrant;
     use WiresApiGuard;
     use WiresAuthorization;
     use WiresDemo;
@@ -79,6 +81,12 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
     use WiresRoutes;
     use WiresSeed;
     use WiresTeamsMigrations;
+
+    /** Every registry write in register()/boot() that names no `$by` records this package. */
+    protected function registrant(): string
+    {
+        return 'splicewire/laravel-beam-accounts';
+    }
 
     /**
      * The third value a publish gate can take, alongside `true` and `false`.
