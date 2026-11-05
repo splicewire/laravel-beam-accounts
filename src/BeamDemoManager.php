@@ -126,8 +126,29 @@ class BeamDemoManager
             return false;
         }
 
-        $flag = config('beam.accounts.demo.login_links');
+        return $this->strictlyOn(config('beam.accounts.demo.login_links'));
+    }
 
+    /**
+     * May the login page offer a typeahead over EVERY user, each a signed login-as link (S1, owner-review-20261026
+     * ticket 01)? Reads `beam.accounts.demo.user_picker`, which ships **false**.
+     *
+     * The third and strictest demo gate, because it is the widest door: {@see self::publishesLoginLinks()} hands a
+     * guest the demo SUBJECTS, this hands a guest anyone at all. So it requires both gates above, AND an app
+     * environment of literally `local`, AND a strict true on its own key (the same fail-closed parse). The
+     * environment arm has no config override on purpose: a preview, staging box or production host cannot reach it
+     * with any combination of flags, which is the owner's 2026-10-27 ruling ("local-only is acceptable").
+     */
+    public function offersUserPicker(): bool
+    {
+        return $this->publishesLoginLinks()
+            && app()->environment('local')
+            && $this->strictlyOn(config('beam.accounts.demo.user_picker'));
+    }
+
+    /** The fail-closed parse both publishing gates share: only a strict affirmative is on. */
+    private function strictlyOn(mixed $flag): bool
+    {
         if (is_bool($flag)) {
             return $flag;
         }

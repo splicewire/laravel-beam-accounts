@@ -8,6 +8,7 @@ use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Ops\LogInAsUser;
+use Splicewire\Beam\Accounts\Ops\SearchDemoUsers;
 use Splicewire\Beam\Facades\Particle;
 
 /**
@@ -46,6 +47,14 @@ trait WiresDemo
         // retired bespoke route did too.
         Route::middleware('web')->group(function () {
             Particle::ops('users', 'users', [LogInAsUser::class], ['method' => 'get']);
+
+            // S1: the local-only "log in as any user" typeahead's search. Mounted only behind the THIRD gate
+            // (`offersUserPicker()`: demo on, demo mode on, APP_ENV=local, `user_picker` strictly true), so a host
+            // without it has no such route at all. The op declares GET itself. Its handler and the mint re-check the
+            // gate, so a config change after boot still refuses.
+            if (BeamDemo::offersUserPicker()) {
+                Particle::ops('users', 'users', [SearchDemoUsers::class]);
+            }
         });
     }
 }

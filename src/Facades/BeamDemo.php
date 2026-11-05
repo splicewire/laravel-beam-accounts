@@ -29,6 +29,7 @@ use Splicewire\Beam\Accounts\BeamDemoManager;
  * @method static bool isOperator(string $key)
  * @method static bool enabled()
  * @method static bool publishesLoginLinks()
+ * @method static bool offersUserPicker()
  * @method static array<int, string> keys()
  * @method static bool has(string $key)
  * @method static \Splicewire\Beam\Accounts\Enums\Role roleFor(string $key)

@@ -174,6 +174,17 @@ return [
         // true/1/'true'/'1'/'on'/'yes' turns it on, and `enabled` must hold as well.
         'login_links' => env('ACCOUNT_DEMO_LOGIN_LINKS', false),
 
+        // LOG IN AS ANY USER — may the login page offer a typeahead over EVERY user in the system, each result a
+        // signed login-as link (owner-review-20261026 ticket 01, S1)? The widest demo door the package has: a guest
+        // types a name and becomes that user, demo subject or not. So it is a THIRD gate, stricter than both above,
+        // and LOCAL-ONLY by construction: it holds only when `enabled` and `login_links` hold, the app environment
+        // is literally `local`, and this key is a strict true. No other environment can turn it on, production
+        // included, whatever the flags say. Ships false and fails closed like `login_links`.
+        // ({@see \Splicewire\Beam\Accounts\BeamDemoManager::offersUserPicker()}). When it holds, the package mounts
+        // `GET users/demo-search` ({@see \Splicewire\Beam\Accounts\Ops\SearchDemoUsers}); when it does not, that
+        // route does not exist.
+        'user_picker' => env('ACCOUNT_DEMO_USER_PICKER', false),
+
         // How long a minted login-as link stays valid, in MINUTES. This is the ONLY bound on a
         // leaked link: the operation admits an anonymous holder on a valid signature alone, and a
         // signature carries no per-link revocation (rotating APP_KEY invalidates every link at

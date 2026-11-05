@@ -30,6 +30,10 @@ final class AuthEntryPageData extends Data
         public string|Optional|null $status,
         #[DataCollectionOf(DemoAccountLinkData::class)]
         public array|Optional $demoAccounts,
+        // S1: where the local-only "log in as any user" typeahead searches (`users.demo-search`), from
+        // DemoLoginLinks::userSearchUrl(). Optional and absent unless the third demo gate holds, so a page that
+        // is not local + demo + picker has no URL to find.
+        public string|Optional $demoUserSearchUrl,
         public string|Optional $passwordRules,
     ) {}
 }

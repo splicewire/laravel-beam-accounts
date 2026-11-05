@@ -102,3 +102,14 @@ it('preserves non-scalar reset input until the submitted form validates it', fun
 
     expect($page->toArray()['email'])->toBe(['unexpected' => 'value']);
 });
+
+it('carries the S1 user-picker search URL only when the host supplies one', function () {
+    $with = AuthEntryPageData::from([
+        'slug' => 'login', 'entry' => null, 'body' => null,
+        'demoUserSearchUrl' => '/users/demo-search',
+    ]);
+    $without = AuthEntryPageData::from(['slug' => 'login', 'entry' => null, 'body' => null]);
+
+    expect($with->toArray())->toHaveKey('demoUserSearchUrl', '/users/demo-search')
+        ->and($without->toArray())->not->toHaveKey('demoUserSearchUrl');
+});

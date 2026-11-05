@@ -2,11 +2,14 @@
 
 namespace Splicewire\Beam\Accounts\Actions;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
+use Splicewire\Beam\Accounts\Data\DemoUserLinkData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Ops\LogInAsUser;
+use Splicewire\Beam\Accounts\Ops\SearchDemoUsers;
 
 /**
  * Mint the signed `users/{id}/login-as` link for a demo subject — the ONE place that turns a
@@ -47,11 +50,11 @@ use Splicewire\Beam\Accounts\Ops\LogInAsUser;
  * is exactly what "one-click demo sign-in" means. The bound on a leaked link is its expiry, and
  * nothing else; {@see LoginAsCommand} shares that bound.
  *
- * ## Two doors, two gates — and why {@see BeamDemo::enabled()} was not enough
+ * ## Three doors, three gates — and why {@see BeamDemo::enabled()} was not enough
  *
  * `enabled()` is false in production and, unset, TRUE in every other environment. As the only gate
  * it would arm the anonymous-page affordance on every preview deploy, staging box and shared dev
- * host the moment the package installed — nobody having asked for it. So the two doors are gated
+ * host the moment the package installed — nobody having asked for it. So the doors are gated
  * separately:
  *
  * - {@see self::for()} — mint ONE link, for a caller that has already established it may
@@ -60,6 +63,9 @@ use Splicewire\Beam\Accounts\Ops\LogInAsUser;
  * - {@see self::all()} — publish the WHOLE roster as links into a page's props. Gated on
  *   {@see BeamDemo::publishesLoginLinks()} ⇒ `beam.accounts.demo.login_links`, which ships **false**
  *   and fails closed on anything but a strict true. This is "demo mode", and a host turns it on.
+ * - {@see self::users()} — ANY user in the system, searched by name or email, for the local-only
+ *   "log in as any user" picker (S1). Gated on {@see BeamDemo::offersUserPicker()}: both gates above, AND
+ *   `APP_ENV=local`, AND `beam.accounts.demo.user_picker` strictly true. No flag reaches it off `local`.
  *
  * The gate sits HERE, at the mint, and not in the component that renders the buttons. A frontend
  * gate is one a visitor walks around by reading the page's props, and props carrying live signed
@@ -78,6 +84,9 @@ class DemoLoginLinks
      * {@see self::minutes()}; this constant is what that key defaults to and falls back to.
      */
     public const DEFAULT_MINUTES = 30;
+
+    /** How many users one picker search returns — a typeahead's list, not a directory export. */
+    public const USER_SEARCH_LIMIT = 10;
 
     /**
      * The TTL to mint with — the ONE place the expiry's value is decided.
@@ -139,11 +148,7 @@ class DemoLoginLinks
             return null;
         }
 
-        return URL::temporarySignedRoute(
-            'users.login-as',
-            now()->addMinutes($this->minutes($minutes)),
-            ['id' => $user->getKey()],
-        );
+        return $this->mint($user->getKey(), $minutes);
     }
 
     /**
@@ -182,5 +187,74 @@ class DemoLoginLinks
         }
 
         return $links;
+    }
+
+    /**
+     * The THIRD door (S1): any user in the system, matched by name or email, each as a signed login-as link —
+     * what the login page's "log in as any user" typeahead lists. An empty or absent `$query` is the roster: the
+     * first {@see self::USER_SEARCH_LIMIT} users by name.
+     *
+     * **Empty unless {@see BeamDemo::offersUserPicker()}** — demo affordances on, demo mode on, `APP_ENV=local`,
+     * and `beam.accounts.demo.user_picker` strictly true. Checked first and unconditionally, at the mint, for the
+     * same reason {@see self::all()} checks its gate here: a gate that lives in the op or the component is one a
+     * second caller walks around.
+     *
+     * Each link goes through {@see self::mint()}, so it carries the same expiry as every other login-as link.
+     * The query is text, never a pattern: `%` and `_` are escaped before the `LIKE`.
+     *
+     * @return list<DemoUserLinkData>
+     */
+    public function users(?string $query = null, ?int $minutes = null): array
+    {
+        if (! BeamDemo::offersUserPicker()) {
+            return [];
+        }
+
+        $builder = BeamAccounts::userModel()::query()->orderBy('name')->orderBy('email')->limit(self::USER_SEARCH_LIMIT);
+
+        $needle = mb_strtolower(trim((string) $query));
+
+        if ($needle !== '') {
+            // `!` as the LIKE escape rather than a backslash, whose literal is spelled differently per engine.
+            $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $needle).'%';
+
+            $builder->where(fn ($where) => $where
+                ->whereRaw("lower(name) like ? escape '!'", [$like])
+                ->orWhereRaw("lower(email) like ? escape '!'", [$like]));
+        }
+
+        return $builder->get()
+            ->map(fn ($user) => new DemoUserLinkData(
+                id: (string) $user->getKey(),
+                name: (string) $user->name,
+                email: (string) $user->email,
+                url: $this->mint($user->getKey(), $minutes),
+            ))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Where the picker searches — the relative URL of {@see SearchDemoUsers}' mount — or `null` when the picker is
+     * not offered. A host puts this on its login page's props (`AuthEntryPageData::$demoUserSearchUrl`); `null`
+     * means "draw no picker", and the route it would name does not exist.
+     */
+    public function userSearchUrl(): ?string
+    {
+        if (! BeamDemo::offersUserPicker() || ! Route::has('users.demo-search')) {
+            return null;
+        }
+
+        return route('users.demo-search', [], false);
+    }
+
+    /** The one signed, expiring login-as URL builder every door shares. */
+    protected function mint(int|string $userKey, ?int $minutes = null): string
+    {
+        return URL::temporarySignedRoute(
+            'users.login-as',
+            now()->addMinutes($this->minutes($minutes)),
+            ['id' => $userKey],
+        );
     }
 }
