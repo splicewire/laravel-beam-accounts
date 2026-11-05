@@ -21,7 +21,15 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * granted realm the principal composes `ux.{realm}.author`; if ANY realm is granted, the coarse
  * `ux.author` alias also composes; if the `operator` realm specifically is granted, `os.enter` and
  * `os.operate` compose too — reproducing today's blanket staff capability exactly, but as a Team's
- * grants rather than a boolean column. No special-cased "Staff Team" identity is needed anywhere in
+ * grants rather than a boolean column.
+ *
+ * ## The board seat (`exec.view`)
+ *
+ * The `exec` realm (`splicewire/laravel-beam-exec`, owner ruling D3) is gated by `entitlement:exec.view`, and
+ * two grants compose it: the `operator` realm grant (anyone who operates the platform sees its board), and
+ * an `exec` realm grant, which is the BOARD SEAT, for a principal who should read the board and do nothing
+ * else. So an `exec` grant composes `exec.view` and nothing more: no `ux.exec.author` and no `ux.author`.
+ * A read seat that also unlocked the authoring chrome would make every board member a site author. No special-cased "Staff Team" identity is needed anywhere in
  * this class: any Team holding `manage` on every realm's root behaves identically to the old
  * `is_staff = true` principal.
  *
@@ -53,6 +61,18 @@ class DefaultEntitlementResolver implements EntitlementResolver
     /** The realm whose grant additionally unlocks the OS-shell + operator back-office. */
     public const OPERATOR_REALM = 'operator';
 
+    /** The board realm: its grant is a read seat ({@see SEAT_REALMS}), and it composes {@see EXEC_VIEW}. */
+    public const EXEC_REALM = 'exec';
+
+    /** The entitlement the `exec` realm is gated on: composed by an `operator` OR an `exec` realm grant. */
+    public const EXEC_VIEW = 'exec.view';
+
+    /**
+     * Realms whose grant is a READ seat: it composes that realm's view entitlement and no authoring key
+     * (`ux.{realm}.author`, `ux.author`). See the class docblock's board-seat section.
+     */
+    public const SEAT_REALMS = [self::EXEC_REALM];
+
     public function __construct(private EntitlementComposer $composer) {}
 
     /**
@@ -63,16 +83,21 @@ class DefaultEntitlementResolver implements EntitlementResolver
     public function entitlementsFor(mixed $principal): array
     {
         $realms = $this->grantedRealms($principal);
+        $authoring = array_values(array_diff($realms, self::SEAT_REALMS));
 
-        $keys = array_map(static fn (string $realm): string => "ux.{$realm}.author", $realms);
+        $keys = array_map(static fn (string $realm): string => "ux.{$realm}.author", $authoring);
 
-        if ($realms !== []) {
+        if ($authoring !== []) {
             $keys[] = 'ux.author';
         }
 
         if (in_array(self::OPERATOR_REALM, $realms, true)) {
             $keys[] = 'os.enter';
             $keys[] = 'os.operate';
+        }
+
+        if (in_array(self::OPERATOR_REALM, $realms, true) || in_array(self::EXEC_REALM, $realms, true)) {
+            $keys[] = self::EXEC_VIEW;
         }
 
         return $this->composer->compose([], $keys);

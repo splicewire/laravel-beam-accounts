@@ -16,7 +16,7 @@ use stdClass;
 /**
  * The OOTB DefaultEntitlementResolver post-ACC-01: `is_staff` is gone entirely. A principal resolves
  * `ux.{realm}.author` (+ the coarse `ux.author` alias, + `os.enter`/`os.operate` for the `operator`
- * realm) off `manage` grants an Owner/Admin-held Team holds on a realm's root — data, not a flag. A
+ * realm, + `exec.view` for the `operator` or the `exec` board-seat realm) off `manage` grants an Owner/Admin-held Team holds on a realm's root — data, not a flag. A
  * host-declared resolver still wins over the default.
  */
 class DefaultEntitlementResolverTest extends TestCase
@@ -61,9 +61,48 @@ class DefaultEntitlementResolverTest extends TestCase
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
 
         $this->assertEqualsCanonicalizing(
-            ['ux.operator.author', 'ux.author', 'os.enter', 'os.operate'],
+            ['ux.operator.author', 'ux.author', 'os.enter', 'os.operate', 'exec.view'],
             $resolver->entitlementsFor($admin)
         );
+    }
+
+    public function test_an_exec_realm_grant_is_a_board_seat_that_composes_exec_view_and_no_authoring_key(): void
+    {
+        $team = $this->team();
+        $owner = $this->memberOf($team, Role::Owner);
+        $root = RealmRoot::create(['realm' => 'exec']);
+        app(AccessGrants::class)->share($root, $team, AccessGrant::ABILITY_MANAGE);
+
+        $resolver = $this->app->make(DefaultEntitlementResolver::class);
+
+        $this->assertSame(['exec.view'], $resolver->entitlementsFor($owner));
+    }
+
+    public function test_an_exec_seat_beside_an_authoring_realm_keeps_the_authoring_keys_of_that_realm_only(): void
+    {
+        $team = $this->team();
+        $owner = $this->memberOf($team, Role::Owner);
+        foreach (['exec', 'site'] as $realm) {
+            app(AccessGrants::class)->share(RealmRoot::create(['realm' => $realm]), $team, AccessGrant::ABILITY_MANAGE);
+        }
+
+        $resolver = $this->app->make(DefaultEntitlementResolver::class);
+
+        $this->assertEqualsCanonicalizing(
+            ['ux.site.author', 'ux.author', 'exec.view'],
+            $resolver->entitlementsFor($owner)
+        );
+    }
+
+    public function test_a_member_of_a_team_holding_the_exec_seat_does_not_resolve_exec_view(): void
+    {
+        $team = $this->team();
+        $member = $this->memberOf($team, Role::Member);
+        app(AccessGrants::class)->share(RealmRoot::create(['realm' => 'exec']), $team, AccessGrant::ABILITY_MANAGE);
+
+        $resolver = $this->app->make(DefaultEntitlementResolver::class);
+
+        $this->assertSame([], $resolver->entitlementsFor($member));
     }
 
     public function test_a_team_without_a_grant_resolves_no_keys(): void
