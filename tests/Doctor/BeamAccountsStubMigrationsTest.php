@@ -2,16 +2,16 @@
 
 namespace Splicewire\Beam\Accounts\Tests\Doctor;
 
-use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
+use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Tests\TestCase;
 use Splicewire\Beam\Doctor\Testing\AssertsStubMigrations;
 
 /**
  * beam-accounts' own operator check: its migrations must stay publish-only .stub files. Mirrors the
  * per-package `DeclaredTopologyTest` shape (`rushing/php-package-topology`'s `AssertsDeclaredTopology`) —
- * a thin test wrapping a shared engine, declaring only "which audit is mine."
+ * a thin test wrapping a shared engine, declaring only "which package is mine."
  */
-class BeamAccountsMigrationsAuditTest extends TestCase
+class BeamAccountsStubMigrationsTest extends TestCase
 {
     use AssertsStubMigrations;
 
@@ -20,8 +20,13 @@ class BeamAccountsMigrationsAuditTest extends TestCase
         $this->assertMigrationsArePublishOnlyStubs();
     }
 
-    protected function stubMigrationsAuditClass(): string
+    protected function stubMigrationsPackage(): ?string
     {
-        return BeamAccountsMigrationsAudit::class;
+        return 'splicewire/laravel-beam-accounts';
+    }
+
+    protected function stubMigrationsProvider(): ?string
+    {
+        return BeamAccountsServiceProvider::class;
     }
 }

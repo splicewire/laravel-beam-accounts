@@ -24,7 +24,7 @@ use Splicewire\Beam\Accounts\Models\Team;
  * `register_migrations`/`register_auth_migrations` used to gate whether beam-accounts' migrations
  * were auto-loaded at runtime (`loadMigrationsFrom()`); that assertion is gone since migrations are
  * now publish-only stubs, never auto-loaded regardless of config —
- * {@see \Splicewire\Beam\Accounts\Tests\Doctor\BeamAccountsMigrationsAuditTest} covers that
+ * {@see \Splicewire\Beam\Accounts\Tests\Doctor\BeamAccountsStubMigrationsTest} covers that
  * mechanically. The two flags are still live, restored to gate what `configurePackage()` declares
  * via `->hasMigrations()` — i.e. what `vendor:publish`/`splicewire:beam:install` puts on a host's
  * disk in the first place, independent of auto-load. {@see MigrationPublishGateTest} covers that.
