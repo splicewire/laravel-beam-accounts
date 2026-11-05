@@ -7,8 +7,9 @@ use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Data\AccountShellData;
 
 /**
- * The default {@see AccountShellProvider} — reads nothing, returns null. A host that never binds its
- * own provider gets this, so consuming the shell prop is safe OOTB (the shell simply renders empty).
+ * An opt-in {@see AccountShellProvider} — reads nothing, returns null, so the shell renders empty. Bind
+ * it to hide the account shell's profile and plan blocks entirely. The package default is
+ * {@see IdentityAccountShellProvider} (identity only, no plan).
  */
 class NullAccountShellProvider implements AccountShellProvider
 {

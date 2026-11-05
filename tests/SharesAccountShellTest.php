@@ -63,10 +63,17 @@ it('shares what the host-bound provider returns for a signed-in user', function 
         ->and($shell->account->email)->toBe('drew@example.test');
 });
 
-it('shares the null default when the host binds no provider', function () {
-    $user = User::create(['name' => 'Drew', 'email' => 'drew@example.test', 'password' => 'secret']);
+it('shares the identity-only default when the host binds no provider', function () {
+    $user = User::create(['name' => 'Drew Morgan', 'email' => 'drew@example.test', 'password' => 'secret']);
 
-    expect(accountShellSharer()->shared(requestFor($user)))->toBeNull();
+    $shell = accountShellSharer()->shared(requestFor($user));
+
+    expect($shell)->toBeInstanceOf(AccountShellData::class)
+        ->and($shell->plan)->toBeNull()
+        ->and($shell->profile->handle)->toBe('@drew')
+        ->and($shell->profile->avatar)->toBe('DM')
+        ->and($shell->profile->metrics)->toBe([])
+        ->and($shell->account->email)->toBe('drew@example.test');
 });
 
 it('degrades to null when the provider throws', function () {

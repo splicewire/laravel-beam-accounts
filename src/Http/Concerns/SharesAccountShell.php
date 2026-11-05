@@ -9,15 +9,16 @@ use Throwable;
 
 /**
  * The `accountShell` share: the {@see AccountShellData} the packaged `<AccountShell>` renders, filled by whichever
- * {@see AccountShellProvider} the host bound (the {@see \Splicewire\Beam\Accounts\Support\NullAccountShellProvider}
- * by default).
+ * {@see AccountShellProvider} the host bound (the identity-only
+ * {@see \Splicewire\Beam\Accounts\Support\IdentityAccountShellProvider} by default).
  *
  * Use it in the host's Inertia middleware (a subclass of `Inertia\Middleware`) and share
  * `'accountShell' => $this->accountShell($request)`. `splicewire/laravel-beam-ux`'s `SharesBeamShell` composes it
  * with the rest of the shell's props.
  *
- * Every starter carried this method by hand, byte for byte (make-surface 01). The PROVIDER stays the host's: the
- * shell's plan, profile and account values are its own product data (see {@see AccountShellData}); the share is not.
+ * Every starter carried this method by hand, byte for byte (make-surface 01). A host with product data binds its
+ * own PROVIDER: the shell's plan, profile metrics and upsells are that host's data (see {@see AccountShellData}).
+ * The share is not host data, and neither is the identity-only default.
  */
 trait SharesAccountShell
 {

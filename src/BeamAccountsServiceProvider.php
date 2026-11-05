@@ -40,7 +40,7 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
 use Splicewire\Beam\Accounts\Oidc\SigningKey;
-use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
+use Splicewire\Beam\Accounts\Support\IdentityAccountShellProvider;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
 use Splicewire\Beam\Install\BeamInstallManifest;
@@ -424,10 +424,12 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
 
         // The account-shell provider seam (ticket 08): the package projects the SHAPE
         // (AccountShellData); the host binds a provider that fills it from its own product data.
-        // Default to the null provider so consuming the shell prop is safe OOTB — an unbound host
-        // gets `null` and the shell degrades gracefully rather than erroring. Bound with `bind`
-        // (not `singleton`) so a host override takes precedence with the same lazy semantics.
-        $this->app->bind(AccountShellProvider::class, NullAccountShellProvider::class);
+        // The default fills only the user's own identity (handle, initials, email) with no plan, so
+        // an unbound host renders a truthful profile block and no plan chip (make-surface 01, owner
+        // ruling 2026-11-05; it replaced the starters' copied StarterAccountShell). A host wanting an
+        // empty shell binds NullAccountShellProvider. Bound with `bind` (not `singleton`) so a host
+        // override takes precedence with the same lazy semantics.
+        $this->app->bind(AccountShellProvider::class, IdentityAccountShellProvider::class);
 
         // The OIDC-issuer module's two primitives, always bindable from PHP regardless of the
         // `oidc.enabled` gate (mirrors the `keys` seam's DeterministicToken posture) — only the

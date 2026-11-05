@@ -45,7 +45,7 @@ bindable provider seam; the **host populates every value** from its own product 
 
 ```
 AccountShellData {
-  plan:    PlanData    { tier, label, credits?, max? }
+  plan:    PlanData?   { tier, label, credits?, max? }   // null = no plan on this host
   profile: ProfileData { handle, avatar?, metrics: MetricData[] { label, value } }
   account: AccountData { email, paymentMethodLabel? }   // label is a DISPLAY STRING, e.g. "Visa •••• 4242"
   upsells: UpsellData[] { key, label, href? }
@@ -61,8 +61,11 @@ app()->bind(AccountShellProvider::class, App\Account\AudiostudAccountShell::clas
 'accountShell' => app(AccountShellProvider::class)->shellFor($request->user()),
 ```
 
-The default binding is `Support\NullAccountShellProvider` (returns `null`), so a host that binds
-nothing degrades gracefully — the shell renders empty rather than erroring. The metric semantics
+The plan is optional (`plan: null`); the packaged `<AccountShell>` then hides the plan section.
+The default binding is `Support\IdentityAccountShellProvider`, so a host that binds nothing gets
+only what the user record has: the handle (`@` + the email's local part), an initials avatar and the
+email, with no plan, metrics or upsells. Commerce contributes a plan when it is installed. Bind
+`Support\NullAccountShellProvider` (returns `null`) to render the shell empty. The metric semantics
 (SONGS / PLAYS / FOLLOWERS), the plan/credit meaning, and all monetization copy are **host product
 content**; the package carries only the slots.
 

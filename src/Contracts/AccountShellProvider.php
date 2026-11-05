@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Splicewire\Beam\Accounts\Data\AccountShellData;
+use Splicewire\Beam\Accounts\Support\IdentityAccountShellProvider;
 use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
 
 /**
@@ -13,8 +14,9 @@ use Splicewire\Beam\Accounts\Support\NullAccountShellProvider;
  * DISPLAY LABEL) and returns the filled shape.
  *
  * The package owns no billing: it makes no charge, holds no card data, and ships no monetization copy.
- * A host that binds no provider gets the {@see NullAccountShellProvider}
- * default, which returns `null` — so the shell degrades gracefully (renders nothing) rather than 500.
+ * A host that binds no provider gets the {@see IdentityAccountShellProvider} default: the user's own
+ * handle, initials and email, and no plan, metrics or upsells. A host that wants the shell empty binds
+ * {@see NullAccountShellProvider}, which returns `null`.
  */
 interface AccountShellProvider
 {
