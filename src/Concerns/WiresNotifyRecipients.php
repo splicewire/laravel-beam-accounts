@@ -29,7 +29,7 @@ use Splicewire\Beam\Notifications\Contracts\AccountsDirectory;
  *
  * ## Appending, not assigning
  *
- * `config()->set()` on the leaf key, never on `recipient_kinds` wholesale: the notify package registers
+ * `config()->set()` on the leaf key, never on `recipient-kinds` wholesale: the notify package registers
  * `to` there and a host may register its own kinds in its published config file. Writing the array
  * would silently amputate both. Late is fine — `RecipientKindRegistry` is a `ConfigRegistry`, which
  * reads through to the repository on every read rather than snapshotting at construction, which is
@@ -54,7 +54,7 @@ trait WiresNotifyRecipients
     {
         $this->app->bind(AccountsDirectory::class, MembershipDirectory::class);
 
-        config()->set('beam.notifications.recipient_kinds.to_roles', RolesRecipientKind::class);
-        config()->set('beam.notifications.recipient_kinds.to_teams', TeamsRecipientKind::class);
+        config()->set('beam.notifications.recipient-kinds.to_roles', RolesRecipientKind::class);
+        config()->set('beam.notifications.recipient-kinds.to_teams', TeamsRecipientKind::class);
     }
 }

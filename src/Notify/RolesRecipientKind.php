@@ -10,7 +10,7 @@ use Splicewire\Beam\Notifications\Recipients\Recipient;
  * The `to_roles:` recipient kind — every member holding one of the named membership roles, as a
  * persistent Notifiable, so the whole channel set including the `database` inbox is reachable.
  *
- * Registered into `beam.notifications.recipient_kinds` by this package's provider. beam-notifications
+ * Registered into `beam.notifications.recipient-kinds` by this package's provider. beam-notifications
  * knows nothing about it: an unregistered kind is an absent config entry, so a host without this
  * package simply has no `to_roles` key and hears about it the first time a schema uses one.
  *

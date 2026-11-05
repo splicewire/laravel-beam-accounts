@@ -46,25 +46,25 @@ it('binds the AccountsDirectory port to the memberships-backed implementation', 
 });
 
 it('registers to_roles and to_teams into the notify registry without either package probing the other', function () {
-    expect(config('beam.notifications.recipient_kinds.to_roles'))->toBe(RolesRecipientKind::class)
-        ->and(config('beam.notifications.recipient_kinds.to_teams'))->toBe(TeamsRecipientKind::class);
+    expect(config('beam.notifications.recipient-kinds.to_roles'))->toBe(RolesRecipientKind::class)
+        ->and(config('beam.notifications.recipient-kinds.to_teams'))->toBe(TeamsRecipientKind::class);
 });
 
 it('APPENDS rather than assigning, so beam-notifications own `to` kind survives', function () {
-    // The failure this guards is silent: `config()->set('…recipient_kinds', [...])` would leave the
+    // The failure this guards is silent: `config()->set('…recipient-kinds', [...])` would leave the
     // keyword with roles and teams and no `to:` at all, and nothing would say so until a schema that
     // mails a literal address stopped mailing it.
     //
     // The notify package boots in this harness (see TestCase), so this reads the real composition:
     // its `to` kind merged at register time, this package's two appended in boot.
-    expect(config('beam.notifications.recipient_kinds.to'))->toBe(AddressRecipientKind::class)
-        ->and(config('beam.notifications.recipient_kinds'))->toHaveKeys(['to', 'to_roles', 'to_teams']);
+    expect(config('beam.notifications.recipient-kinds.to'))->toBe(AddressRecipientKind::class)
+        ->and(config('beam.notifications.recipient-kinds'))->toHaveKeys(['to', 'to_roles', 'to_teams']);
 
     // …and the append survives a re-run, which is what says it is an append and not an assignment
     // that happens to be running last.
     (fn () => $this->bootNotifyRecipients())->call(app()->getProvider(BeamAccountsServiceProvider::class));
 
-    expect(config('beam.notifications.recipient_kinds'))->toHaveKeys(['to', 'to_roles', 'to_teams']);
+    expect(config('beam.notifications.recipient-kinds'))->toHaveKeys(['to', 'to_roles', 'to_teams']);
 });
 
 it('resolves to_roles: to every member holding that membership role', function () {

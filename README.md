@@ -144,7 +144,7 @@ It registers into registries it doesn't own:
 - [`beam.particle.operations`](https://github.com/splicewire/laravel-beam/blob/main/docs/registries/beam.particle.operations.mdx),
   owned by `splicewire/laravel-beam`: the team, invitation, sharing and demo log-in operations, registered when
   their routes are mounted.
-- [`beam.notifications.recipient_kinds`](https://github.com/splicewire/laravel-beam-notifications/blob/main/docs/registries/beam.notifications.recipient_kinds.mdx),
+- [`beam.notifications.recipient-kinds`](https://github.com/splicewire/laravel-beam-notifications/blob/main/docs/registries/beam.notifications.recipient-kinds.mdx),
   owned by `splicewire/laravel-beam-notifications`: the `to_roles` and `to_teams` recipient kinds.
 
 ## Conventions
