@@ -33,6 +33,10 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * this class: any Team holding `manage` on every realm's root behaves identically to the old
  * `is_staff = true` principal.
  *
+ * Storing and deleting the board's scenarios (`exec.scenario.manage`, the exec scenario builder) composes from the
+ * `operator` grant only. A stored scenario is shared board state, and the board seat stays a read seat: a seat holder
+ * can preview a scenario but not save one.
+ *
  * ## Naming (entitlement-dot-namespace rename)
  *
  * `author-ux`/`author-ux-{realm}` → `ux.author`/`ux.{realm}.author` and `app-operator` → `os.operate`
@@ -73,6 +77,9 @@ class DefaultEntitlementResolver implements EntitlementResolver
      */
     public const SEAT_REALMS = [self::EXEC_REALM];
 
+    /** Saving and deleting the board's scenarios: composed by an `operator` grant only, never by the board seat. */
+    public const EXEC_SCENARIO_MANAGE = 'exec.scenario.manage';
+
     public function __construct(private EntitlementComposer $composer) {}
 
     /**
@@ -94,6 +101,7 @@ class DefaultEntitlementResolver implements EntitlementResolver
         if (in_array(self::OPERATOR_REALM, $realms, true)) {
             $keys[] = 'os.enter';
             $keys[] = 'os.operate';
+            $keys[] = self::EXEC_SCENARIO_MANAGE;
         }
 
         if (in_array(self::OPERATOR_REALM, $realms, true) || in_array(self::EXEC_REALM, $realms, true)) {

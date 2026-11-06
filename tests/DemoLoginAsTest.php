@@ -271,11 +271,11 @@ it('grants the demo team manage on every REGISTERED realm root (not just already
 
     expect($resolver->entitlementsFor($owner))->toEqualCanonicalizing([
         'ux.site.author', 'ux.operator.author', 'ux.tenant.author', 'ux.user.author',
-        'ux.author', 'os.enter', 'os.operate', 'exec.view',
+        'ux.author', 'os.enter', 'os.operate', 'exec.scenario.manage', 'exec.view',
     ]);
     expect($resolver->entitlementsFor($admin))->toEqualCanonicalizing([
         'ux.site.author', 'ux.operator.author', 'ux.tenant.author', 'ux.user.author',
-        'ux.author', 'os.enter', 'os.operate', 'exec.view',
+        'ux.author', 'os.enter', 'os.operate', 'exec.scenario.manage', 'exec.view',
     ]);
     expect($resolver->entitlementsFor($member))->toBe([]);
 });
