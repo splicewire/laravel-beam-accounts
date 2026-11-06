@@ -29,7 +29,6 @@ use Splicewire\Beam\Accounts\Concerns\WiresSeed;
 use Splicewire\Beam\Accounts\Concerns\WiresTeamsMigrations;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
-use Splicewire\Beam\Accounts\Doctor\BeamAccountsMigrationsAudit;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsRetiredMigrationAudit;
 use Splicewire\Beam\Accounts\Doctor\PermissionModelPairingAudit;
 use Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit;
@@ -527,9 +526,9 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // convention — self-registers the doctor/operator check on ITS OWN migrations, same as
         // every other beam-* package registers it on theirs.
         if ($this->app->bound(BeamDoctorManifest::class)) {
-            $this->app->make(BeamDoctorManifest::class)->register(
+            $this->app->make(BeamDoctorManifest::class)->stubMigrations(
                 'splicewire/laravel-beam-accounts',
-                BeamAccountsMigrationsAudit::class,
+                self::class,
             );
 
             // Verifies the CLAIM a host makes by turning a publish gate off — that the estate is
