@@ -61,7 +61,7 @@ class DefaultEntitlementResolverTest extends TestCase
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
 
         $this->assertEqualsCanonicalizing(
-            ['ux.operator.author', 'ux.author', 'os.enter', 'os.operate', 'exec.view'],
+            ['ux.operator.author', 'ux.author', 'os.enter', 'os.operate', 'exec.scenario.manage', 'exec.view'],
             $resolver->entitlementsFor($admin)
         );
     }
@@ -75,6 +75,7 @@ class DefaultEntitlementResolverTest extends TestCase
 
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
 
+        // No `exec.scenario.manage` either: the seat can preview a scenario but not store one.
         $this->assertSame(['exec.view'], $resolver->entitlementsFor($owner));
     }
 
