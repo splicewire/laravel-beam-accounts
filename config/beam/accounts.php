@@ -333,6 +333,20 @@ return [
         // to resolve, the cascade grants nothing. `splicewire/laravel-beam-ux` binds its own OOTB
         // implementation (BeamUxEntry IS the realm root) when installed.
         'realm_grantable' => null,
+
+        // tutorial-dx 04: where the principal's PLAN lives, read by the default module resolver
+        // (Entitlements\ModuleEntitlementResolver: realm defaults ∪ bundle(plan) ∪ grants). Strict:
+        //   - null: no plan, no bundle composed (the default resolver's answer, unchanged);
+        //   - a class implementing Entitlements\PlanSource: a COMPUTED plan, e.g. a method like
+        //     `currentTeamOrPersonal()->plan` (a class that does not implement it is refused);
+        //   - any other string: a data_get path on the principal, a STORED plan ('plan_tier', 'team.plan').
+        'plan' => null,
+
+        // The bundle a principal with no plan composes (null: none).
+        'plan_default' => null,
+
+        // Derived grants: Entitlements\GrantSource classes, each declaring its keys statically.
+        'grants' => [],
     ],
 
     // The team-admin resources (Members / Invitations) scope to the acting request's team. The

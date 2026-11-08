@@ -36,6 +36,8 @@ use Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
+use Splicewire\Beam\Accounts\Entitlements\ModuleEntitlementResolver;
+use Splicewire\Beam\Entitlements\EntitlementKeyUniverse;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
@@ -383,8 +385,20 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // to build its EntitlementResolver singleton, and beam's registerEntitlementAbilities() then defines
         // the `entitlement:{key}` gates. A host resolver (audiostud's) wins because it sets this key first.
         // This is what turns a fresh host's operator/OS gates on without a laravel-beam edit.
+        // tutorial-dx 04: the OOTB resolver is now the module resolver (realm defaults ∪ bundle(plan) ∪ grant sources),
+        // which answers exactly what DefaultEntitlementResolver does until the host configures a plan or a grant. A host
+        // resolver still wins the same way.
         if (config('permission-cascade.entitlement_resolver') === null) {
-            config(['permission-cascade.entitlement_resolver' => DefaultEntitlementResolver::class]);
+            config(['permission-cascade.entitlement_resolver' => ModuleEntitlementResolver::class]);
+        }
+
+        // Every key a bundle or grant source can produce joins beam's key universe, read lazily, so its
+        // `entitlement:{key}` ability is defined without the host listing it in register(). Guarded: a beam-core
+        // predating the universe still boots.
+        if (class_exists(EntitlementKeyUniverse::class)) {
+            $this->callAfterResolving(EntitlementKeyUniverse::class, static function (EntitlementKeyUniverse $universe): void {
+                $universe->contribute(static fn (): array => ModuleEntitlementResolver::declaredKeys());
+            });
         }
 
         // Binding the resolver alone is NOT enough to turn the gates on: beam-core's

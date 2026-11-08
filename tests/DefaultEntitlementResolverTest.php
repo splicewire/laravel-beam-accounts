@@ -5,6 +5,7 @@ namespace Splicewire\Beam\Accounts\Tests;
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
+use Splicewire\Beam\Accounts\Entitlements\ModuleEntitlementResolver;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
@@ -159,16 +160,32 @@ class DefaultEntitlementResolverTest extends TestCase
 
     public function test_the_default_is_bound_via_config_when_the_host_declares_none(): void
     {
-        // The package sets permission-cascade.entitlement_resolver to the default in register()
-        // (host had not set it), so the kernel's EntitlementResolver singleton resolves to it.
+        // The package sets permission-cascade.entitlement_resolver in register() (host had not set it), so the
+        // kernel's EntitlementResolver singleton resolves to it. Since tutorial-dx 04 that is the module resolver,
+        // which composes THIS resolver as its realm-defaults half.
         $this->assertSame(
-            DefaultEntitlementResolver::class,
+            ModuleEntitlementResolver::class,
             config('permission-cascade.entitlement_resolver')
         );
 
         $this->assertInstanceOf(
-            DefaultEntitlementResolver::class,
+            ModuleEntitlementResolver::class,
             $this->app->make(EntitlementResolver::class)
         );
+    }
+
+    public function test_with_no_plan_or_grants_configured_the_bound_resolver_answers_exactly_what_this_one_does(): void
+    {
+        // tutorial-dx 04: changing the OOTB binding must not change an unconfigured host's answer.
+        $team = $this->team();
+        $admin = $this->memberOf($team, Role::Admin);
+        $root = RealmRoot::create(['realm' => 'operator']);
+        app(AccessGrants::class)->share($root, $team, AccessGrant::ABILITY_MANAGE);
+
+        $this->assertEqualsCanonicalizing(
+            $this->app->make(DefaultEntitlementResolver::class)->entitlementsFor($admin),
+            $this->app->make(EntitlementResolver::class)->entitlementsFor($admin),
+        );
+        $this->assertCount(6, $this->app->make(EntitlementResolver::class)->entitlementsFor($admin));
     }
 }
