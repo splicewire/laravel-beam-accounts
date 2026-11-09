@@ -2,12 +2,18 @@
 
 namespace Splicewire\Beam\Accounts\Concerns;
 
+use ReflectionClass;
 use Rushing\Popcorn\Concerns\Chained;
+use Rushing\Popcorn\Discovery\AttributedClassScanner;
 use Splicewire\Beam\Accounts\Authorization\TeamMemberReadPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
+use Splicewire\Beam\Accounts\Particle\Backing\ConfiguredTokenBacking;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
+use Splicewire\Beam\Particle\Attributes\ParticleOp;
+use Splicewire\Beam\Particle\Attributes\ParticleRelative;
+use Splicewire\Beam\Particle\Attributes\ParticleResource as ParticleResourceAttribute;
 use Splicewire\Beam\Particle\ParticleResource;
 use Splicewire\Beam\Particle\ParticleResourceRegistry;
 
@@ -85,7 +91,7 @@ trait WiresFrameResources
         // Registration is idempotent by key (last wins), so `Sharing`'s own explicit `discover([...])`
         // stays valid and a host that lists these classes during a migration window gets the same result.
         $this->app->make(AttributedParticleDiscovery::class)
-            ->discover(paths: [__DIR__.'/../Data']);
+            ->discover(classes: $this->frameDataClasses());
 
         // Members — backed by the team pivot rather than a plain model, so it is declared
         // imperatively (the attribute has nowhere to put a backing class). Mirrors tower's
@@ -119,5 +125,40 @@ trait WiresFrameResources
             deletable: false,
             editable: false,
         ));
+    }
+
+    /**
+     * The attributed classes under `src/Data`, minus any resource backed by the personal-access-token table when the
+     * host declares that table absent (`publish_auth_migrations => 'absent'`, the estate that carries the PAT create
+     * migration). Such a host has no `personal_access_tokens` table, so a `tokens` resource there is advertised in the
+     * Frame manifest and then answers 500 on its list (measured at `rushing/stephenrushing` 2026-11-09). It is the same
+     * pure config read {@see WiresSeed::bootSeed()} makes for the teams estate; `false` ("committed on my disk") keeps
+     * the resource, and only `'absent'` drops it.
+     *
+     * Filtered by a property of the declaration (its backing), never by a hand-written class list.
+     *
+     * @return list<class-string>
+     */
+    protected function frameDataClasses(): array
+    {
+        $tokensAbsent = BeamAccountsServiceProvider::estateDeclaredAbsent('auth_migrations');
+        $classes = [];
+
+        foreach ((new AttributedClassScanner)->classesIn([__DIR__.'/../Data']) as $class) {
+            $reflection = new ReflectionClass($class);
+            $resources = $reflection->getAttributes(ParticleResourceAttribute::class);
+
+            if ($resources === [] && $reflection->getAttributes(ParticleOp::class) === [] && $reflection->getAttributes(ParticleRelative::class) === []) {
+                continue;
+            }
+
+            if ($tokensAbsent && $resources !== [] && $resources[0]->newInstance()->backing === ConfiguredTokenBacking::class) {
+                continue;
+            }
+
+            $classes[] = $class;
+        }
+
+        return $classes;
     }
 }
