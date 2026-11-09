@@ -72,21 +72,26 @@ class DeterministicToken
     {
         $now = Carbon::now();
 
-        DB::table($this->table)->updateOrInsert(
-            ['id' => $this->id],
-            // created_at is written on the first mint only: a re-mint refreshes the row but keeps
-            // when the credential was born.
-            fn (bool $exists): array => [
-                'tokenable_type' => $this->tokenableType,
-                'tokenable_id' => $this->tokenableId,
-                'name' => $this->name,
-                'token' => $this->hash(),
-                'abilities' => json_encode($this->abilities),
-                'expires_at' => null,
-                'updated_at' => $now,
-                ...($exists ? [] : ['created_at' => $now]),
-            ],
-        );
+        $values = [
+            'tokenable_type' => $this->tokenableType,
+            'tokenable_id' => $this->tokenableId,
+            'name' => $this->name,
+            'token' => $this->hash(),
+            'abilities' => json_encode($this->abilities),
+            'expires_at' => null,
+            'updated_at' => $now,
+        ];
+
+        // created_at is written on the first mint only: a re-mint refreshes the row but keeps when
+        // the credential was born. Spelled as exists → update | insert rather than updateOrInsert's
+        // closure form, which Illuminate only accepts from 11.10 (this package allows ^11.0).
+        $rows = DB::table($this->table)->where('id', $this->id);
+
+        if ($rows->exists()) {
+            $rows->update($values);
+        } else {
+            DB::table($this->table)->insert(['id' => $this->id, ...$values, 'created_at' => $now]);
+        }
 
         return $this->bearer();
     }
