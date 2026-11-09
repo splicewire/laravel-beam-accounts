@@ -77,18 +77,18 @@ class DefaultEntitlementResolverTest extends TestCase
     }
 
     /**
-     * analytics-area 04: `analytics.view` opens the Analytics section, and an `operator` grant composes it. It is not a
-     * realm, so it is not a seat realm: no realm grant other than `operator` composes it, the board seat does not, and a
-     * Member never exercises the team's grant.
+     * `analytics.view` opens the Analytics section, which is seated in the `operator` and `tenant` realms, and a grant on
+     * either realm composes it (analytics-area 04 and 05). It is not a realm, so it is not a seat realm: no other realm grant
+     * composes it, the board seat does not, and a Member never exercises the team's grant.
      */
-    public function test_analytics_view_composes_from_the_operator_grant_only_and_is_no_seat_realm(): void
+    public function test_analytics_view_composes_from_the_operator_or_tenant_grant_only_and_is_no_seat_realm(): void
     {
         $this->assertSame(['exec'], DefaultEntitlementResolver::SEAT_REALMS);
 
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
         $grants = [];
 
-        foreach (['operator', 'site', 'exec'] as $realm) {
+        foreach (['operator', 'tenant', 'site', 'exec'] as $realm) {
             $team = $this->team();
             app(AccessGrants::class)->share(RealmRoot::create(['realm' => $realm]), $team, AccessGrant::ABILITY_MANAGE);
             $grants[$realm] = $team;
@@ -96,6 +96,10 @@ class DefaultEntitlementResolverTest extends TestCase
 
         $this->assertContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['operator'], Role::Admin)));
         $this->assertContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['operator'], Role::Owner)));
+        $this->assertContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['tenant'], Role::Admin)));
+        $this->assertContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['tenant'], Role::Owner)));
+        $this->assertNotContains('os.operate', $resolver->entitlementsFor($this->joined($grants['tenant'], Role::Owner)), 'a tenant grant opens analytics, not the operator console');
+        $this->assertSame([], $resolver->entitlementsFor($this->joined($grants['tenant'], Role::Member)));
         $this->assertNotContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['site'], Role::Owner)));
         $this->assertNotContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['exec'], Role::Owner)));
         $this->assertSame([], $resolver->entitlementsFor($this->joined($grants['operator'], Role::Member)));
