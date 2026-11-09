@@ -74,7 +74,9 @@ class DeterministicToken
 
         DB::table($this->table)->updateOrInsert(
             ['id' => $this->id],
-            [
+            // created_at is written on the first mint only: a re-mint refreshes the row but keeps
+            // when the credential was born.
+            fn (bool $exists): array => [
                 'tokenable_type' => $this->tokenableType,
                 'tokenable_id' => $this->tokenableId,
                 'name' => $this->name,
@@ -82,7 +84,7 @@ class DeterministicToken
                 'abilities' => json_encode($this->abilities),
                 'expires_at' => null,
                 'updated_at' => $now,
-                'created_at' => $now,
+                ...($exists ? [] : ['created_at' => $now]),
             ],
         );
 

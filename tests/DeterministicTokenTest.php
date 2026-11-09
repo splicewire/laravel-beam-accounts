@@ -112,6 +112,20 @@ it('is idempotent — re-minting never duplicates and never changes the credenti
         ->and(DB::table('personal_access_tokens')->count())->toBe(1);
 });
 
+it('keeps the first mint\'s created_at on a re-mint and moves only updated_at', function () {
+    Carbon\Carbon::setTestNow('2026-01-01 00:00:00');
+    makeToken()->mint();
+
+    Carbon\Carbon::setTestNow('2026-02-01 00:00:00');
+    makeToken()->mint();
+    Carbon\Carbon::setTestNow();
+
+    $row = DB::table('personal_access_tokens')->where('id', PINNED_TOKEN_ID)->first();
+
+    expect((string) $row->created_at)->toStartWith('2026-01-01 00:00:00')
+        ->and((string) $row->updated_at)->toStartWith('2026-02-01 00:00:00');
+});
+
 it('mints against a uuid-keyed table storing the pinned uuid verbatim as the row id', function () {
     // The property under test is that NOTHING between the caller and the row generates or
     // coerces the key. `mint()` writes through the query builder, so Eloquent's
