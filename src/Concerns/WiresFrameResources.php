@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Concerns;
 
+use Laravel\Sanctum\HasApiTokens;
 use ReflectionClass;
 use Rushing\Popcorn\Concerns\Chained;
 use Rushing\Popcorn\Discovery\AttributedClassScanner;
@@ -9,6 +10,7 @@ use Splicewire\Beam\Accounts\Authorization\TeamMemberReadPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
+use Splicewire\Beam\Accounts\Models\User;
 use Splicewire\Beam\Accounts\Particle\Backing\ConfiguredTokenBacking;
 use Splicewire\Beam\Particle\Attributes\AttributedParticleDiscovery;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
@@ -129,19 +131,26 @@ trait WiresFrameResources
 
     /**
      * The attributed classes under `src/Data`, minus any resource backed by the personal-access-token table when the
-     * host declares that table absent (`publish_auth_migrations => 'absent'`, the estate that carries the PAT create
-     * migration). Such a host has no `personal_access_tokens` table, so a `tokens` resource there is advertised in the
-     * Frame manifest and then answers 500 on its list (measured at `rushing/stephenrushing` 2026-11-09). It is the same
-     * pure config read {@see WiresSeed::bootSeed()} makes for the teams estate; `false` ("committed on my disk") keeps
-     * the resource, and only `'absent'` drops it.
+     * host has signalled it has no token surface: it declares the package's auth estate (which carries the PAT create
+     * migration) `'absent'`, AND its user model cannot own tokens (no Sanctum `HasApiTokens`). `rushing/stephenrushing`
+     * is both, has no `personal_access_tokens` table, and its Frame manifest advertised a `tokens` list that answered
+     * 500 (2026-11-09).
      *
-     * Filtered by a property of the declaration (its backing), never by a hand-written class list.
+     * ⚠️ Neither fact alone is the signal (codex review ba-estate, REVISE):
+     * - the estate alone is not: `~/Herd/beam` and `~/Herd/satellite` declare it absent, own their PAT tables and serve
+     *   `GET /frame/resources/tokens` (their TokensResourceTest);
+     * - the user model alone is not: this package's own fixture user has no `HasApiTokens`, yet its tokens resolve
+     *   through the PAT model's `tokenable` morph.
+     * The table itself would be the exact fact, but a schema query at boot runs on every request ({@see WiresSeed}).
+     *
+     * Boot-safe: config reads and a class reflection, no query. Filtered by a property of the declaration (its backing),
+     * never by a hand-written list.
      *
      * @return list<class-string>
      */
     protected function frameDataClasses(): array
     {
-        $tokensAbsent = BeamAccountsServiceProvider::estateDeclaredAbsent('auth_migrations');
+        $tokensAbsent = BeamAccountsServiceProvider::estateDeclaredAbsent('auth_migrations') && ! self::userModelOwnsTokens();
         $classes = [];
 
         foreach ((new AttributedClassScanner)->classesIn([__DIR__.'/../Data']) as $class) {
@@ -160,5 +169,13 @@ trait WiresFrameResources
         }
 
         return $classes;
+    }
+
+    /** Whether the host's authenticatable model can own personal access tokens (Sanctum's `HasApiTokens`). */
+    protected static function userModelOwnsTokens(): bool
+    {
+        $model = config('beam.accounts.user_model') ?: config('auth.providers.users.model') ?: User::class;
+
+        return is_string($model) && class_exists($model) && in_array(HasApiTokens::class, class_uses_recursive($model), true);
     }
 }
