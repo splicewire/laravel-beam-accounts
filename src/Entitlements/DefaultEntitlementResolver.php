@@ -39,9 +39,10 @@ use Splicewire\Beam\Accounts\Enums\Role;
  *
  * ## The Analytics section (`analytics.view`)
  *
- * `splicewire/laravel-beam-analytics` seats an Analytics section in the `operator` realm and declares `analytics.view`,
- * which opens it. The `operator` grant composes it, as it does `os.operate`. It is an entitlement, not a realm, so it is
- * no {@see SEAT_REALMS} entry, and neither the board seat nor any other realm grant composes it (analytics-area ticket 04).
+ * `splicewire/laravel-beam-analytics` seats an Analytics section in the `operator` and `tenant` realms and declares
+ * `analytics.view`, which opens it. A grant on either realm composes it: the `operator` grant beside `os.operate`, and a
+ * `tenant` grant for a workspace's own section, without the operator console. It is an entitlement, not a realm, so it is
+ * no {@see SEAT_REALMS} entry, and neither the board seat nor any other realm grant composes it (analytics-area 04, 05).
  *
  * ## Naming (entitlement-dot-namespace rename)
  *
@@ -88,10 +89,16 @@ class DefaultEntitlementResolver implements EntitlementResolver
 
     /**
      * The entitlement that opens the Analytics section (`splicewire/laravel-beam-analytics`, which declares the key):
-     * composed by an `operator` grant. It is not a realm, so it is not a {@see SEAT_REALMS} entry, and the board seat does
-     * not compose it.
+     * composed by a grant on any of {@see ANALYTICS_REALMS}. It is not a realm, so it is not a {@see SEAT_REALMS} entry, and
+     * the board seat does not compose it.
      */
     public const ANALYTICS_VIEW = 'analytics.view';
+
+    /** The tenant workspace realm. */
+    public const TENANT_REALM = 'tenant';
+
+    /** The realms the Analytics section is seated in, so a grant on either composes {@see ANALYTICS_VIEW}. */
+    public const ANALYTICS_REALMS = [self::OPERATOR_REALM, self::TENANT_REALM];
 
     public function __construct(private EntitlementComposer $composer) {}
 
@@ -115,6 +122,9 @@ class DefaultEntitlementResolver implements EntitlementResolver
             $keys[] = 'os.enter';
             $keys[] = 'os.operate';
             $keys[] = self::EXEC_SCENARIO_MANAGE;
+        }
+
+        if (array_intersect(self::ANALYTICS_REALMS, $realms) !== []) {
             $keys[] = self::ANALYTICS_VIEW;
         }
 
