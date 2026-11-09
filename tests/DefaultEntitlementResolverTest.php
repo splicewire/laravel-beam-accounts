@@ -62,9 +62,43 @@ class DefaultEntitlementResolverTest extends TestCase
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
 
         $this->assertEqualsCanonicalizing(
-            ['ux.operator.author', 'ux.author', 'os.enter', 'os.operate', 'exec.scenario.manage', 'exec.view'],
+            ['ux.operator.author', 'ux.author', 'os.enter', 'os.operate', 'exec.scenario.manage', 'exec.view', 'analytics.view'],
             $resolver->entitlementsFor($admin)
         );
+    }
+
+    /** A fresh user in `$team` with `$role`, under its own email, so one test can seat the same role in several teams. */
+    private function joined(Team $team, Role $role): User
+    {
+        $user = User::create(['name' => $role->value, 'email' => uniqid($role->value.'-').'@example.test', 'password' => 'secret']);
+        Membership::create(['team_id' => $team->id, 'user_id' => $user->id, 'role' => $role->value]);
+
+        return $user->fresh();
+    }
+
+    /**
+     * analytics-area 04: `analytics.view` opens the Analytics section, and an `operator` grant composes it. It is not a
+     * realm, so it is not a seat realm: no realm grant other than `operator` composes it, the board seat does not, and a
+     * Member never exercises the team's grant.
+     */
+    public function test_analytics_view_composes_from_the_operator_grant_only_and_is_no_seat_realm(): void
+    {
+        $this->assertSame(['exec'], DefaultEntitlementResolver::SEAT_REALMS);
+
+        $resolver = $this->app->make(DefaultEntitlementResolver::class);
+        $grants = [];
+
+        foreach (['operator', 'site', 'exec'] as $realm) {
+            $team = $this->team();
+            app(AccessGrants::class)->share(RealmRoot::create(['realm' => $realm]), $team, AccessGrant::ABILITY_MANAGE);
+            $grants[$realm] = $team;
+        }
+
+        $this->assertContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['operator'], Role::Admin)));
+        $this->assertContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['operator'], Role::Owner)));
+        $this->assertNotContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['site'], Role::Owner)));
+        $this->assertNotContains('analytics.view', $resolver->entitlementsFor($this->joined($grants['exec'], Role::Owner)));
+        $this->assertSame([], $resolver->entitlementsFor($this->joined($grants['operator'], Role::Member)));
     }
 
     public function test_an_exec_realm_grant_is_a_board_seat_that_composes_exec_view_and_no_authoring_key(): void
@@ -186,6 +220,6 @@ class DefaultEntitlementResolverTest extends TestCase
             $this->app->make(DefaultEntitlementResolver::class)->entitlementsFor($admin),
             $this->app->make(EntitlementResolver::class)->entitlementsFor($admin),
         );
-        $this->assertCount(6, $this->app->make(EntitlementResolver::class)->entitlementsFor($admin));
+        $this->assertCount(7, $this->app->make(EntitlementResolver::class)->entitlementsFor($admin));
     }
 }

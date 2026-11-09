@@ -37,6 +37,12 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * `operator` grant only. A stored scenario is shared board state, and the board seat stays a read seat: a seat holder
  * can preview a scenario but not save one.
  *
+ * ## The Analytics section (`analytics.view`)
+ *
+ * `splicewire/laravel-beam-analytics` seats an Analytics section in the `operator` realm and declares `analytics.view`,
+ * which opens it. The `operator` grant composes it, as it does `os.operate`. It is an entitlement, not a realm, so it is
+ * no {@see SEAT_REALMS} entry, and neither the board seat nor any other realm grant composes it (analytics-area ticket 04).
+ *
  * ## Naming (entitlement-dot-namespace rename)
  *
  * `author-ux`/`author-ux-{realm}` → `ux.author`/`ux.{realm}.author` and `app-operator` → `os.operate`
@@ -80,6 +86,13 @@ class DefaultEntitlementResolver implements EntitlementResolver
     /** Saving and deleting the board's scenarios: composed by an `operator` grant only, never by the board seat. */
     public const EXEC_SCENARIO_MANAGE = 'exec.scenario.manage';
 
+    /**
+     * The entitlement that opens the Analytics section (`splicewire/laravel-beam-analytics`, which declares the key):
+     * composed by an `operator` grant. It is not a realm, so it is not a {@see SEAT_REALMS} entry, and the board seat does
+     * not compose it.
+     */
+    public const ANALYTICS_VIEW = 'analytics.view';
+
     public function __construct(private EntitlementComposer $composer) {}
 
     /**
@@ -102,6 +115,7 @@ class DefaultEntitlementResolver implements EntitlementResolver
             $keys[] = 'os.enter';
             $keys[] = 'os.operate';
             $keys[] = self::EXEC_SCENARIO_MANAGE;
+            $keys[] = self::ANALYTICS_VIEW;
         }
 
         if (in_array(self::OPERATOR_REALM, $realms, true) || in_array(self::EXEC_REALM, $realms, true)) {
