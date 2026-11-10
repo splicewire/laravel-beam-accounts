@@ -100,7 +100,6 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     navOrder: 1,
     group: 'Settings',
     icon: 'users',
-    form: 'bare',
     input: ProfileUpdateInputData::class,
     editData: ProfileUpdateInputData::class,
     policy: UserPolicy::class,

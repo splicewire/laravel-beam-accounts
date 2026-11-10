@@ -48,7 +48,6 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     label: 'Invitations',
     group: 'Settings',
     icon: 'mail',
-    form: 'bare',
     input: CreateInvitationData::class,
     editData: CreateInvitationData::class,
     editable: false,

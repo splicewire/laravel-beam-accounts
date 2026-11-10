@@ -65,7 +65,6 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     label: 'API tokens',
     group: 'Settings',
     icon: 'key',
-    form: 'bare',
     readOnly: true,
     deletable: true,
     // No per-record detail. Every field this DTO carries is already a list column except `id`, which is

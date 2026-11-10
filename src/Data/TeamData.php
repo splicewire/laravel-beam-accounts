@@ -35,7 +35,6 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     navOrder: 2,
     group: 'Platform',
     icon: 'building',
-    form: 'bare',
     readOnly: true,
 )]
 #[TypeScript]

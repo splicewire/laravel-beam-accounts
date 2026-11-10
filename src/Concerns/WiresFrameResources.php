@@ -118,7 +118,6 @@ trait WiresFrameResources
             key: 'members',
             backing: MembershipSource::class,
             data: MembershipData::class,
-            form: 'bare',
             label: 'Members',
             group: 'Settings',
             icon: 'users',
