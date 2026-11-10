@@ -149,6 +149,12 @@ It registers into registries it doesn't own:
   their routes are mounted.
 - [`beam.notifications.recipient-kinds`](https://github.com/splicewire/laravel-beam-notifications/blob/main/docs/registries/beam.notifications.recipient-kinds.mdx),
   owned by `splicewire/laravel-beam-notifications`: the `to_roles` and `to_teams` recipient kinds.
+- [`beam.analytics.areas`](https://github.com/splicewire/laravel-beam-analytics/blob/main/docs/registries/beam.analytics.areas.mdx),
+  owned by `splicewire/laravel-beam-analytics`: the **Audience** area, `analytics-audience`. In a workspace it counts
+  the members, the members who joined in the period and the pending invites; for the operator, the users and teams.
+  Each figure is the total its own index lists to the same reader, linking to that index where the reader's rail has
+  it. It is named to the registry as a string, so it is inert on a host without that package, which this one requires
+  only for its own tests.
 
 ## Conventions
 

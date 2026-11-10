@@ -2,28 +2,82 @@
 
 namespace Splicewire\Beam\Accounts\Analytics;
 
+use Carbon\CarbonImmutable;
+use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Analytics\Areas\AnalyticsArea;
 use Splicewire\Beam\Analytics\Areas\AnalyticsReading;
 use Splicewire\Beam\Analytics\Areas\Attributes\Area;
 use Splicewire\Beam\Analytics\Data\AnalyticsFigureData;
 
 /**
- * An Analytics Area, drawn as the `analytics-audience` resource: a page listing its figures, and a card on the Analytics
- * section's overview. Register it in `beam.analytics.areas` from your provider, naming the registry as a string so it costs
- * no composer edge:
+ * Audience (analytics-area ticket 11): who the reader's site serves, from the indexes that already list them.
  *
- *     $this->app->afterResolving('Splicewire\Beam\Analytics\Areas\AnalyticsAreaRegistry', fn ($areas) => $areas
- *         ->add(AudienceArea::class, 'vendor/package'));
+ *  - In **Tenant scope** (a workspace's admin): its **Members**, the members who **joined in the period**, and its
+ *    **Pending invites**, from the `members` and `invitations` indexes, which list the current team's.
+ *  - In **Install scope** (the operator): the install's **Users** and **Teams**, from the `users` and `teams` indexes.
  *
- * Measure only what you can read for `$reading->scope` over `$reading->period`. An area with nothing to measure returns no
- * figures, never an invented zero.
+ * No figure is a second count. Each is the total its index lists to the same reader, read through that index's own
+ * scoped count path ({@see AudienceDestinations}): Members = the `members` list's rows, Pending invites = the
+ * `invitations` list (its `scope()` is the current team's unaccepted invitations), Users and Teams = those lists. New
+ * members are the `members` rows whose Joined date falls in the period. Each figure links to its index where this reader's
+ * rail has it. An index this reader may not read draws no figure.
+ *
+ * The scope is 05's {@see \Splicewire\Beam\Analytics\Scope\AnalyticsScope}, decided at the request's boundary; this
+ * area holds no topology code. Synthetic tenants: charter ruling (C), 2026-11-10. The Users and Teams figures equal their
+ * indexes and do not apply `SyntheticReporting`, because this package's users and teams are not tenants; that toggle
+ * governs counts of tenants, which laravel-beam-tenancy's own reportable count makes.
+ *
+ * Scaffolded by `splicewire:beam:analytics:make-area AudienceArea` (ticket 11), then filled in.
  */
 #[Area(key: 'audience', label: 'Audience', icon: 'Users', order: 40, ability: null)]
 final class AudienceArea implements AnalyticsArea
 {
+    public function __construct(
+        private readonly AudienceDestinations $indexes,
+    ) {}
+
     /** @return list<AnalyticsFigureData> */
     public function measure(AnalyticsReading $reading): array
     {
-        return [];
+        return $reading->scope->isTenant() ? $this->workspace($reading) : $this->install();
+    }
+
+    /** @return list<AnalyticsFigureData> */
+    private function workspace(AnalyticsReading $reading): array
+    {
+        $figures = [];
+
+        $members = $this->indexes->members();
+        if ($members !== null) {
+            $href = $this->indexes->href('members');
+            $since = CarbonImmutable::now()->subDays($reading->period->days);
+            $joined = array_filter($members, fn (MembershipData $member): bool => $member->joinedAt !== null
+                && CarbonImmutable::parse($member->joinedAt)->greaterThanOrEqualTo($since));
+
+            $figures[] = new AnalyticsFigureData(id: 'members', label: 'Members', value: count($members), href: $href);
+            $figures[] = new AnalyticsFigureData(id: 'new-members', label: 'New members, '.lcfirst($reading->period->label()), value: count($joined), href: $href);
+        }
+
+        $invites = $this->indexes->count('invitations');
+        if ($invites !== null) {
+            $figures[] = new AnalyticsFigureData(id: 'pending-invites', label: 'Pending invites', value: $invites, href: $this->indexes->href('invitations'));
+        }
+
+        return $figures;
+    }
+
+    /** @return list<AnalyticsFigureData> */
+    private function install(): array
+    {
+        $figures = [];
+
+        foreach (['users' => 'Users', 'teams' => 'Teams'] as $key => $label) {
+            $count = $this->indexes->count($key);
+            if ($count !== null) {
+                $figures[] = new AnalyticsFigureData(id: $key, label: $label, value: $count, href: $this->indexes->href($key));
+            }
+        }
+
+        return $figures;
     }
 }

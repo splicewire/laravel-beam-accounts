@@ -12,6 +12,7 @@ use Rushing\Popcorn\Contracts\ChainsTraitMethods as ChainsTraitMethodsContract;
 use Rushing\Popcorn\Registries\ScopesRegistrant;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
+use Splicewire\Beam\Accounts\Concerns\WiresAnalyticsArea;
 use Splicewire\Beam\Accounts\Concerns\WiresApiGuard;
 use Splicewire\Beam\Accounts\Concerns\WiresAuthorization;
 use Splicewire\Beam\Accounts\Concerns\WiresDemo;
@@ -67,6 +68,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
 {
     use ChainsTraitMethods;
     use ScopesRegistrant;
+    use WiresAnalyticsArea;
     use WiresApiGuard;
     use WiresAuthorization;
     use WiresDemo;
@@ -458,6 +460,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         if ($this->app->runningInConsole()) {
             $this->commands([LoginAsCommand::class]);
         }
+
+        // The Audience area (analytics-area 11), into laravel-beam-analytics' area registry by its NAME: inert on a host
+        // without that package. Register phase, because that package resolves its registry while it boots.
+        $this->registerAnalyticsArea();
     }
 
     /**
