@@ -16,7 +16,7 @@ use Splicewire\Beam\Accounts\Tests\TestCase;
 
 $case = new class('boot-accounts-alone') extends TestCase
 {
-    public function boot(): \Illuminate\Foundation\Application
+    public function boot(): Illuminate\Foundation\Application
     {
         $this->setUp();
 
