@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Doctor;
 
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Routing\Router;
 use Rushing\Doctor\DoctorAudit;
 use Rushing\Doctor\Finding;
@@ -32,9 +33,15 @@ class TeamScopeWiringAudit implements DoctorAudit
     /** beam-tenancy's adapter, by literal — a soft reference, never a require. */
     private const TENANCY_BOOTSTRAPPER = 'Splicewire\\Beam\\Tenancy\\PermissionsTenancyBootstrapper';
 
+    /** Stancl's event, and the listener that actually runs the configured bootstrappers on it — literals, soft references. */
+    private const TENANCY_INITIALIZED = 'Stancl\\Tenancy\\Events\\TenancyInitialized';
+
+    private const BOOTSTRAP_TENANCY = 'Stancl\\Tenancy\\Listeners\\BootstrapTenancy';
+
     public function __construct(
         private readonly Router $router,
         private readonly Repository $config,
+        private readonly Dispatcher $events,
     ) {}
 
     /** @return list<Finding> */
@@ -47,7 +54,12 @@ class TeamScopeWiringAudit implements DoctorAudit
             $adapters[] = "the `splicewire.team` middleware in the `web` group";
         }
 
-        if (in_array(self::TENANCY_BOOTSTRAPPER, (array) $this->config->get('tenancy.bootstrappers', []), true)) {
+        // The bootstrapper binds the scope only when tenancy initialization runs it: configured AND Stancl's
+        // TenancyInitialized → BootstrapTenancy listener registered. Configured without that listener, tenancy still
+        // initializes but the registrar's team id stays null — the same silent denial — so it is not counted.
+        $bootstrapperConfigured = in_array(self::TENANCY_BOOTSTRAPPER, (array) $this->config->get('tenancy.bootstrappers', []), true);
+        $bootstrapperInert = $bootstrapperConfigured && ! $this->bootstrapListenerRegistered();
+        if ($bootstrapperConfigured && ! $bootstrapperInert) {
             $adapters[] = 'beam-tenancy\'s PermissionsTenancyBootstrapper';
         }
 
@@ -56,8 +68,15 @@ class TeamScopeWiringAudit implements DoctorAudit
                 'team-scope-unwired',
                 'No team-scope adapter is wired, so this host AUTHORIZES NOTHING, silently: roles are '
                 .'team-scoped and the registrar\'s team id stays null, every cascade-policed resource '
-                .'denies its own team owner. Add `splicewire.team` to the web middleware group (plain '
-                .'host) or beam-tenancy\'s PermissionsTenancyBootstrapper (multi-tenant host).',
+                .'denies its own team owner. '
+                .($bootstrapperInert
+                    ? 'beam-tenancy\'s PermissionsTenancyBootstrapper is configured but never runs: no '
+                        .'`Stancl\\Tenancy\\Events\\TenancyInitialized` → `Stancl\\Tenancy\\Listeners\\BootstrapTenancy` '
+                        .'listener is registered. Register that listener (beam-tenancy\'s event wiring does) or add '
+                        .'`splicewire.team` to the web middleware group.'
+                    : 'Add `splicewire.team` to the web middleware group (plain host) or beam-tenancy\'s '
+                        .'PermissionsTenancyBootstrapper with its TenancyInitialized → BootstrapTenancy listener '
+                        .'(multi-tenant host).'),
             )],
             1 => [Finding::pass('team-scope-wired', "Team scope is bound by {$adapters[0]}.")],
             default => [Finding::warn(
@@ -66,5 +85,29 @@ class TeamScopeWiringAudit implements DoctorAudit
                 .'write is redundant at best. Keep the one that matches the host\'s tenancy posture.',
             )],
         };
+    }
+
+    /**
+     * Whether TenancyInitialized has BootstrapTenancy among its raw listeners, in any form Laravel registers it:
+     * the class string, `Class@handle`, or `[Class, 'handle']`. A closure cannot be identified, so it does not count
+     * (fail closed: the audit then names the missing listener).
+     */
+    private function bootstrapListenerRegistered(): bool
+    {
+        if (! method_exists($this->events, 'getRawListeners')) {
+            return false;
+        }
+        foreach ($this->events->getRawListeners()[self::TENANCY_INITIALIZED] ?? [] as $listener) {
+            $class = match (true) {
+                is_string($listener) => explode('@', $listener, 2)[0],
+                is_array($listener) && is_string($listener[0] ?? null) => $listener[0],
+                default => null,
+            };
+            if ($class === self::BOOTSTRAP_TENANCY) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

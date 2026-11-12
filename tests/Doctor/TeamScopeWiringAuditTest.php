@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Tests\Doctor;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Doctor\TeamScopeWiringAudit;
 use Splicewire\Beam\Accounts\Tests\TestCase;
@@ -43,6 +44,8 @@ class TeamScopeWiringAuditTest extends TestCase
         config()->set('tenancy.bootstrappers', [
             'Splicewire\\Beam\\Tenancy\\PermissionsTenancyBootstrapper',
         ]);
+        // Wired means it runs: Stancl's TenancyInitialized → BootstrapTenancy listener (amend, review-r1).
+        Event::listen('Stancl\\Tenancy\\Events\\TenancyInitialized', 'Stancl\\Tenancy\\Listeners\\BootstrapTenancy');
 
         $findings = $this->findings();
 
@@ -56,6 +59,8 @@ class TeamScopeWiringAuditTest extends TestCase
         config()->set('tenancy.bootstrappers', [
             'Splicewire\\Beam\\Tenancy\\PermissionsTenancyBootstrapper',
         ]);
+        // Wired means it runs: Stancl's TenancyInitialized → BootstrapTenancy listener (amend, review-r1).
+        Event::listen('Stancl\\Tenancy\\Events\\TenancyInitialized', 'Stancl\\Tenancy\\Listeners\\BootstrapTenancy');
 
         $findings = $this->findings();
 
