@@ -54,6 +54,8 @@ final class AudienceDestinations
             return null;
         }
 
+        $this->requireViewer();
+
         try {
             $definition = $this->frame->get($key);
             $this->authorizer->authorizeAccess($definition);
@@ -77,6 +79,8 @@ final class AudienceDestinations
         if (! $this->frame->has('members') || ! $this->particles->has('members')) {
             return null;
         }
+
+        $this->requireViewer();
 
         try {
             $this->authorizer->authorizeAccess($this->frame->get('members'));
@@ -145,6 +149,21 @@ final class AudienceDestinations
     }
 
     /** A request of its own for one index read: this reader, the route serving this request, no query. */
+    /**
+     * analytics-area 19 (charter shape, 2026-11-12): every count here is a viewer's own index read, so with no signed-in viewer
+     * there is no answer to give. Say so BEFORE the authorizer, whose refusal is caught to null below and would read as a card
+     * with nothing to show: an AuthorizationException, which the doctor's dashboard-tier audit classes as UNKNOWN ("verify with
+     * a permitted signed-in actor"). A signed-in viewer an index refuses still reads null.
+     *
+     * @throws AuthorizationException
+     */
+    private function requireViewer(): void
+    {
+        if (request()->user() === null) {
+            throw new AuthorizationException('The Audience area reads each index as its viewer; with no signed-in viewer it cannot be read.');
+        }
+    }
+
     private function read(): Request
     {
         $current = request();
