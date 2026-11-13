@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
+use Splicewire\Beam\Accounts\Routing\AccountsRoutes;
 
 /**
  * One concern of {@see BeamAccountsServiceProvider}, contributed to its `boot` chain by the trait that
@@ -67,15 +68,17 @@ trait WiresRouteMacro
          * (`beam/accounts`, session `web` + `auth`), so a starter can call it bare.
          */
         Route::macro('splicewireAccountApiRoutes', function (?string $prefix = null, ?array $middleware = null) {
-            $prefix ??= (string) config('beam.accounts.api_root', 'beam/accounts');
             $middleware ??= (array) config('beam.accounts.routes.middleware', ['web', 'auth']);
 
-            Route::prefix($prefix)
-                ->name('beam.accounts.')
-                ->middleware($middleware)
-                // `dirname(__DIR__, 2)` for the same reason as above — this trait lives one level
-                // deeper than the provider the macro was extracted from.
-                ->group(dirname(__DIR__, 2).'/routes/account-api.php');
+            Route::middleware($middleware)->group(function () use ($prefix): void {
+                if ($prefix === null) {
+                    AccountsRoutes::mount();
+
+                    return;
+                }
+                // Explicit legacy exposure remains until the owner-authorized contract stage.
+                Route::prefix($prefix)->name('beam.accounts.')->group(dirname(__DIR__, 2).'/routes/account-api.php');
+            });
         });
 
         /*
