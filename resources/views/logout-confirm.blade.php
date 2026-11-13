@@ -1,9 +1,9 @@
 {{-- ux-walkthrough UX-11: the packaged GET /logout confirm. Signing out is a POST with a CSRF token, never a GET. --}}
 <!doctype html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="utf-8">
-    <title>Sign out · {{ $appName }}</title>
+    <title>{{ __('beam-accounts::messages.logout_title', ['app' => $appName]) }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { margin: 0; padding: 96px 24px; font-family: ui-sans-serif, system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
@@ -17,12 +17,12 @@
 </head>
 <body>
     <main class="card">
-        <h1>Sign out?</h1>
-        <p>You will be signed out of {{ $appName }} on this browser.</p>
+        <h1>{{ __('beam-accounts::messages.logout_heading') }}</h1>
+        <p>{{ __('beam-accounts::messages.logout_detail', ['app' => $appName]) }}</p>
         <form method="POST" action="{{ $action }}" class="row">
             @csrf
-            <button type="submit">Sign out</button>
-            <a href="{{ url('/') }}">Cancel</a>
+            <button type="submit">{{ __('beam-accounts::messages.logout_action') }}</button>
+            <a href="{{ url('/') }}">{{ __('beam-accounts::messages.cancel') }}</a>
         </form>
     </main>
 </body>

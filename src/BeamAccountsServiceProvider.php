@@ -37,7 +37,6 @@ use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
 use Splicewire\Beam\Accounts\Entitlements\ModuleEntitlementResolver;
-use Splicewire\Beam\Entitlements\EntitlementKeyUniverse;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
@@ -45,6 +44,7 @@ use Splicewire\Beam\Accounts\Oidc\SigningKey;
 use Splicewire\Beam\Accounts\Support\IdentityAccountShellProvider;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
+use Splicewire\Beam\Entitlements\EntitlementKeyUniverse;
 use Splicewire\Beam\Install\BeamInstallManifest;
 use Splicewire\Beam\Realm\RealmRegistry;
 
@@ -506,6 +506,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // trait — and the sequence does not rest on where a `use` statement sits, which `pint`'s
         // `ordered_traits` fixer resorts alphabetically.
         $this->chainTraitMethods('boot');
+
+        $this->callAfterResolving(\Illuminate\Contracts\Debug\ExceptionHandler::class, function ($handler): void {
+            $handler->renderable(Localization\AccountErrorResponses::render(...));
+        });
 
         // ux-walkthrough UX-09 (IA-10; lead 09:01Z): the operator rail's People task section. `users` and `teams` declare
         // `section: people`; this seat is what they join. A host whose operator realm lists neither (collapse_user_realm,

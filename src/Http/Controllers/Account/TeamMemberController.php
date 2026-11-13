@@ -12,6 +12,7 @@ use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Data\RoleOptionsData;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Frame\Sources\MembershipSource;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 
 /**
  * The ACCOUNT-TIER team-members surface — list, role vocabulary, role change, remove.
@@ -80,6 +81,8 @@ class TeamMemberController extends Controller
      * Change a member's role
      */
     #[ResponseFromData(MembershipData::class)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
     public function updateRole(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
@@ -92,13 +95,13 @@ class TeamMemberController extends Controller
         $member = $this->member($team, $id);
 
         if ($member === null) {
-            return response()->json(['message' => 'Member not found'], 404);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::MemberNotFound->message(), AccountError::MemberNotFound->code()))->toArray(), 404);
         }
 
         $role = Role::from($validated['role']);
 
         if ($team->memberRole($member) === Role::Owner && $role !== Role::Owner && $this->ownerCount($team) < 2) {
-            return response()->json(['message' => 'A team must keep at least one owner.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::LastOwner->message(), AccountError::LastOwner->code()))->toArray(), 422);
         }
 
         $team->assignMember($member, $role);
@@ -110,6 +113,8 @@ class TeamMemberController extends Controller
      * Remove a member
      */
     #[ResponseFromData(MembershipData::class)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
     public function remove(Request $request, string $id): JsonResponse
     {
         $team = $this->team($request);
@@ -118,11 +123,11 @@ class TeamMemberController extends Controller
         $member = $this->member($team, $id);
 
         if ($member === null) {
-            return response()->json(['message' => 'Member not found'], 404);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::MemberNotFound->message(), AccountError::MemberNotFound->code()))->toArray(), 404);
         }
 
         if ($team->memberRole($member) === Role::Owner && $this->ownerCount($team) < 2) {
-            return response()->json(['message' => 'A team must keep at least one owner.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::LastOwner->message(), AccountError::LastOwner->code()))->toArray(), 422);
         }
 
         // Snapshot before the seat goes, so the data slot carries the removed member's final state —
@@ -144,29 +149,21 @@ class TeamMemberController extends Controller
     {
         $team = \Splicewire\Beam\Accounts\Facades\BeamAccounts::currentTeam();
 
-        abort_if($team === null, 403, 'No active team.');
+        AccountError::NoActiveTeam->abortIf($team === null, 403);
 
-        abort_unless(
-            $team instanceof TeamContract,
-            500,
-            'config(beam.accounts.teams.resolver) returned a '.get_debug_type($team).', which does not implement TeamContract.'
-        );
+        AccountError::TeamResolverInvalid->abortUnless($team instanceof TeamContract, 500, ['type' => get_debug_type($team)]);
 
         $user = $request->user();
 
-        abort_if($user === null, 401, 'Not authenticated.');
-        abort_unless($team->memberRole($user) !== null, 403, 'You are not a member of this team.');
+        AccountError::NotAuthenticated->abortIf($user === null, 401);
+        AccountError::NotTeamMember->abortUnless($team->memberRole($user) !== null, 403);
 
         return $team;
     }
 
     protected function assertOwner(TeamContract $team, ?Authenticatable $user): void
     {
-        abort_unless(
-            $user !== null && $team->memberRole($user) === Role::Owner,
-            403,
-            'Only a team owner can manage members.'
-        );
+        AccountError::TeamOwnerRequired->abortUnless($user !== null && $team->memberRole($user) === Role::Owner, 403);
     }
 
     /** One member of this team by their opaque id, or null. */

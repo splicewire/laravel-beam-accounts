@@ -9,6 +9,7 @@ use Schemastud\Frame\Contracts\ResourceRegistry;
 use Schemastud\Frame\Registry\NavManifest;
 use Schemastud\Frame\Registry\RouteContextEntry;
 use Splicewire\Beam\Accounts\Data\MembershipData;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Authorization\ResourceReadGuard;
 use Splicewire\Beam\Particle\Backing\StreamsRecords;
 use Splicewire\Beam\Particle\ListRouteName;
@@ -160,7 +161,7 @@ final class AudienceDestinations
     private function requireViewer(): void
     {
         if (request()->user() === null) {
-            throw new AuthorizationException('The Audience area reads each index as its viewer; with no signed-in viewer it cannot be read.');
+            throw new \Splicewire\Beam\Accounts\Localization\AccountAuthorizationException(AccountError::AudienceViewerRequired);
         }
     }
 

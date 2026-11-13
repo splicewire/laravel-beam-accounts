@@ -2,12 +2,12 @@
 
 namespace Splicewire\Beam\Accounts\Teams;
 
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
@@ -29,7 +29,7 @@ class TeamMembers
         $role = $role instanceof Role ? $role : Role::from($role);
 
         if (! in_array($role, Role::invitable(), true)) {
-            throw new AuthorizationException("The {$role->value} role cannot be assigned by invitation.");
+            throw new \Splicewire\Beam\Accounts\Localization\AccountAuthorizationException(AccountError::RoleNotInvitable, ['role' => $role->value]);
         }
 
         return Invitation::updateOrCreate(
@@ -71,7 +71,7 @@ class TeamMembers
         $this->assertOwner($team, $actor);
 
         if ($team->user_id == $member->getKey()) {
-            throw new AuthorizationException('The team owner cannot be removed.');
+            throw new \Splicewire\Beam\Accounts\Localization\AccountAuthorizationException(AccountError::RemoveOwner);
         }
 
         Membership::where('team_id', $team->getKey())
@@ -102,7 +102,7 @@ class TeamMembers
                 ->exists();
 
         if (! $isOwner) {
-            throw new AuthorizationException('Only a team owner may manage members.');
+            throw new \Splicewire\Beam\Accounts\Localization\AccountAuthorizationException(AccountError::TeamManageRequired);
         }
     }
 }

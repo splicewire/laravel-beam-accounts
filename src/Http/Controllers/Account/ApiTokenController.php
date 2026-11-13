@@ -10,7 +10,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
 use Rushing\LaravelDataSchemasScribe\Attributes\ResponseFromData;
 use Splicewire\Beam\Accounts\Data\ApiTokenCreateInputData;
@@ -23,6 +22,7 @@ use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Keys\TokenLastFour;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
 
 /**
@@ -147,6 +147,8 @@ class ApiTokenController extends Controller
      */
     #[RequestFromData(ApiTokenExpiryInputData::class)]
     #[ResponseFromData(ApiTokenData::class)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
     public function renew(Request $request, string $id): JsonResponse
     {
         $input = ApiTokenExpiryInputData::validateAndCreate($request);
@@ -154,10 +156,10 @@ class ApiTokenController extends Controller
         $token = $this->findOwnToken($id);
 
         if ($token === null) {
-            return response()->json(['message' => 'Token not found'], 404);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
         if ($token->archived_at) {
-            return response()->json(['message' => 'Cannot renew an archived token.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::RenewArchived->message(), AccountError::RenewArchived->code()))->toArray(), 422);
         }
 
         $token->forceFill(['expires_at' => $this->expiresAtFor($this->optional($input->expiresInDays))])->save();
@@ -173,6 +175,8 @@ class ApiTokenController extends Controller
      */
     #[RequestFromData(ApiTokenExpiryInputData::class)]
     #[ResponseFromData(CreatedTokenData::class, status: 201)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
     public function rotate(Request $request, string $id): JsonResponse
     {
         $input = ApiTokenExpiryInputData::validateAndCreate($request);
@@ -180,13 +184,13 @@ class ApiTokenController extends Controller
         $old = $this->findOwnToken($id);
 
         if ($old === null) {
-            return response()->json(['message' => 'Token not found'], 404);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
         if ((string) $old->getKey() === (string) $this->currentTokenId($request)) {
-            return response()->json(['message' => 'You cannot rotate the token you are using.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::RotateCurrent->message(), AccountError::RotateCurrent->code()))->toArray(), 422);
         }
         if ($old->archived_at) {
-            return response()->json(['message' => 'Cannot rotate an archived token.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::RotateArchived->message(), AccountError::RotateArchived->code()))->toArray(), 422);
         }
 
         // Same name + scope, carried verbatim: the scope was clamped when first minted.
@@ -219,24 +223,27 @@ class ApiTokenController extends Controller
      * archived token is a 409.
      */
     #[ResponseFromData(ApiTokenData::class)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 409)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
     public function archive(Request $request, string $id): JsonResponse
     {
         $token = $this->findOwnToken($id);
 
         if ($token === null) {
-            return response()->json(['message' => 'Token not found'], 404);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
         if ((string) $token->getKey() === (string) $this->currentTokenId($request)) {
-            return response()->json(['message' => 'You cannot archive the token you are using.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::ArchiveCurrent->message(), AccountError::ArchiveCurrent->code()))->toArray(), 422);
         }
         if ($token->archived_at) {
-            return response()->json(['message' => 'Token already archived'], 409);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::AlreadyArchived->message(), AccountError::AlreadyArchived->code()))->toArray(), 409);
         }
 
         $this->neutralize($token);
 
         return response()->json([
-            'message' => 'Token archived',
+            'message' => __('beam-accounts::messages.token_archived'),
             'data' => $this->present($token->fresh(), $this->currentTokenId($request)),
         ]);
     }
@@ -248,18 +255,20 @@ class ApiTokenController extends Controller
      * never skipped by accident. The response carries the deleted token's final state.
      */
     #[ResponseFromData(ApiTokenData::class)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
     public function destroy(Request $request, string $id): JsonResponse
     {
         $token = $this->findOwnToken($id);
 
         if ($token === null) {
-            return response()->json(['message' => 'Token not found'], 404);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
         if ((string) $token->getKey() === (string) $this->currentTokenId($request)) {
-            return response()->json(['message' => 'You cannot delete the token you are using.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::DeleteCurrent->message(), AccountError::DeleteCurrent->code()))->toArray(), 422);
         }
         if (! $token->archived_at) {
-            return response()->json(['message' => 'Archive the token before deleting it.'], 422);
+            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::DeleteActive->message(), AccountError::DeleteActive->code()))->toArray(), 422);
         }
 
         // Snapshot before the row goes, so the data slot carries the deleted token's final state.
@@ -267,7 +276,7 @@ class ApiTokenController extends Controller
 
         $token->delete();
 
-        return response()->json(['message' => 'Token deleted', 'data' => $snapshot]);
+        return response()->json(['message' => __('beam-accounts::messages.token_deleted'), 'data' => $snapshot]);
     }
 
     /**
@@ -287,7 +296,7 @@ class ApiTokenController extends Controller
             ->delete();
 
         return response()->json([
-            'message' => "Revoked {$revoked} other session(s).",
+            'message' => __('beam-accounts::messages.sessions_revoked', ['count' => $revoked]),
             'data' => new SessionsRevokedData(revoked: (int) $revoked),
         ]);
     }
@@ -414,7 +423,7 @@ class ApiTokenController extends Controller
     {
         $user = $request->user();
 
-        abort_if($user === null, 401, 'Not authenticated.');
+        AccountError::NotAuthenticated->abortIf($user === null, 401);
 
         return $user;
     }
@@ -493,12 +502,7 @@ class ApiTokenController extends Controller
         $overreach = array_values(array_diff($requested, $this->heldPermissionNames($user)));
 
         if ($overreach !== []) {
-            throw ValidationException::withMessages([
-                'abilities' => [
-                    'A token can only be scoped to permissions you hold. Not held: '
-                        .implode(', ', $overreach).'.',
-                ],
-            ]);
+            throw \Splicewire\Beam\Localization\CodedValidationException::for('abilities', AccountError::TokenAbilities, ['permissions' => implode(', ', $overreach)]);
         }
 
         return $requested;

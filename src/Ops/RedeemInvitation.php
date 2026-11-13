@@ -4,9 +4,9 @@ namespace Splicewire\Beam\Accounts\Ops;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Validation\ValidationException;
 use Splicewire\Beam\Accounts\Data\InvitationAcceptedData;
 use Splicewire\Beam\Accounts\Landing;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
@@ -85,18 +85,18 @@ class RedeemInvitation
 
     private static function refuse(string $verdict, Request $request): never
     {
-        [$status, $message] = match ($verdict) {
-            InvitationRedemption::USED => [410, __('This invitation has already been used.')],
-            InvitationRedemption::EXPIRED => [410, __('This invitation has expired. Ask the team for a new one.')],
-            InvitationRedemption::WRONG_ACCOUNT => [403, __('This invitation was sent to a different email address.')],
-            InvitationRedemption::GUEST => [401, __('Sign in to accept this invitation.')],
-            default => [404, __('This invitation link is not valid.')],
+        [$status, $error] = match ($verdict) {
+            InvitationRedemption::USED => [410, AccountError::InvitationUsed],
+            InvitationRedemption::EXPIRED => [410, AccountError::InvitationExpired],
+            InvitationRedemption::WRONG_ACCOUNT => [403, AccountError::InvitationWrongAccount],
+            InvitationRedemption::GUEST => [401, AccountError::InvitationGuest],
+            default => [404, AccountError::InvitationInvalid],
         };
 
         if ($request->expectsJson()) {
-            abort($status, $message);
+            $error->abort($status);
         }
 
-        throw ValidationException::withMessages(['invitation' => $message]);
+        throw \Splicewire\Beam\Localization\CodedValidationException::for('invitation', $error);
     }
 }

@@ -42,11 +42,11 @@ class ResetPasswordNotification extends Notification
         $brand = config('app.name');
 
         return (new MailMessage)
-            ->subject("Reset your {$brand} password")
-            ->line('You are receiving this email because we received a password reset request for your account.')
-            ->action('Reset Password', $url)
-            ->line("This password reset link will expire in {$minutes} minutes.")
-            ->line('If you did not request a password reset, no further action is required.');
+            ->subject(__('beam-accounts::messages.reset_subject', ['brand' => $brand]))
+            ->line(__('beam-accounts::messages.reset_intro'))
+            ->action(__('beam-accounts::messages.reset_action'), $url)
+            ->line(__('beam-accounts::messages.reset_expiry', ['minutes' => $minutes]))
+            ->line(__('beam-accounts::messages.reset_ignore'));
     }
 
     /**

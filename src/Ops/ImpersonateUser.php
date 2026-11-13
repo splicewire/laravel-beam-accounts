@@ -9,6 +9,7 @@ use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Impersonation\Impersonation;
 use Splicewire\Beam\Accounts\Landing;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\ParticleOperation;
 
@@ -55,24 +56,16 @@ class ImpersonateUser
     {
         $actor ??= $request->user();
 
-        abort_if($actor === null, 403, 'Not authenticated.');
+        AccountError::NotAuthenticated->abortIf($actor === null, 403);
 
         // Self gets its own 400, ahead of the policy, because the two refusals mean different
         // things and both originals said so: impersonating yourself is a NONSENSICAL request
         // (400), while impersonating a peer operator is a FORBIDDEN one (403). The policy answers
         // both as one boolean — correct as a gate, but it cannot carry two status codes, so the
         // distinction is restated here rather than lost.
-        abort_if(
-            (string) $actor->getAuthIdentifier() === (string) $user->getKey(),
-            400,
-            'You cannot impersonate yourself.',
-        );
+        AccountError::ImpersonateSelf->abortIf((string) $actor->getAuthIdentifier() === (string) $user->getKey(), 400);
 
-        abort_if(
-            ! Gate::forUser($actor)->allows('impersonate', $user),
-            403,
-            'This account cannot be impersonated.',
-        );
+        AccountError::ImpersonateForbidden->abortIf(! Gate::forUser($actor)->allows('impersonate', $user), 403);
 
         app(Impersonation::class)->start($user, $actor);
 

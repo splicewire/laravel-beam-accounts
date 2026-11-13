@@ -5,10 +5,10 @@ namespace Splicewire\Beam\Accounts\Http\Controllers\Api\V1;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Validation\ValidationException;
 use Splicewire\Beam\Accounts\Data\ForgotPasswordInputData;
 use Splicewire\Beam\Accounts\Data\PasswordResetResultData;
 use Splicewire\Beam\Accounts\Data\ResetPasswordInputData;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Data\ResponseBody;
 use Splicewire\Beam\Http\Controller;
 
@@ -39,7 +39,7 @@ class PasswordResetController extends Controller
         // The data slot carries a machine-readable outcome (never the submitted email — the
         // response must stay byte-identical across existing/missing accounts).
         return ResponseBody::from([
-            'message' => 'If an account exists for that email, a reset link is on its way.',
+            'message' => __('beam-accounts::messages.reset_link_sent'),
             'data' => new PasswordResetResultData(status: 'link-sent'),
         ]);
     }
@@ -69,13 +69,16 @@ class PasswordResetController extends Controller
         );
 
         if ($status !== Password::PASSWORD_RESET) {
-            throw ValidationException::withMessages([
-                'email' => [__($status)],
-            ]);
+            $error = match ($status) {
+                Password::INVALID_USER => AccountError::ResetInvalidUser,
+                Password::RESET_THROTTLED => AccountError::ResetThrottled,
+                default => AccountError::ResetInvalidToken,
+            };
+            throw \Splicewire\Beam\Localization\CodedValidationException::for('email', $error);
         }
 
         return ResponseBody::from([
-            'message' => 'Your password has been reset.',
+            'message' => __('beam-accounts::messages.password_reset'),
             'data' => new PasswordResetResultData(status: 'reset'),
         ]);
     }

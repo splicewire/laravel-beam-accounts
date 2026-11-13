@@ -24,6 +24,6 @@ class TeamMemberReadPolicy implements ResourceReadPolicy
             && $team instanceof TeamContract
             && $team->hasMember($actor)
                 ? Response::allow()
-                : Response::deny("Reading [{$resource->key}] requires membership in the current team.");
+                : new \Splicewire\Beam\Accounts\Localization\AccountAuthorizationResponse(\Splicewire\Beam\Accounts\Localization\AccountError::ResourceMembershipRequired, ['resource' => $resource->key]);
     }
 }

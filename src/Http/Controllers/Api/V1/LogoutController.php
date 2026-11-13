@@ -38,6 +38,6 @@ class LogoutController extends Controller
             $request->session()->regenerateToken();
         }
 
-        return ResponseBody::from(['message' => 'Signed out.']);
+        return ResponseBody::from(['message' => __('beam-accounts::messages.signed_out')]);
     }
 }

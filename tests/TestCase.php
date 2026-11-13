@@ -25,6 +25,8 @@ use Splicewire\Beam\Notifications\BeamNotificationsServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
+    use Concerns\RecordsAccountResponses;
+
     /**
      * Whether the test app configures `permission.models.*` onto this package's uuid-keyed pair.
      *
@@ -37,6 +39,10 @@ abstract class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Test-only isolation: neither baseline nor candidate may contact a paid provider.
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+        config(['mail.default' => 'array', 'mail.mailers.array.transport' => 'array']);
 
         $this->aliasCentralOntoTheDefaultDatabase();
 

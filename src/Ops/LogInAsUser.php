@@ -10,6 +10,7 @@ use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Landing;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
 use Splicewire\Beam\Particle\OperationKind;
 
@@ -106,7 +107,7 @@ class LogInAsUser
         // The ONLY check left here, and it is an ENVIRONMENT gate rather than an authorization one —
         // which is why it stays in the handler and carries its own reason. Authorization itself is
         // now entirely declared (`ability:` + `signed:`) and runs in the framework before this point.
-        abort_unless(BeamDemo::enabled(), 403, 'Demo login is disabled in this environment.');
+        AccountError::DemoDisabled->abortUnless(BeamDemo::enabled(), 403);
 
         app(LogInAs::class)->asUser($user);
 

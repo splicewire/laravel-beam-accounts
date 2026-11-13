@@ -11,6 +11,7 @@ use Splicewire\Beam\Accounts\Data\AuthUserData;
 use Splicewire\Beam\Accounts\Data\PasskeyLoginInputData;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Accounts\Landing;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyAuthenticator;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyChallengeStore;
 use Splicewire\Beam\Accounts\Passkeys\ResolvesPasskeyCeremonies;
@@ -67,14 +68,14 @@ class PasskeyLoginController extends Controller
         $options = $this->pullOptions($store, $input->handle, PublicKeyCredentialRequestOptions::class);
 
         if (! $options) {
-            return ResponseBody::from(['message' => 'This passkey challenge has expired. Please try again.'])
+            return ResponseBody::from(['message' => AccountError::PasskeyExpired->message(), 'meta' => ['code' => AccountError::PasskeyExpired->code()]])
                 ->unauthorized();
         }
 
         $user = $authenticator->resolveUserFromAssertion($this->credentialFromRequest($input->credential), $options);
 
         if (! $user) {
-            return ResponseBody::from(['message' => 'Passkey verification failed.'])->unauthorized();
+            return ResponseBody::from(['message' => AccountError::PasskeyFailed->message(), 'meta' => ['code' => AccountError::PasskeyFailed->code()]])->unauthorized();
         }
 
         // Mint a passkey-stamped token via the shared factory (same expiry/stamping as the session mint),

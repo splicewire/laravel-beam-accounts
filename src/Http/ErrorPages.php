@@ -102,11 +102,11 @@ final class ErrorPages
             : '';
 
         [$title, $fallback] = match ($status) {
-            403 => ['You don’t have access to this page', 'You don’t have permission to open this page.'],
-            404 => ['Page not found', 'The page you were looking for doesn’t exist or has moved.'],
-            419 => ['This page expired', 'Your session timed out. Refresh the page and try again.'],
-            503 => ['Down for maintenance', 'We’re making some changes. Please check back shortly.'],
-            default => ['Something went wrong', 'An unexpected error stopped this page from loading. Please try again in a moment.'],
+            403 => [__('beam-accounts::messages.error_forbidden_title'), __('beam-accounts::messages.error_forbidden')],
+            404 => [__('beam-accounts::messages.error_not_found_title'), __('beam-accounts::messages.error_not_found')],
+            419 => [__('beam-accounts::messages.error_expired_title'), __('beam-accounts::messages.error_expired')],
+            503 => [__('beam-accounts::messages.error_maintenance_title'), __('beam-accounts::messages.error_maintenance')],
+            default => [__('beam-accounts::messages.error_unknown_title'), __('beam-accounts::messages.error_unknown')],
         };
 
         return new ErrorPageData(

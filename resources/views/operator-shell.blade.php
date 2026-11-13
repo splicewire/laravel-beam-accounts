@@ -4,10 +4,10 @@
     `beam.accounts.operator_shell.developer_note`).
 --}}
 <!doctype html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="utf-8">
-    <title>Operator</title>
+    <title>{{ __('beam-accounts::messages.operator_title') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { margin: 0; padding: 64px 24px; font-family: ui-sans-serif, system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
@@ -29,22 +29,22 @@
 </head>
 <body>
     <main class="wrap">
-        <h1>Operator</h1>
-        <p class="sub">Signed in as {{ $page->staff->name }} ({{ $page->staff->email }})</p>
+        <h1>{{ __('beam-accounts::messages.operator_title') }}</h1>
+        <p class="sub">{{ __('beam-accounts::messages.operator_signed_in', ['name' => $page->staff->name, 'email' => $page->staff->email]) }}</p>
 
         <div class="stats">
-            <div class="stat"><b>{{ $page->stats->users }}</b><span>Users</span></div>
+            <div class="stat"><b>{{ $page->stats->users }}</b><span>{{ __('beam-accounts::messages.operator_users') }}</span></div>
             @if ($page->stats->teams !== null)
-                <div class="stat"><b>{{ $page->stats->teams }}</b><span>Teams</span></div>
+                <div class="stat"><b>{{ $page->stats->teams }}</b><span>{{ __('beam-accounts::messages.operator_teams') }}</span></div>
             @endif
             @if ($page->stats->pendingInvitations !== null)
-                <div class="stat"><b>{{ $page->stats->pendingInvitations }}</b><span>Pending invitations</span></div>
+                <div class="stat"><b>{{ $page->stats->pendingInvitations }}</b><span>{{ __('beam-accounts::messages.operator_invitations') }}</span></div>
             @endif
         </div>
 
-        <h2 id="operator-areas">Manage</h2>
+        <h2 id="operator-areas">{{ __('beam-accounts::messages.operator_manage') }}</h2>
         @if ($page->areas === [])
-            <p class="empty">This site has no operator pages yet. When it adds some, they are listed here.</p>
+            <p class="empty">{{ __('beam-accounts::messages.operator_empty') }}</p>
         @else
             <ul class="areas" aria-labelledby="operator-areas">
                 @foreach ($page->areas as $area)

@@ -54,13 +54,13 @@ final class AudienceArea implements AnalyticsArea
             $joined = array_filter($members, fn (MembershipData $member): bool => $member->joinedAt !== null
                 && CarbonImmutable::parse($member->joinedAt)->greaterThanOrEqualTo($since));
 
-            $figures[] = new AnalyticsFigureData(id: 'members', label: 'Members', value: count($members), href: $href);
-            $figures[] = new AnalyticsFigureData(id: 'new-members', label: 'New members, '.lcfirst($reading->period->label()), value: count($joined), href: $href);
+            $figures[] = new AnalyticsFigureData(id: 'members', label: __('beam-accounts::messages.analytics_members'), value: count($members), href: $href);
+            $figures[] = new AnalyticsFigureData(id: 'new-members', label: __('beam-accounts::messages.analytics_new_members', ['days' => $reading->period->days]), value: count($joined), href: $href);
         }
 
         $invites = $this->indexes->count('invitations');
         if ($invites !== null) {
-            $figures[] = new AnalyticsFigureData(id: 'pending-invites', label: 'Pending invites', value: $invites, href: $this->indexes->href('invitations'));
+            $figures[] = new AnalyticsFigureData(id: 'pending-invites', label: __('beam-accounts::messages.analytics_pending_invites'), value: $invites, href: $this->indexes->href('invitations'));
         }
 
         return $figures;
@@ -71,7 +71,8 @@ final class AudienceArea implements AnalyticsArea
     {
         $figures = [];
 
-        foreach (['users' => 'Users', 'teams' => 'Teams'] as $key => $label) {
+        foreach (['users', 'teams'] as $key) {
+            $label = $key === 'users' ? __('beam-accounts::messages.analytics_users') : __('beam-accounts::messages.analytics_teams');
             $count = $this->indexes->count($key);
             if ($count !== null) {
                 $figures[] = new AnalyticsFigureData(id: $key, label: $label, value: $count, href: $this->indexes->href($key));

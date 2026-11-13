@@ -8,6 +8,7 @@ use Laravel\Passkeys\Support\WebAuthn;
 use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
 use Splicewire\Beam\Accounts\Data\PasskeyRegisterInputData;
 use Splicewire\Beam\Accounts\Data\PasskeyRenameInputData;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyAuthenticator;
 use Splicewire\Beam\Accounts\Passkeys\PasskeyChallengeStore;
 use Splicewire\Beam\Accounts\Passkeys\ResolvesPasskeyCeremonies;
@@ -68,7 +69,7 @@ class PasskeyController extends Controller
         $options = $this->pullOptions($store, $input->handle, PublicKeyCredentialCreationOptions::class);
 
         if (! $options) {
-            return ResponseBody::from(['message' => 'This passkey challenge has expired. Please try again.'])->badRequest();
+            return ResponseBody::from(['message' => AccountError::PasskeyExpired->message(), 'meta' => ['code' => AccountError::PasskeyExpired->code()]])->badRequest();
         }
 
         $passkey = $authenticator->register(
@@ -125,7 +126,7 @@ class PasskeyController extends Controller
 
         $passkey->delete();
 
-        return ResponseBody::from(['message' => 'Passkey removed.', 'data' => $snapshot])->deleted();
+        return ResponseBody::from(['message' => __('beam-accounts::messages.passkey_removed'), 'data' => $snapshot])->deleted();
     }
 
     /**

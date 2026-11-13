@@ -5,6 +5,7 @@ namespace Splicewire\Beam\Accounts\Impersonation;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\ImpersonationEvent;
 use Splicewire\Beam\Accounts\Ops\StopImpersonating;
 
@@ -67,7 +68,7 @@ class Impersonation
     {
         $actorId = session()->pull(self::SESSION_KEY);
 
-        abort_if($actorId === null, 403, 'Not impersonating.');
+        AccountError::NotImpersonating->abortIf($actorId === null, 403);
 
         $this->audit('stop', $actorId, Auth::id());
 

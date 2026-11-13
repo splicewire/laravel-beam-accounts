@@ -17,7 +17,7 @@ class MePolicy implements ResourceReadPolicy
         Request $request,
     ): Response {
         return $actor === null
-            ? Response::deny('Authentication required.')
+            ? new \Splicewire\Beam\Accounts\Localization\AccountAuthorizationResponse(\Splicewire\Beam\Accounts\Localization\AccountError::AuthenticationRequired)
             : Response::allow();
     }
 }

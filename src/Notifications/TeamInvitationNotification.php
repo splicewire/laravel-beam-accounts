@@ -36,14 +36,18 @@ class TeamInvitationNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $role = ucfirst((string) $this->invitation->role);
-        $who = $this->inviterName ?? __('A teammate');
+        $knownRole = \Splicewire\Beam\Accounts\Enums\Role::tryFrom((string) $this->invitation->role);
+        if ($knownRole !== null) {
+            $role = app(\Splicewire\Beam\Localization\BeamSchemaText::class)->enumCaseLabel($knownRole, $role);
+        }
+        $who = $this->inviterName ?? __('beam-accounts::messages.inviter');
 
         return (new MailMessage)
-            ->subject(__('You are invited to join :team', ['team' => $this->teamName]))
-            ->line(__(':who invited you to join :team as :role.', ['who' => $who, 'team' => $this->teamName, 'role' => $role]))
-            ->action(__('Accept invitation'), $this->acceptUrl)
-            ->line(__('This invitation was sent to :email and expires on :date.', ['email' => $this->invitation->email, 'date' => $this->expiresOn]))
-            ->line(__('If you do not have an account yet, you can create one from the link.'));
+            ->subject(__('beam-accounts::messages.invitation_subject', ['team' => $this->teamName]))
+            ->line(__('beam-accounts::messages.invitation_intro', ['who' => $who, 'team' => $this->teamName, 'role' => $role]))
+            ->action(__('beam-accounts::messages.invitation_action'), $this->acceptUrl)
+            ->line(__('beam-accounts::messages.invitation_expiry', ['email' => $this->invitation->email, 'date' => $this->expiresOn]))
+            ->line(__('beam-accounts::messages.invitation_register'));
     }
 
     /** @return array<string, mixed> */

@@ -13,6 +13,7 @@ use Splicewire\Beam\Accounts\Data\LoginInputData;
 use Splicewire\Beam\Accounts\Data\LoginResponseData;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Accounts\Landing;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Data\ResponseBody;
 use Splicewire\Beam\Http\Controller;
 
@@ -58,7 +59,7 @@ class LoginController extends Controller
             ]);
         }
 
-        $body = ResponseBody::from(['message' => 'Unauthorized.']);
+        $body = ResponseBody::from(['message' => AccountError::Unauthorized->message(), 'meta' => ['code' => AccountError::Unauthorized->code()]]);
         $body->success = false;
         $body->statusCode = Response::HTTP_UNAUTHORIZED;
 

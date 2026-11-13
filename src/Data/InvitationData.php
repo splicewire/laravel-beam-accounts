@@ -6,7 +6,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
 use Schemastud\Frame\Attributes\Column;
@@ -16,6 +15,7 @@ use Splicewire\Beam\Accounts\Authorization\InvitationReadPolicy;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationMailer;
 use Splicewire\Beam\Data\BeamData;
@@ -110,9 +110,7 @@ class InvitationData extends BeamData
         $address = mb_strtolower(trim($input->email));
         $users = BeamAccounts::userModel()::query()->whereRaw('lower(email) = ?', [$address])->get();
         if ($users->contains(fn ($user) => $user instanceof Authenticatable && $team->hasMember($user))) {
-            throw ValidationException::withMessages([
-                'email' => "{$input->email} is already a member of this team.",
-            ]);
+            throw \Splicewire\Beam\Localization\CodedValidationException::for('email', AccountError::AlreadyMember, ['email' => $input->email]);
         }
 
         // The same case-insensitive, trimmed match: a re-invite of `Pending@Example.test` REFRESHES the pending
@@ -182,7 +180,7 @@ class InvitationData extends BeamData
     public static function assertManages(?object $actor): TeamContract
     {
         $team = BeamAccounts::currentTeam();
-        abort_if($team === null, 403, 'No active team to invite into.');
+        AccountError::NoInvitationTeam->abortIf($team === null, 403);
 
         // ⚠️ `currentTeam()` is typed `?object`, not `?TeamContract`, because `beam.accounts.teams.resolver`
         // is a host seam and nothing type-checks what a host binds to it — `splicewire/tower` binds
@@ -192,11 +190,7 @@ class InvitationData extends BeamData
         // 403 an ordinary member gets. Deliberately NOT a 403 — this estate's rule is that a check whose
         // answer depends on the host is advisory, and the corollary here is that it must not be able to
         // read as a legitimate denial.
-        abort_unless(
-            $team instanceof TeamContract,
-            500,
-            'config(beam.accounts.teams.resolver) returned a '.get_debug_type($team).', which does not implement TeamContract.'
-        );
+        AccountError::TeamResolverInvalid->abortUnless($team instanceof TeamContract, 500, ['type' => get_debug_type($team)]);
 
         // Owner/admin only — asked through the TEAM CONTRACT, which every team notion in the estate
         // satisfies: beam's own `Team` implements `memberRole()` directly, and a host whose team lives on
@@ -209,11 +203,7 @@ class InvitationData extends BeamData
         // relation only beam's `Team` has. Both arms named beam's own schema while the guard pretended
         // to be neutral — measured 2026-09-01 against `~/Herd/splicewire-app`, whose team is a
         // string-keyed `Tenant` over `tenant_users`. The contract method is the neutral question.
-        abort_unless(
-            self::managesTeam($actor, $team),
-            403,
-            'Only owners and admins can manage invitations.'
-        );
+        AccountError::InvitationManagerRequired->abortUnless(self::managesTeam($actor, $team), 403);
 
         return $team;
     }

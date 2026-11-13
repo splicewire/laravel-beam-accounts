@@ -4,9 +4,9 @@ namespace Splicewire\Beam\Accounts\Actions;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 
 /**
  * Assume a demo subject's identity on the session guard. The single wrapped operation
@@ -17,12 +17,10 @@ class LogInAs
 {
     public function __invoke(string $subject): Authenticatable
     {
-        abort_unless(BeamDemo::enabled(), 403, 'Demo login is disabled in this environment.');
+        AccountError::DemoDisabled->abortUnless(BeamDemo::enabled(), 403);
 
         if (! BeamDemo::has($subject)) {
-            throw ValidationException::withMessages([
-                'subject' => "Unknown demo subject [{$subject}]. Expected one of: ".implode(', ', BeamDemo::keys()),
-            ]);
+            throw \Splicewire\Beam\Localization\CodedValidationException::for('subject', AccountError::DemoUnknown, ['subject' => $subject, 'expected' => implode(', ', BeamDemo::keys())]);
         }
 
         $user = BeamAccounts::userModel()::query()->where('email', BeamDemo::email($subject))->firstOrFail();
