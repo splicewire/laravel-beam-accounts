@@ -234,6 +234,10 @@
         },
         {
             "type": "git",
+            "url": "https://github.com/stephenr85/laravel-data-nav.git"
+        },
+        {
+            "type": "git",
             "url": "https://github.com/stephenr85/laravel-data-schemas-scribe.git"
         },
         {
