@@ -245,12 +245,20 @@ it('403s the login-as operation when demo affordances are disabled', function ()
     $this->get(signedLoginAs($owner->getKey()))->assertForbidden();
 });
 
-it('skips seeding when demo affordances are disabled', function () {
+/**
+ * seeding-scenarios 01: this was "skips seeding when demo affordances are disabled". The Seeding Scenario decides
+ * what seeds and the door decides who logs in, so the seeder no longer reads the door: subjects seeded behind a
+ * shut door exist and cannot log in.
+ */
+it('seeds with the door shut, and the seeded subjects cannot log in', function () {
     config()->set('beam.accounts.demo.enabled', false);
 
     seedDemo();
 
-    expect(User::where('email', 'like', 'demo-%')->count())->toBe(0);
+    $owner = User::where('email', BeamDemo::email(Role::Owner->value))->firstOrFail();
+
+    expect(User::where('email', 'like', 'demo-%')->count())->toBeGreaterThan(0);
+    $this->get(signedLoginAs($owner->getKey()))->assertForbidden();
 });
 
 // ── ACC-01: the Demo Team's grant-derived reach — no separate "Staff" subject needed ──────────

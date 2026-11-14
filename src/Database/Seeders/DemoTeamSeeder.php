@@ -35,11 +35,9 @@ class DemoTeamSeeder extends Seeder
 
     public function run(): void
     {
-        if (! BeamDemo::enabled()) {
-            $this->command?->warn('beam-accounts: demo subjects skipped (demo affordances disabled in this environment).');
-
-            return;
-        }
+        // No `BeamDemo::enabled()` check here (seeding-scenarios 01): the Seeding Scenario decides what seeds, and the
+        // demo door decides who can log in, on the login path. A door defaulting off in production read here was the
+        // same environment gate under another name. Demo subjects seeded behind a shut door cannot log in.
 
         // Capability, checked here rather than in the config gate that registers this step. The gate
         // is resolved in the provider's `boot`, where there is no database to ask — it can only read

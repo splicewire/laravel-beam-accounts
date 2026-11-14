@@ -199,12 +199,12 @@ return [
         // DemoLoginLinks::DEFAULT_MINUTES.
         'login_link_minutes' => env('ACCOUNT_DEMO_LOGIN_LINK_MINUTES', 30),
 
-        // The config GATE for the DemoTeamSeeder's registration in the beam-seed manifest
-        // (splicewire:beam:seed). The seeder registers unconditionally from the provider, but
-        // this key decides whether it actually runs — so a production `beam:seed` never fabricates
-        // demo subjects. null (default) mirrors `Demo::enabled()` (on everywhere but production);
-        // set false to suppress demo seeding even in a preview, or true to force it. Explicit
-        // config wins; the provider resolves the null→non-production fallback at registration.
+        // The DemoTeamSeeder's seed step is a `demo` step: which environment runs it is the Seeding
+        // Scenario's choice (config/beam/seed.php, seeding-scenarios 01). `local` includes demo;
+        // every environment without a scenario of its name gets `baseline`, which does not. This
+        // key is only the host's opt-out: false keeps the step off under every scenario. null
+        // (default) and true leave it to the scenario. The provider also closes it when this host
+        // declared the teams estate absent.
         'seed_users' => env('ACCOUNT_SEED_DEMO_USERS'),
 
         // Deterministic credentials the DemoTeamSeeder provisions and login-as targets.
