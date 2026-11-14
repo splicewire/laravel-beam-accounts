@@ -152,6 +152,8 @@ enum AccountError: string implements CodedError
     /** Keep each existing HTTP status while adding its language-independent identity. */
     public function abort(int $status, array $params = []): never
     {
-        throw new AccountHttpException($status, $this, $params);
+        throw $status === 404
+            ? new AccountNotFoundHttpException($this, $params)
+            : new AccountHttpException($status, $this, $params);
     }
 }

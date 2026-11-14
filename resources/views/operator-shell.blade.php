@@ -4,7 +4,7 @@
     `beam.accounts.operator_shell.developer_note`).
 --}}
 <!doctype html>
-<html lang="{{ app()->getLocale() }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <title>{{ __('beam-accounts::messages.operator_title') }}</title>

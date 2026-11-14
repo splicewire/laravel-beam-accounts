@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Rushing\LaravelDataSchemasScribe\Attributes\ResponseFromData;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
+use Splicewire\Beam\Accounts\Data\AccountErrorData;
 use Splicewire\Beam\Accounts\Data\MembershipData;
 use Splicewire\Beam\Accounts\Data\RoleOptionsData;
 use Splicewire\Beam\Accounts\Enums\Role;
@@ -81,8 +82,8 @@ class TeamMemberController extends Controller
      * Change a member's role
      */
     #[ResponseFromData(MembershipData::class)]
-    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
-    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
+    #[ResponseFromData(AccountErrorData::class, status: 404)]
+    #[ResponseFromData(AccountErrorData::class, status: 422)]
     public function updateRole(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
@@ -95,13 +96,13 @@ class TeamMemberController extends Controller
         $member = $this->member($team, $id);
 
         if ($member === null) {
-            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::MemberNotFound->message(), AccountError::MemberNotFound->code()))->toArray(), 404);
+            return response()->json((new AccountErrorData(AccountError::MemberNotFound->message(), AccountError::MemberNotFound->code()))->toArray(), 404);
         }
 
         $role = Role::from($validated['role']);
 
         if ($team->memberRole($member) === Role::Owner && $role !== Role::Owner && $this->ownerCount($team) < 2) {
-            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::LastOwner->message(), AccountError::LastOwner->code()))->toArray(), 422);
+            return response()->json((new AccountErrorData(AccountError::LastOwner->message(), AccountError::LastOwner->code()))->toArray(), 422);
         }
 
         $team->assignMember($member, $role);
@@ -113,8 +114,8 @@ class TeamMemberController extends Controller
      * Remove a member
      */
     #[ResponseFromData(MembershipData::class)]
-    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
-    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 422)]
+    #[ResponseFromData(AccountErrorData::class, status: 404)]
+    #[ResponseFromData(AccountErrorData::class, status: 422)]
     public function remove(Request $request, string $id): JsonResponse
     {
         $team = $this->team($request);
@@ -123,11 +124,11 @@ class TeamMemberController extends Controller
         $member = $this->member($team, $id);
 
         if ($member === null) {
-            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::MemberNotFound->message(), AccountError::MemberNotFound->code()))->toArray(), 404);
+            return response()->json((new AccountErrorData(AccountError::MemberNotFound->message(), AccountError::MemberNotFound->code()))->toArray(), 404);
         }
 
         if ($team->memberRole($member) === Role::Owner && $this->ownerCount($team) < 2) {
-            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::LastOwner->message(), AccountError::LastOwner->code()))->toArray(), 422);
+            return response()->json((new AccountErrorData(AccountError::LastOwner->message(), AccountError::LastOwner->code()))->toArray(), 422);
         }
 
         // Snapshot before the seat goes, so the data slot carries the removed member's final state —

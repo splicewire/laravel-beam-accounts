@@ -5,6 +5,7 @@ namespace Splicewire\Beam\Accounts\Data;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Localization\BeamSchemaText;
 
 /**
  * The role vocabulary payload the team UI's selects render from — both context subsets of the
@@ -31,8 +32,17 @@ class RoleOptionsData extends Data
     public static function current(): self
     {
         return new self(
-            assignable: array_map(fn (array $option) => RoleOptionData::from($option), Role::options(Role::assignable())),
-            invitable: array_map(fn (array $option) => RoleOptionData::from($option), Role::options(Role::invitable())),
+            assignable: self::translatedOptions(Role::assignable()),
+            invitable: self::translatedOptions(Role::invitable()),
         );
+    }
+
+    /** Runtime projection only; Role's declaration vocabulary remains English. */
+    private static function translatedOptions(array $roles): array
+    {
+        return array_map(fn (Role $role) => new RoleOptionData(
+            value: $role->value,
+            label: app(BeamSchemaText::class)->enumCaseLabel($role, $role->label()),
+        ), $roles);
     }
 }

@@ -18,17 +18,17 @@ final class AccountErrorResponses
         }
 
         // Laravel converts an AuthorizationException into an AccessDeniedHttpException before callbacks run.
-        $source = $exception instanceof AccountHttpException || $exception instanceof AccountAuthorizationException
+        $source = $exception instanceof AccountHttpException || $exception instanceof AccountNotFoundHttpException || $exception instanceof AccountAuthorizationException
             ? $exception
             : $exception->getPrevious();
         $response = $source instanceof \Illuminate\Auth\Access\AuthorizationException ? $source->response() : null;
         $codedPolicy = $response instanceof AccountAuthorizationResponse ? $response->error : null;
-        if (! $source instanceof AccountHttpException && ! $source instanceof AccountAuthorizationException && $codedPolicy === null) {
+        if (! $source instanceof AccountHttpException && ! $source instanceof AccountNotFoundHttpException && ! $source instanceof AccountAuthorizationException && $codedPolicy === null) {
             return null;
         }
 
         $status = $exception instanceof HttpExceptionInterface ? $exception->getStatusCode() : 403;
 
-        return new JsonResponse((new AccountErrorData($source->getMessage(), ($codedPolicy ?? $source->error)->code()))->toArray(), $status);
+        return new JsonResponse((new AccountErrorData($source->getMessage(), ($codedPolicy ?? $source->error)->code()))->toArray(), $status, $exception instanceof HttpExceptionInterface ? $exception->getHeaders() : [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 }

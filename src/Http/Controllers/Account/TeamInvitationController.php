@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
 use Rushing\LaravelDataSchemasScribe\Attributes\ResponseFromData;
+use Splicewire\Beam\Accounts\Data\AccountErrorData;
 use Splicewire\Beam\Accounts\Data\CreateInvitationData;
 use Splicewire\Beam\Accounts\Data\InvitationData;
 use Splicewire\Beam\Accounts\Localization\AccountError;
@@ -91,13 +92,13 @@ class TeamInvitationController extends Controller
      * row by `[team, email]` and updates it.
      */
     #[ResponseFromData(InvitationData::class)]
-    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(AccountErrorData::class, status: 404)]
     public function resend(Request $request, string $id): JsonResponse
     {
         $existing = $this->scoped()->whereKey($id)->first();
 
         if ($existing === null) {
-            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::InvitationNotFound->message(), AccountError::InvitationNotFound->code()))->toArray(), 404);
+            return response()->json((new AccountErrorData(AccountError::InvitationNotFound->message(), AccountError::InvitationNotFound->code()))->toArray(), 404);
         }
 
         $invitation = $this->persist(
@@ -116,13 +117,13 @@ class TeamInvitationController extends Controller
      * be able to see.
      */
     #[ResponseFromData(InvitationData::class)]
-    #[ResponseFromData(\Splicewire\Beam\Accounts\Data\AccountErrorData::class, status: 404)]
+    #[ResponseFromData(AccountErrorData::class, status: 404)]
     public function revoke(Request $request, string $id): JsonResponse
     {
         $invitation = $this->scoped()->whereKey($id)->first();
 
         if ($invitation === null) {
-            return response()->json((new \Splicewire\Beam\Accounts\Data\AccountErrorData(AccountError::InvitationNotFound->message(), AccountError::InvitationNotFound->code()))->toArray(), 404);
+            return response()->json((new AccountErrorData(AccountError::InvitationNotFound->message(), AccountError::InvitationNotFound->code()))->toArray(), 404);
         }
 
         // The owner/admin gate is the resource's own, asked directly: `prepare()` runs it for a WRITE,

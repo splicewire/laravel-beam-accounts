@@ -9,6 +9,7 @@ use Splicewire\Beam\Accounts\Data\ForgotPasswordInputData;
 use Splicewire\Beam\Accounts\Data\PasswordResetResultData;
 use Splicewire\Beam\Accounts\Data\ResetPasswordInputData;
 use Splicewire\Beam\Accounts\Localization\AccountError;
+use Splicewire\Beam\Accounts\Localization\AccountValidationException;
 use Splicewire\Beam\Data\ResponseBody;
 use Splicewire\Beam\Http\Controller;
 
@@ -74,7 +75,12 @@ class PasswordResetController extends Controller
                 Password::RESET_THROTTLED => AccountError::ResetThrottled,
                 default => AccountError::ResetInvalidToken,
             };
-            throw \Splicewire\Beam\Localization\CodedValidationException::for('email', $error);
+            $key = match ($status) {
+                Password::INVALID_USER => Password::INVALID_USER,
+                Password::RESET_THROTTLED => Password::RESET_THROTTLED,
+                default => Password::INVALID_TOKEN,
+            };
+            throw AccountValidationException::forMessage('email', $error, __($key));
         }
 
         return ResponseBody::from([

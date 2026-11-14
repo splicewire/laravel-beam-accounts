@@ -1,6 +1,6 @@
 {{-- ux-walkthrough UX-11: the packaged GET /logout confirm. Signing out is a POST with a CSRF token, never a GET. --}}
 <!doctype html>
-<html lang="{{ app()->getLocale() }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <title>{{ __('beam-accounts::messages.logout_title', ['app' => $appName]) }}</title>
