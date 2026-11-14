@@ -3,8 +3,11 @@
 namespace Splicewire\Beam\Accounts\Teams;
 
 use Illuminate\Support\Facades\Notification;
+use Splicewire\Beam\Accounts\Localization\PreferredLocale;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Notifications\TeamInvitationNotification;
+use Splicewire\Beam\Localization\DeliveryRecipient;
+use Splicewire\Beam\Localization\LocaleResolver;
 
 /**
  * Put one invitation's email on the wire — the ONE call both transports make after a send or resend:
@@ -23,6 +26,13 @@ use Splicewire\Beam\Accounts\Notifications\TeamInvitationNotification;
  *  - It is already accepted.
  *
  * Returns whether a mail was sent, so a caller (and a test) can tell a skip from a send.
+ *
+ * ## Its language (localization 36; ruling 03 §3)
+ *
+ * The invitee's, never the inviter's. A recipient who already has an account and chose a language reads it; otherwise
+ * the INVITATION's workspace default (its team, the tenant on a tenancy host), then the brand's, then the app's. It is
+ * sent through beam's delivery seam ({@see LocaleResolver::deliver()}): resolved once, rendered inside that locale,
+ * with `->locale()` on the notification, and the expiry date formatted at render in that same language.
  */
 class InvitationMailer
 {
@@ -41,13 +51,20 @@ class InvitationMailer
             return false;
         }
 
-        Notification::route('mail', $invitation->email)->notify(new TeamInvitationNotification(
+        $route = Notification::route('mail', $invitation->email);
+        $recipient = new DeliveryRecipient(
+            PreferredLocale::centralByEmail($invitation->email) ?? $route,
+            workspace: $this->redemption->team($invitation),
+        );
+        $expiresAt = $this->redemption->expiresAt($invitation);
+
+        app(LocaleResolver::class)->deliver($recipient, fn (string $locale) => $route->notify((new TeamInvitationNotification(
             invitation: $invitation,
             acceptUrl: $url,
             teamName: $teamName,
             inviterName: $this->redemption->inviterName($invitation),
-            expiresOn: $this->redemption->expiresAt($invitation)->toFormattedDayDateString(),
-        ));
+            expiresOn: $expiresAt->toFormattedDayDateString(),
+        ))->expiringAt($expiresAt)->locale($locale)));
 
         return true;
     }

@@ -9,8 +9,11 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\LaravelData\Optional;
 use Splicewire\Beam\Accounts\Data\ProfileDeleteInputData;
 use Splicewire\Beam\Accounts\Data\ProfileUpdateInputData;
+use Splicewire\Beam\Accounts\Localization\PreferredLocale;
+use Splicewire\Beam\Localization\Locales;
 
 /**
  * The Inertia settings-profile surface.
@@ -29,6 +32,9 @@ class ProfileController extends Controller
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            // localization 36: the picker's state. The saved choice (null = automatic) and the languages it may name.
+            'preferredLocale' => PreferredLocale::of($request->user()),
+            'supportedLocales' => Locales::supported(),
         ]);
     }
 
@@ -42,6 +48,12 @@ class ProfileController extends Controller
         }
 
         $user->save();
+
+        // localization 36: an explicit choice (or clear) saves on the CENTRAL identity, under the same `auth` +
+        // `$request->user()` ownership as the name and email above. Omitted leaves it as it was.
+        if (! $input->preferredLocale instanceof Optional) {
+            PreferredLocale::save($user, $input->preferredLocale);
+        }
 
         return to_route('profile.edit')->with('status', 'profile-updated');
     }

@@ -238,6 +238,8 @@ abstract class TestCase extends Orchestra
             // guard so it lands even on a host whose `users` predates this package. Every estate
             // host has it; `User::$fillable` has carried it since the squash.
             $table->string('google_id')->nullable();
+            // From the central-only `add_preferred_locale_to_users_table` ALTER (localization 36).
+            $table->string('preferred_locale', 35)->nullable();
             $table->rememberToken();
             $table->timestamps();
         });

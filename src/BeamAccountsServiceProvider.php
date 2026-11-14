@@ -158,6 +158,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
             // AUTH — users/permission_tables/passkeys/PAT create+provenance/the tenant identity estate.
             'auth_migrations' => [
                 'shared/create_users_table',
+                // localization 36 (ruling 03 owner resolution (a)): `users.preferred_locale`, a NEW central-only ALTER
+                // right after the users create it extends, never an edit to that published shared stub. A host with this
+                // gate `false` must commit it too, and PublishGateCoverageAudit says so until it does.
+                'add_preferred_locale_to_users_table',
                 'shared/create_permission_tables',
                 'create_passkeys_table',
                 // The CREATE has to precede its own ALTER, and until ticket 25 NOBODY in the estate
@@ -445,6 +449,10 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // empty shell binds NullAccountShellProvider. Bound with `bind` (not `singleton`) so a host
         // override takes precedence with the same lazy semantics.
         $this->app->bind(AccountShellProvider::class, IdentityAccountShellProvider::class);
+
+        // localization 36: beam's person slot reads the central preferred_locale. A plain bind(), not bindIf(): beam-core
+        // registered its null adapter with bindIf() first, and this package is the slot's owner (ruling 03 §1).
+        $this->app->bind(\Splicewire\Beam\Localization\Contracts\PersonLocaleSource::class, Localization\PreferredLocaleSource::class);
 
         // The OIDC-issuer module's two primitives, always bindable from PHP regardless of the
         // `oidc.enabled` gate (mirrors the `keys` seam's DeterministicToken posture) — only the

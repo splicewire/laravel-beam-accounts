@@ -97,7 +97,11 @@ it('declares both estates by default', function () {
     // after the provenance one rather than an edit to either published stub.
     expect(array_search('add_provenance_and_archived_to_personal_access_tokens_table', $declared, true))
         ->toBeLessThan(array_search('add_last_four_to_personal_access_tokens_table', $declared, true));
-    expect($declared)->toHaveCount(18);
+    // 19th: add_preferred_locale_to_users_table (localization 36), a new central-only ALTER right after the users
+    // create it extends, never an edit to that shared stub.
+    expect(array_search('shared/create_users_table', $declared, true))
+        ->toBeLessThan(array_search('add_preferred_locale_to_users_table', $declared, true));
+    expect($declared)->toHaveCount(19);
 });
 
 /**

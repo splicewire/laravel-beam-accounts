@@ -2,10 +2,13 @@
 
 namespace Splicewire\Beam\Accounts\Data;
 
+use Illuminate\Validation\Rule;
+use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Data\BeamData;
+use Splicewire\Beam\Localization\Locales;
 
 /**
  * The self-service profile-edit body — name + email (auth-cluster spec asset 11 §3.5).
@@ -14,12 +17,17 @@ use Splicewire\Beam\Data\BeamData;
  * Part 2) folded the request's **inline** name/email dup into beam-accounts'
  * {@see ProfileValidationRules}: `profileRules($userId)` is the one rule source, and its email rule is
  * unique-ignore-self. The ignore-self id is context-dependent (the authenticated user).
+ *
+ * `preferredLocale` (localization 36, additive): the person's EXPLICIT language choice. Omitted means unchanged (a client
+ * that predates the picker); null or empty means "automatic" (clear); otherwise it must be a supported locale.
+ * Negotiation never writes it.
  */
 class ProfileUpdateInputData extends BeamData
 {
     public function __construct(
         public string $name,
         public string $email,
+        public string|Optional|null $preferredLocale = new Optional,
     ) {}
 
     use ProfileValidationRules;
@@ -42,6 +50,9 @@ class ProfileUpdateInputData extends BeamData
      */
     public static function rules(ValidationContext $context): array
     {
-        return self::profileRules(auth()->user()?->getKey());
+        return [
+            ...self::profileRules(auth()->user()?->getKey()),
+            'preferredLocale' => ['sometimes', 'nullable', 'string', Rule::in(Locales::supported())],
+        ];
     }
 }

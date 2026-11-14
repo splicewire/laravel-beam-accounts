@@ -1,0 +1,51 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * `users.preferred_locale`: the language a person chose, or null for automatic (localization 36; ruling 03 owner
+ * resolution (a)).
+ *
+ * - Saved ONLY by an explicit choice: negotiation never writes it, and clearing it returns the person to automatic.
+ * - The canonical value is the CENTRAL identity's. A tenant-side replica never carries it, and a tenant notifiable looks
+ *   up the central value.
+ *
+ * A NEW ALTER, not an edit to `shared/create_users_table`. That create is published and already ran at every host, and
+ * editing a published stub reaches only a fresh database.
+ *
+ * CENTRAL-ONLY (the bare top level, like the personal-access-token ALTERs): it is not in `shared/`, so it never runs in a
+ * tenant schema, and `getSyncedAttributeNames()` is unchanged.
+ *
+ * Writers go through {@see \Splicewire\Beam\Accounts\Localization\PreferredLocale::save()}, which skips the write on a
+ * host that has not run this migration yet. Readers find null there.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Guarded on the TABLE (a host with no users table yet) and on the COLUMN (a host that added it by hand runs
+        // this as a no-op), exactly like the last_four ALTER.
+        if (! Schema::hasTable('users') || Schema::hasColumn('users', 'preferred_locale')) {
+            return;
+        }
+
+        Schema::table('users', function (Blueprint $table) {
+            // 35: a BCP 47 tag is at most this long in practice (language-script-region plus a variant); tags are
+            // canonical hyphen form, e.g. es-MX.
+            $table->string('preferred_locale', 35)->nullable();
+        });
+    }
+
+    public function down(): void
+    {
+        if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'preferred_locale')) {
+            return;
+        }
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn('preferred_locale');
+        });
+    }
+};
