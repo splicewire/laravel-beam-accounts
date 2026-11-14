@@ -234,3 +234,17 @@ it('treats a host without the column as having no preference, and skips the writ
 
     expect(PreferredLocale::of($ana->refresh()))->toBeNull();
 });
+
+it('reads a saved choice through a partial select on a strict host, without throwing (B12-2)', function () {
+    $ana = localizedMember(preference: 'de');
+    $partial = LocalizedUser::query()->select(['id', 'name', 'email'])->findOrFail($ana->getKey());
+
+    $prior = Model::preventsAccessingMissingAttributes();
+    Model::preventAccessingMissingAttributes();
+    try {
+        expect(PreferredLocale::of($partial))->toBe('de', 'the left-out column is fetched, not misread as automatic')
+            ->and(app(PersonLocaleSource::class)->locale(null, $partial))->toBe('de');
+    } finally {
+        Model::preventAccessingMissingAttributes($prior);
+    }
+});

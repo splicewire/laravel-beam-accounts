@@ -79,9 +79,22 @@ final class PreferredLocale
         return $person;
     }
 
+    /**
+     * The stored choice, read off the RAW attributes, never `getAttribute()` (range review B12-2; the TokenLastFour
+     * precedent): under `Model::preventAccessingMissingAttributes()` a missing attribute throws, and "this host has not
+     * migrated yet" must read as automatic. A row loaded through a `select()` that left the column out is fetched for
+     * that one column, if its table has it, so a saved choice is never misread as automatic.
+     */
     private static function raw(Model $central): ?string
     {
-        $value = $central->getAttribute(self::COLUMN);
+        $attributes = $central->getAttributes();
+        if (array_key_exists(self::COLUMN, $attributes)) {
+            $value = $attributes[self::COLUMN];
+        } elseif ($central->exists && self::hasColumn($central)) {
+            $value = $central->newQuery()->whereKey($central->getKey())->value(self::COLUMN);
+        } else {
+            return null;
+        }
 
         return is_string($value) && $value !== '' ? $value : null;
     }
