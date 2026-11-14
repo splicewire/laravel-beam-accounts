@@ -8,6 +8,7 @@ use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Database\Seeders\RolePermissionsSeeder;
 use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Seed\BeamSeedManifest;
+use Splicewire\Beam\Seed\SeedStep;
 
 /**
  * One concern of {@see BeamAccountsServiceProvider}, contributed to its `boot` chain by the trait that
@@ -23,11 +24,16 @@ trait WiresSeed
      * so a host's `DatabaseSeeder` no longer hand-calls it by class — it just runs `splicewire:beam:seed`
      * and every beam-* package's seeder fires, each config-gated.
      *
-     * The gate is the config key `beam.accounts.demo.seed_users`. It defaults to `env('ACCOUNT_SEED_DEMO_USERS')`
-     * (null), and here — mirroring {@see BeamDemo::enabled()} — a null resolves to on-everywhere-but-production, so
-     * a production `beam:seed` never fabricates demo subjects while dev/preview seed them by default. Explicit
-     * config wins; the resolved boolean is written back onto the same key so the manifest's raw `config($gate)`
-     * check reads the effective value.
+     * **Which environment gets demo subjects is the Seeding Scenario's question** (seeding-scenarios 01): the step
+     * registers with the `demo` membership, so only a scenario that includes `demo` runs it — `local` out of the
+     * box, and `baseline` (which production, staging and testing fall to) never. This provider no longer reads
+     * the environment: the null-means-not-production resolution it had, mirroring {@see BeamDemo::enabled()}, is
+     * gone, and `BeamDemo::enabled()` itself (the login door, not seeding) is unchanged.
+     *
+     * The config gate `beam.accounts.demo.seed_users` stays for "this step cannot run here": it is the host's
+     * explicit opt-out (`false`) AND-ed with the teams estate below. Null, its default from
+     * `env('ACCOUNT_SEED_DEMO_USERS')`, now means "no objection". The resolved boolean is written back onto the
+     * same key so the manifest's raw `config($gate)` check reads the effective value.
      *
      * Inert (silently skipped) unless beam-core's {@see BeamSeedManifest} is present — a beam-accounts host
      * composed without the seed command pays nothing.
@@ -39,10 +45,10 @@ trait WiresSeed
             return;
         }
 
-        // Resolve the null → non-production fallback ONCE (config($gate) can't run the environment logic),
-        // and write it back so the manifest gate reads a concrete boolean.
+        // Only an explicit `false` turns the step off here; null is no objection. The environment is not read:
+        // the `demo` membership below hands that choice to the run's Seeding Scenario.
         $flag = config('beam.accounts.demo.seed_users');
-        $enabled = $flag !== null ? (bool) $flag : ! $this->app->environment('production');
+        $enabled = $flag === null || (bool) $flag;
 
         // AND the demo gate with the TEAMS ESTATE, which this seeder writes into (`beam_teams` /
         // `beam_memberships`). A host that runs its own team system declares that estate ABSENT
@@ -77,6 +83,7 @@ trait WiresSeed
             seederClass: DemoTeamSeeder::class,
             order: 10,
             configGate: 'beam.accounts.demo.seed_users',
+            memberships: SeedStep::DEMO,
         );
 
         // The role-permission backfill — a SECOND step from this package, and therefore a second
