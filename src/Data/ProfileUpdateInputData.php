@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Illuminate\Validation\Rule;
+use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
@@ -27,6 +28,7 @@ class ProfileUpdateInputData extends BeamData
     public function __construct(
         public string $name,
         public string $email,
+        #[Description('The preferred supported locale tag for this account. Omit to keep the existing choice; null or an empty string means automatic.')]
         public string|Optional|null $preferredLocale = new Optional,
     ) {}
 
