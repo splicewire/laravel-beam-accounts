@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Data\BeamData;
 
 /**
@@ -12,6 +13,7 @@ use Splicewire\Beam\Data\BeamData;
  * the rule is local. Enumeration-safety is enforced by the controller's identical-response contract,
  * not here.
  */
+#[TypeScript]
 class ForgotPasswordInputData extends BeamData
 {
     public function __construct(

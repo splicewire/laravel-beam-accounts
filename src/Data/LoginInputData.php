@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Data\BeamData;
 
 /**
@@ -13,6 +14,7 @@ use Splicewire\Beam\Data\BeamData;
  * become this InputData's own `rules()`, run on resolution under beam's OnlyRequests strategy. No
  * shared policy applies (email + password + remember is login-specific), so the rules stay local.
  */
+#[TypeScript]
 class LoginInputData extends BeamData
 {
     public function __construct(

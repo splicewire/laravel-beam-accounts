@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 use Splicewire\Beam\Data\BeamData;
 
@@ -14,6 +15,7 @@ use Splicewire\Beam\Data\BeamData;
  * settings surface is exactly the one a client most needs a typed contract for, and leaving it as a
  * FormRequest kept it out of the generation chain entirely.
  */
+#[TypeScript]
 class ProfileDeleteInputData extends BeamData
 {
     use PasswordValidationRules;

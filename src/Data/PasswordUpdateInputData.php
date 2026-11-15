@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
@@ -22,6 +23,7 @@ use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
  * snake companion. Every multi-word field carries an explicit camel `#[MapName]` so host mappers
  * cannot change the published contract.
  */
+#[TypeScript]
 class PasswordUpdateInputData extends BeamData
 {
     use PasswordValidationRules;
