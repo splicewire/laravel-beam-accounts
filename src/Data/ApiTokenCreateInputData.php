@@ -6,6 +6,7 @@ use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Http\Controllers\Account\ApiTokenController;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
@@ -33,6 +34,7 @@ use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
  * default means a missing key hydrates as null rather than as an `Optional` instance, so the
  * controller reads the properties directly.
  */
+#[TypeScript]
 class ApiTokenCreateInputData extends BeamData
 {
     use RejectsUnknownInputKeys;

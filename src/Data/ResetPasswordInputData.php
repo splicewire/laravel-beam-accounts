@@ -5,6 +5,7 @@ namespace Splicewire\Beam\Accounts\Data;
 use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
@@ -18,6 +19,7 @@ use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
  * `password` field, so the SPA reset can't drift from the engine's Fortify reset. The confirmation is a promoted
  * property because it is part of the strict public wire even though the controller only passes it to Laravel's broker.
  */
+#[TypeScript]
 class ResetPasswordInputData extends BeamData
 {
     use PasswordValidationRules;

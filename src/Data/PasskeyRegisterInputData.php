@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Data;
 
 use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Data\BeamData;
 
 /**
@@ -21,6 +22,7 @@ use Splicewire\Beam\Data\BeamData;
  * is never handed this class by the container, which is 27's gate-order rule (an injected DTO validates
  * during resolution and puts 422 ahead of `authorize`).
  */
+#[TypeScript]
 class PasskeyRegisterInputData extends BeamData
 {
     /**

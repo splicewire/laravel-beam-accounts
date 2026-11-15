@@ -5,6 +5,7 @@ namespace Splicewire\Beam\Accounts\Data;
 use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Data\BeamData;
 
 /**
@@ -17,6 +18,7 @@ use Splicewire\Beam\Data\BeamData;
  * what is accepted (`boolean` accepts the absent case) and stops the wire carrying an
  * undocumented, behaviour-changing field.
  */
+#[TypeScript]
 class PasskeyLoginInputData extends BeamData
 {
     /**

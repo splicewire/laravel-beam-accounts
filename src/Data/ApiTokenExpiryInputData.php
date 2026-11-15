@@ -6,6 +6,7 @@ use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Data\BeamData;
 use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
 
@@ -25,6 +26,7 @@ use Splicewire\Beam\Data\Concerns\RejectsUnknownInputKeys;
  * for a token that never expires — so it must not land in the emitted schema's `required` list, and a
  * plain nullable still would.
  */
+#[TypeScript]
 class ApiTokenExpiryInputData extends BeamData
 {
     use RejectsUnknownInputKeys;
