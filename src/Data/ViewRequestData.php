@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Models\ViewRequest;
 use Splicewire\Beam\Authorization\AuthenticatedReadPolicy;
 use Splicewire\Beam\Data\BeamData;
@@ -23,6 +24,7 @@ use Splicewire\Beam\Particle\Attributes\ParticleResource;
     readOnly: true,
     showable: false,
 )]
+#[TypeScript]
 class ViewRequestData extends BeamData
 {
     public function __construct(

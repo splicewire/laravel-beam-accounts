@@ -6,6 +6,7 @@ use Illuminate\Validation\Rule;
 use Schemastud\DataSchemas\Attributes\Description;
 use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Data\BeamData;
@@ -23,6 +24,7 @@ use Splicewire\Beam\Localization\Locales;
  * that predates the picker); null or empty means "automatic" (clear); otherwise it must be a supported locale.
  * Negotiation never writes it.
  */
+#[TypeScript]
 class ProfileUpdateInputData extends BeamData
 {
     public function __construct(
