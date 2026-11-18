@@ -49,6 +49,37 @@ it('keeps the sharing ledgers optional and index only at both roots', function (
     }
 });
 
+it('names the new exports beam.accounts.api.* so a dual mount beside the legacy names does not collide', function () {
+    // The flagship's legacy spelling: api/v1/beam/accounts with `beam.accounts.{resource}.{verb}` names (13c amend).
+    Route::prefix('api/v1')->middleware('host')->group(fn () => Route::splicewireAccountApiRoutes(prefix: 'beam/accounts', middleware: []));
+    Route::prefix('api/v1')->group(function (): void {
+        Route::splicewireAccountsAuthV1();
+        Route::splicewireAccountsSessionV1();
+        Route::splicewireAccountsMeV1();
+    });
+    Route::middleware('host-guest')->group(fn () => AccountsRoutes::auth());
+    Route::middleware('host-central')->group(fn () => AccountsRoutes::session());
+    Route::middleware('host-session')->group(fn () => AccountsRoutes::sessionToken());
+    Route::middleware('host-tenant')->group(fn () => AccountsRoutes::me());
+    Route::middleware('host-account')->group(fn () => AccountsRoutes::mount());
+    Route::middleware('host-account')->group(fn () => AccountsRoutes::sharingLedger());
+    $routes = app('router')->getRoutes();
+    $names = collect($routes->getRoutes())->map(fn ($route) => $route->getName())->filter();
+    // Scoped to this package's stems: the unprefixed V1 auth/session names (logout, password.*) collide with the
+    // testbench app's own routes independently of this change (recorded as a LOW; nominated separately).
+    expect($names->filter(fn (string $name) => str_starts_with($name, 'beam.accounts.'))->duplicates()->values()->all())->toBe([]);
+
+    expect($routes->match(Request::create('/beam/accounts/tokens'))->getName())->toBe('beam.accounts.api.tokens.index')
+        ->and($routes->match(Request::create('/api/v1/beam/accounts/tokens'))->getName())->toBe('beam.accounts.tokens.index');
+    $new = collect($routes->getRoutes())->filter(fn ($route) => str_starts_with($route->uri(), 'beam/accounts/'))->map(fn ($route) => $route->getName())->filter();
+    expect($new)->not->toBeEmpty()
+        ->and($new->reject(fn (string $name) => str_starts_with($name, 'beam.accounts.api.'))->values()->all())->toBe([]);
+    foreach (['tokens', 'members', 'invitations'] as $resource) {
+        expect($names->contains(fn (string $name) => str_starts_with($name, "beam.accounts.{$resource}.")))->toBeTrue()
+            ->and($names->contains(fn (string $name) => str_starts_with($name, "beam.accounts.api.{$resource}.")))->toBeTrue();
+    }
+});
+
 it('preserves the explicit legacy account prefix and middleware used by the tower host', function () {
     Route::prefix('v1')->middleware('host')->group(fn () => Route::splicewireAccountApiRoutes(prefix: 'beam/accounts', middleware: []));
     $route = app('router')->getRoutes()->match(Request::create('/v1/beam/accounts/tokens'));

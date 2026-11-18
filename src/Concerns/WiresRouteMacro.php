@@ -72,7 +72,8 @@ trait WiresRouteMacro
 
             Route::middleware($middleware)->group(function () use ($prefix): void {
                 if ($prefix === null) {
-                    AccountsRoutes::mount();
+                    // Legacy names (beam.accounts.*) at the package root; the new export is AccountsRoutes::mount() (13c amend).
+                    AccountsRoutes::mountLegacy();
 
                     return;
                 }
