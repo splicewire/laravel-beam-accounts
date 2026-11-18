@@ -103,7 +103,8 @@ return [
 
     // The URI root the account-tier REST survivors mount under — tokens (reveal-once mint +
     // lifecycle), members (role change + remove), invitations (send/resend/revoke). Each nests as
-    // `{api_root}/{resource}` with canonical `beam.accounts.{resource}.*` route names.
+    // `{api_root}/{resource}`: legacy `beam.accounts.{resource}.*` route names, and `beam.accounts.api.{resource}.*` for
+    // the AccountsRoutes export during the dual mount (13c amend; ticket16 renames the export back).
     //
     // ⚠️ THIS KEY WAS READ BEFORE IT WAS DECLARED. `~/Herd/splicewire-app` has mounted its own copy
     // of this family at `config('beam.accounts.api_root', 'beam/accounts')` since the ADR-0124 tier
