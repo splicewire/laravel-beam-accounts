@@ -167,3 +167,9 @@ it('exits 1 with the findings from the fleet command, and 0 on a clean tree', fu
     $this->artisan('splicewire:beam:accounts:token-writes', ['paths' => ["{$root}/src/Tokens", "{$root}/src/Auth"]])
         ->assertExitCode(0);
 });
+
+it('names the enclosing method of a write, a reserved-word method name included', function () {
+    $findings = (new TokenWriteScanner)->scanSource('<?php class C { public function for($u) { return $u->createToken("x"); } public function mint($u) { $u->createToken("y"); } }');
+
+    expect(array_column($findings, 'function'))->toBe(['for', 'mint']);
+});
