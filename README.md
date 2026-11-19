@@ -26,6 +26,14 @@ beam-accounts   (account engine — Fortify default + self-service account UI + 
   `Auth\AuthTokenFactory` (the single session/login-token mint), and `Support\CentralRoot`
   (the flip-safe central-Root check). Relocated here from `Splicewire\Tower\*` (HTTP-04) so
   the token/root logic lives in the account engine and its consumers call *down* instead of up.
+- **The one machine-token issuer** (fleet ADR 0006 in `splicewire-beam-runbook`) — `Tokens\MachineTokenIssuer`
+  writes every token that is not a login token, as a declared kind (`beam.accounts.tokens.kinds`) with an explicit
+  ability set, never `*`. It refuses to mint while `api.scope_enforcement` is off, caps a same-principal token at a
+  scoped acting token, and issues a different principal's token only through a delegated kind (resolved target,
+  live authority, issuance ability). `Tokens\WidestTokenScope` is what an empty or `*` personal-token request
+  becomes. `splicewire:beam:accounts:token-writes` lists any token write outside `AuthTokenFactory` and the issuer;
+  the existing writers (the Tokens page controller, `DeterministicToken`, `MintKeyCommand`) move onto it in
+  credential-scope 04. See [the kinds registry page](docs/registries/beam.accounts.tokens.kinds.mdx).
 - **The auth API HTTP surface** — five `Http/Controllers/Api/V1/*` on the canonical InputData
   shape (`Login`, `PasskeyLogin`, `PasswordReset`, `Passkey` CRUD, and the API/JSON `Profile`
   variant beside the Inertia one), plus their `Data/*InputData` bodies. Relocated here from
@@ -125,10 +133,12 @@ exposes its own proprietary API — never Passport.
 
 ## Registries
 
-This package declares one registry:
+This package declares two registries:
 
 - [`beam.accounts.entitlements.bundles`](docs/registries/beam.accounts.entitlements.bundles.mdx): named sets
   of entitlement keys that a plan maps to, declared in config.
+- [`beam.accounts.tokens.kinds`](docs/registries/beam.accounts.tokens.kinds.mdx): the machine-token kinds the
+  one issuer mints, declared in config.
 
 It registers into registries it doesn't own:
 

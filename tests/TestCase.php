@@ -444,6 +444,8 @@ abstract class TestCase extends Orchestra
             // From the provenance/archived ALTER stub, not the create.
             $table->string('provenance')->nullable();
             $table->timestamp('archived_at')->nullable();
+            // From the kind ALTER stub (credential-scope 03), not the create.
+            $table->string('kind', 64)->nullable();
             $table->timestamps();
             $table->index(['tokenable_type', 'tokenable_id']);
         });

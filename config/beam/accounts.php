@@ -418,6 +418,19 @@ return [
         // the default connection into `central` at boot — which is why it never broke — and is
         // unusable on a host composing tower without that step.
         'connection' => null,
+
+        // The declared machine-token kinds (fleet ADR 0006, credential-scope 03): `name => class-string` of a
+        // Tokens\SamePrincipalTokenKind or Tokens\DelegatedTokenKind. Tokens\MachineTokenIssuer mints only these,
+        // never `*`, and records the name on the token's `kind` column. A package or host that mints for another
+        // principal (satellite tenant, broker, loopback, federation) declares its delegated kind here.
+        'kinds' => [
+            'personal-access-token' => Splicewire\Beam\Accounts\Tokens\Kinds\PersonalAccessTokenKind::class,
+        ],
+
+        // Contracts\DecisionNameSource classes whose names join a user's permission snapshot in the widest set a
+        // token can be scoped to (Tokens\WidestTokenScope). Empty here: the permission cascade's decision-name
+        // registry (credential-scope 02) is the first source.
+        'decision_name_sources' => [],
     ],
 
     // The invitations resource. `connection` is the seam that lets the one packaged `Invitation`

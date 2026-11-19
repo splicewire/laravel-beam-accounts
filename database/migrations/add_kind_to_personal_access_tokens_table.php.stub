@@ -1,0 +1,47 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * `personal_access_tokens.kind`: the declared machine-token kind a row was issued as (fleet ADR 0006 rule 3,
+ * credential-scope 03). `Tokens\MachineTokenIssuer` writes it on every row it issues and reads it back to rotate;
+ * a login token from `AuthTokenFactory`, and every row written before the issuer, leave it null.
+ *
+ * A NEW ALTER after the last-four one, never an edit to a published stub: those already ran at every host, and an
+ * edit reaches only a fresh database. NO BACKFILL: nothing is deployed, and local scoped tokens are re-minted
+ * through the issuer (ADR 0006, "Existing tokens").
+ *
+ * The issuer requires this column, deliberately unlike `last_four`: a token whose kind is not recorded cannot be
+ * rotated by its kind, so a host that adopts the issuer without running this migration fails loudly on its first
+ * mint rather than writing rows nobody can classify.
+ *
+ * CENTRAL-ONLY and ALTER-ONLY, like the provenance and last-four ALTERs: the table does not exist on the tenant
+ * estate.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (! Schema::hasTable('personal_access_tokens') || Schema::hasColumn('personal_access_tokens', 'kind')) {
+            return;
+        }
+
+        Schema::table('personal_access_tokens', function (Blueprint $table) {
+            $table->string('kind', 64)->nullable()->index();
+        });
+    }
+
+    public function down(): void
+    {
+        if (! Schema::hasTable('personal_access_tokens') || ! Schema::hasColumn('personal_access_tokens', 'kind')) {
+            return;
+        }
+
+        Schema::table('personal_access_tokens', function (Blueprint $table) {
+            $table->dropIndex(['kind']);
+            $table->dropColumn('kind');
+        });
+    }
+};

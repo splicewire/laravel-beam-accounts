@@ -20,6 +20,6 @@ class RegistryDocsAdoptionTest extends TestCase
         $report = RegistryDocsCheck::forPackage(dirname(__DIR__, 2))->run();
 
         $this->assertSame([], $report->failures(), $report->summary());
-        $this->assertCount(1, $report->coverage, 'the beam.accounts.entitlements.bundles root: '.implode(', ', array_keys($report->coverage)));
+        $this->assertCount(2, $report->coverage, 'the beam.accounts.entitlements.bundles and beam.accounts.tokens.kinds roots: '.implode(', ', array_keys($report->coverage)));
     }
 }

@@ -107,6 +107,41 @@ enum AccountError: string implements CodedError
     #[Message('A token can only be scoped to permissions you hold. Not held: :permissions.')]
     case TokenAbilities = 'token_abilities';
 
+    // The machine-token issuer's refusals (ADR 0006, credential-scope 03). Each names the kind it refused.
+
+    #[Message('A token made with a scoped token can only carry what that token carries. Not carried: :abilities.')]
+    case TokenAbilitiesBeyondActingToken = 'token_abilities_beyond_acting_token';
+
+    #[Message('No token kind named :kind is declared.')]
+    case TokenKindUndeclared = 'token_kind_undeclared';
+
+    #[Message('Tokens cannot be issued while credential scope enforcement is off.')]
+    case TokenIssuerEnforcementOff = 'token_issuer_enforcement_off';
+
+    #[Message('A :kind token needs an explicit ability set and can never carry *.')]
+    case TokenWildcardRefused = 'token_wildcard_refused';
+
+    #[Message('A :kind token carries the abilities its kind declares; a request cannot choose them.')]
+    case TokenKindDeclaresAbilities = 'token_kind_declares_abilities';
+
+    #[Message('Issuing a :kind token needs a signed-in principal.')]
+    case TokenActorRequired = 'token_actor_required';
+
+    #[Message('Issuing a :kind token needs a credential that carries :ability.')]
+    case TokenIssuanceAbilityMissing = 'token_issuance_ability_missing';
+
+    #[Message('The principal for a :kind token could not be resolved.')]
+    case TokenTargetUnresolved = 'token_target_unresolved';
+
+    #[Message('A :kind token is issued only for the principal and tenant its kind resolves.')]
+    case TokenTargetMismatch = 'token_target_mismatch';
+
+    #[Message('You do not have authority to issue a :kind token for that principal.')]
+    case TokenTargetNoAuthority = 'token_target_no_authority';
+
+    #[Message('A :kind token cannot be rotated; issue it again.')]
+    case TokenKindNotRotatable = 'token_kind_not_rotatable';
+
     #[Message('The :role role cannot be assigned by invitation.')]
     case RoleNotInvitable = 'role_not_invitable';
 

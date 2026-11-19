@@ -174,6 +174,9 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
                 // (owner-review-20261102 K-28): `last_four`, captured at mint. A host with this gate
                 // `false` must commit it too, and PublishGateCoverageAudit says so until it does.
                 'add_last_four_to_personal_access_tokens_table',
+                // credential-scope 03 (fleet ADR 0006): `kind`, the declared machine-token kind the issuer records.
+                // A NEW ALTER after the last-four one; a host with this gate `false` commits it too.
+                'add_kind_to_personal_access_tokens_table',
                 'tenant/create_userables_table',
                 'tenant/create_guest_tokens_table',
                 // The ALTER immediately after its own create, for the same reason
@@ -441,6 +444,12 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         $this->app->singleton(BundleRegistry::class);
         $this->app->singleton(EntitlementComposer::class);
 
+        // The machine-token issuer (fleet ADR 0006, credential-scope 03) and its kind registry. The registry is a
+        // ConfigRegistry over `beam.accounts.tokens.kinds`, read through on every lookup; the issuer holds no
+        // state and reads the acting credential's scope from the cascade on each call.
+        $this->app->singleton(Tokens\TokenKindRegistry::class);
+        $this->app->singleton(Tokens\MachineTokenIssuer::class);
+
         // The account-shell provider seam (ticket 08): the package projects the SHAPE
         // (AccountShellData); the host binds a provider that fills it from its own product data.
         // The default fills only the user's own identity (handle, initials, email) with no plan, so
@@ -466,7 +475,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         ));
 
         if ($this->app->runningInConsole()) {
-            $this->commands([LoginAsCommand::class]);
+            $this->commands([LoginAsCommand::class, Console\TokenWritesCommand::class]);
         }
 
         // The Audience area (analytics-area 11), into laravel-beam-analytics' area registry by its NAME: inert on a host

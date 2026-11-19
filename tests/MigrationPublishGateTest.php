@@ -101,7 +101,11 @@ it('declares both estates by default', function () {
     // create it extends, never an edit to that shared stub.
     expect(array_search('shared/create_users_table', $declared, true))
         ->toBeLessThan(array_search('add_preferred_locale_to_users_table', $declared, true));
-    expect($declared)->toHaveCount(19);
+    // 20th: add_kind_to_personal_access_tokens_table (credential-scope 03, fleet ADR 0006), the machine-token kind
+    // the issuer records, a new ALTER after the last-four one.
+    expect(array_search('add_last_four_to_personal_access_tokens_table', $declared, true))
+        ->toBeLessThan(array_search('add_kind_to_personal_access_tokens_table', $declared, true));
+    expect($declared)->toHaveCount(20);
 });
 
 /**

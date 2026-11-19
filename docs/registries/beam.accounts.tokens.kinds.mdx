@@ -1,0 +1,73 @@
+---
+title: Machine-token kinds
+segment: beam.accounts.tokens.kinds
+nav_order: 110
+excerpt: The declared kinds the one machine-token issuer mints. Nothing else writes a token, and no kind carries *.
+---
+
+# Machine-token kinds
+
+`beam.accounts.tokens.kinds` holds the **machine-token kinds**: `name => class-string` of a
+`SamePrincipalTokenKind` or a `DelegatedTokenKind`. `Tokens\MachineTokenIssuer` mints only a kind declared
+here, records the name in the token's `kind` column, and refuses `*` whatever the kind returns (fleet ADR 0006,
+rule 3). A login token is not a kind: `Auth\AuthTokenFactory` mints it, and it is the only `*` token.
+
+{/* registry-facts:start — generated from the #[IsRegistry] declaration; regenerate it, do not edit between these markers. */}
+
+- **Root:** `beam.accounts.tokens.kinds`
+- **Entries:** `class-string<Splicewire\Beam\Accounts\Tokens\TokenKind>`
+- **Duplicate keys:** Supersede — a later registration under a taken key replaces the earlier entry, in its place
+- **Population:** Optional — an empty registry is normal
+- **Order:** `100` (display order, ascending)
+- **Declared by:** `Splicewire\Beam\Accounts\Tokens\TokenKindRegistry`
+
+{/* registry-facts:end */}
+
+<RegistryRegistrants root="beam.accounts.tokens.kinds" />
+
+## Declaring a kind
+
+The package declares `personal-access-token`. A package or host that mints a token for **another** principal
+declares a delegated kind under its own name:
+
+```php
+'tokens' => [
+    'kinds' => [
+        'personal-access-token' => \Splicewire\Beam\Accounts\Tokens\Kinds\PersonalAccessTokenKind::class,
+        'satellite-tenant' => \App\Tokens\SatelliteTenantKind::class,
+    ],
+],
+```
+
+A **same-principal** kind (`SamePrincipalTokenKind::abilities($principal, $requested)`) mints for the actor.
+Under a scoped acting token its set may hold nothing that token lacks (`token_abilities_beyond_acting_token`).
+
+A **delegated** kind (`DelegatedTokenKind`) mints for a principal the kind resolves, never one the caller names:
+
+| method | what it declares |
+|---|---|
+| `issuanceAbility()` | the ability a scoped acting credential must carry (`token_issuance_ability_missing`) |
+| `boundSubject($actor)` | the subject it binds to, such as the current tenant; a request naming another is `token_target_mismatch` |
+| `resolveTarget($actor, $subject)` | the token's principal; null is `token_target_unresolved`, and a request naming another is `token_target_mismatch` |
+| `authorizes($actor, $target, $subject)` | the actor's live authority over the target (`token_target_no_authority`) |
+| `abilities($target, $subject)` | the declared set, exactly what the consumer calls; a request naming abilities is `token_kind_declares_abilities` |
+
+Nothing is issued while `beam.accounts.api.scope_enforcement` is off (`token_issuer_enforcement_off`).
+
+## Who reads it
+
+`Tokens\MachineTokenIssuer`, through `Tokens\TokenKindRegistry::kind($name)`. An undeclared name, or a class that
+is neither shape, is `token_kind_undeclared`.
+
+## The widest set
+
+`Tokens\WidestTokenScope::for($user)` is what an empty or `*` personal-token request becomes: the user's
+permission-name snapshot plus the names each `Contracts\DecisionNameSource` in
+`beam.accounts.tokens.decision_name_sources` reports. The permission cascade's decision-name registry is the
+first source.
+
+## No other writer
+
+`splicewire:beam:accounts:token-writes [paths…]` lists every token write outside `AuthTokenFactory` and the
+issuer (`createToken`, a token-model write, a query-builder write to the token table, a direct
+`DeterministicToken`) and exits 1 when there is one.
