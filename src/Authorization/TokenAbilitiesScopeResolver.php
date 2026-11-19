@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Authorization;
 
+use Closure;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
@@ -24,6 +25,46 @@ class TokenAbilitiesScopeResolver implements CredentialScopeResolver
 {
     /** @var array<string, array<int, string>|null> */
     private array $memo = [];
+
+    /** The Sanctum validation callback this class installed, so installing it again is a no-op. */
+    private static ?Closure $refusal = null;
+
+    /**
+     * Fleet ADR 0006 C5: while `beam.accounts.api.scope_enforcement` is off, Sanctum refuses a bearer whose token is
+     * scoped (abilities other than `*`), so the token authenticates nobody and gains nothing; a `*` token, a session
+     * and an unknown token are unchanged. While enforcement is on, the callback passes the guard's own answer through
+     * and the scope narrows the token instead.
+     *
+     * The setting is read on every validation, not at install, so one installation serves both states. A callback a
+     * host installed before this one still runs after it.
+     */
+    public static function refuseScopedTokensWhileUnenforced(): void
+    {
+        if (! class_exists(Sanctum::class)
+            || (self::$refusal !== null && Sanctum::$accessTokenAuthenticationCallback === self::$refusal)) {
+            return;
+        }
+
+        $previous = Sanctum::$accessTokenAuthenticationCallback;
+
+        self::$refusal = static function ($token, bool $isValid) use ($previous): bool {
+            if ($isValid && ! config('beam.accounts.api.scope_enforcement', false) && self::isScoped($token)) {
+                return false;
+            }
+
+            return is_callable($previous) ? (bool) $previous($token, $isValid) : $isValid;
+        };
+
+        Sanctum::authenticateAccessTokensUsing(self::$refusal);
+    }
+
+    /** Whether a token row carries a real scope: an ability list without `*` (null abilities are `*`). */
+    public static function isScoped(mixed $token): bool
+    {
+        $abilities = $token->abilities ?? ['*'];
+
+        return ! in_array('*', (array) $abilities, true);
+    }
 
     public function resolve(): ?array
     {
@@ -52,13 +93,11 @@ class TokenAbilitiesScopeResolver implements CredentialScopeResolver
             return null;
         }
 
-        $abilities = $token->abilities ?? ['*'];
-
-        // '*' is the unscoped default (today's tokens); an explicit list is a real scope.
-        if (in_array('*', $abilities, true)) {
+        // '*' is the unscoped default (login tokens); an explicit list is a real scope.
+        if (! self::isScoped($token)) {
             return null;
         }
 
-        return array_values($abilities);
+        return array_values((array) $token->abilities);
     }
 }

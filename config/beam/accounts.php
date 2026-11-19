@@ -256,12 +256,14 @@ return [
         // null falls back to the same provider as the web guard.
         'provider' => null,
 
-        // Scoped-PAT enforcement (ADR-0109). When true, the acting API token's abilities
-        // become the permission-cascade's credential-scope, so a scoped token can do at
-        // most `token abilities ∩ the user's live permissions`. Default-off and a pure
-        // no-op when off. Blast-radius control, not a trust boundary — a scoped token is
-        // still not safe to hand to an untrusted party. A host that mints scoped PATs
-        // (its own Tokens UI) flips this on.
+        // Scoped-PAT enforcement (ADR-0109; fleet ADR 0006). When true, the acting API token's
+        // abilities become the permission-cascade's credential-scope, so a scoped token can do at
+        // most `token abilities ∩ the user's live permissions`, and every Gate decision whose
+        // name it does not carry is refused (the cascade fails closed). When false, a scoped
+        // token (abilities other than `*`) is REFUSED at authentication, never treated as
+        // unscoped; a session and a `*` login token are unchanged. Blast-radius control, not a
+        // trust boundary — a scoped token is still not safe to hand to an untrusted party.
+        // Default-off until every host's consumer proof (credential-scope 06 flips it).
         'scope_enforcement' => false,
     ],
 

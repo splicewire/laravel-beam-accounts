@@ -4,11 +4,11 @@ namespace Splicewire\Beam\Accounts\Authorization;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Rushing\PermissionCascade\Authorization\CredentialScopeGate;
 use Rushing\PermissionCascade\Policies\ConfiguredModelPolicy;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
-use Splicewire\Beam\Authorization\CredentialScopeGate;
 
 /**
  * `Invitation`'s write policy: the cascade tokens, OR the team role that already governs invitations.

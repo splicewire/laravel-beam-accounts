@@ -69,7 +69,7 @@ function cb39Root(): User
     return $root->fresh();
 }
 
-it('narrows the central Root arms of UserPolicy to what the token carries; the self arm and a session are unchanged', function () {
+it('narrows the central Root arms and the self arm of UserPolicy to what the token carries; a session is unchanged', function () {
     $root = cb39Root();
     $other = User::create(['name' => 'Other', 'email' => 'cb39-other@example.test', 'password' => 'password-1234']);
     test()->actingAs($root);
@@ -84,7 +84,11 @@ it('narrows the central Root arms of UserPolicy to what the token carries; the s
     expect(Gate::allows('update', $other))->toBeFalse('a Root token scoped to entity.view may not edit another user')
         ->and(Gate::allows('delete', $other))->toBeFalse()
         ->and(Gate::allows('loginAs', $other))->toBeFalse('nor log in as them')
-        ->and(Gate::allows('update', $root))->toBeTrue('the self arm is not a permission and is unchanged');
+        ->and(Gate::allows('update', $root))->toBeFalse('the self arm is narrowed too: it is a decision with a name (fleet ADR 0006 C2)');
+
+    cb39Scope([PermissionNamer::assemble($root, 'update')]);
+    expect(Gate::allows('update', $root))->toBeTrue('the token carries the name of updating this very user')
+        ->and(Gate::allows('update', $other))->toBeFalse();
 
     cb39Scope([$update, $loginAs]);
     expect(Gate::allows('update', $other))->toBeTrue('the token carries user.update')
