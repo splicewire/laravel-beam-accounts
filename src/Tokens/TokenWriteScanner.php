@@ -3,39 +3,45 @@
 namespace Splicewire\Beam\Accounts\Tokens;
 
 use FilesystemIterator;
+use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * The architecture check behind fleet ADR 0006 C7: every token write outside
+ * The architecture check behind fleet ADR 0006 C7: token writes outside
  * {@see \Splicewire\Beam\Accounts\Auth\AuthTokenFactory} and {@see MachineTokenIssuer}, in any family package or
  * host it is pointed at.
  *
- * It reads PHP tokens (`token_get_all`), never runs the code, and reports four shapes of write:
+ * It reads PHP tokens (`token_get_all`), never runs the code, and reports EVERY write site it finds (not the first per
+ * function), each as (file, rule, line, function). PHP method, function and class names are matched without regard to
+ * case, and class names through the file's `use … [as …]` imports. Each function or method body is one scope, and the
+ * code outside every function (a routes file, a script) is one more. Four shapes:
  *
- *  - `create-token`: a `->createToken(` call (Sanctum's `HasApiTokens`), except on a `broker()` receiver, which is
- *    a password-reset token;
- *  - `token-model-write`: in one function body, a reference to the token model (a class whose name ends in
- *    `PersonalAccessToken`, `tokenModel()`, `personalAccessTokenModel()`) together with a model write (`save`,
- *    `create`, `forceCreate`, `insert`, `upsert`, `updateOrCreate`, `firstOrCreate`, …), or a `->tokens()`
- *    relation write in one statement;
- *  - `token-table-write`: a query-builder write (`insert`, `update`, `upsert`, `updateOrInsert`, …) in a statement
- *    that calls `table(` with the token table's name, or with a non-literal in a file that names the token table;
- *  - `deterministic-key`: a direct use of {@see \Splicewire\Beam\Accounts\Keys\DeterministicToken}, the
- *    query-builder key writer, which is itself a `token-table-write`.
+ *  - `create-token`: a `->createToken(` / `::createToken(` call (Sanctum's `HasApiTokens`), except on a `broker()`
+ *    receiver, which is a password-reset token;
+ *  - `token-model-write`: a model write (`save`, `create`, `forceCreate`, `insert`, `upsert`, `updateOrCreate`,
+ *    `firstOrCreate`, `update`, …) in a scope that references the token model: a class whose name ends in
+ *    `PersonalAccessToken`, an import aliasing one, a configured model class, `tokenModel()`,
+ *    `personalAccessTokenModel()`; or in a statement on a `->tokens()` relation;
+ *  - `token-table-write`: a query-builder write in a statement that selects the token table (`table('…')` with its
+ *    name, or with a non-literal in a file that names it);
+ *  - `deterministic-key`: a direct use of {@see \Splicewire\Beam\Accounts\Keys\DeterministicToken}, the query-builder
+ *    key writer, which is itself a `token-table-write`.
  *
- * A finding is (file, rule, line). The allowed writers are matched by path suffix, so a vendored or worktree copy
- * of this package is recognised as the same file.
+ * A variable assigned from a token-model, token-table or `->tokens()` expression (`$q = DB::table('personal_access_tokens')`,
+ * `$m = BeamAccounts::tokenModel()`, `$t = new $m`) carries that through later statements in its scope, so
+ * `$q->insert(…)` is reported too.
  *
- * Scope, stated: production code only. Directories named `tests`, `vendor`, `node_modules` and `migrations` are
- * skipped: test code builds fixture rows, vendored code is scanned in its own repository, and a migration changes
- * the schema of rows that already exist. A token write spelled through a variable method name or a raw SQL string
- * is not seen.
+ * NOT SEEN, stated: a method or class named through a variable or string (`$x->{$m}()`, `call_user_func`), raw SQL
+ * (`DB::insert('insert into personal_access_tokens …')`), a value carried through a property, a return value or
+ * another function, and writes in directories named `tests`, `vendor`, `node_modules`, `migrations` (test fixtures,
+ * code scanned in its own repository, and schema changes to existing rows). A text search for the token table name and
+ * `createToken` beside this scan is the cross-check for those.
  */
 final class TokenWriteScanner
 {
-    /** The only files that may write a token row (path suffixes). */
+    /** The only files that may write a token row (real-path suffixes). */
     public const ALLOWED = [
         'laravel-beam-accounts/src/Auth/AuthTokenFactory.php',
         'laravel-beam-accounts/src/Tokens/MachineTokenIssuer.php',
@@ -43,18 +49,31 @@ final class TokenWriteScanner
 
     public const SKIPPED_DIRECTORIES = ['tests', 'vendor', 'node_modules', 'migrations', '.git'];
 
-    private const MODEL_WRITES = ['save', 'saveQuietly', 'push', 'create', 'createQuietly', 'forceCreate', 'forceCreateQuietly', 'insert', 'insertGetId', 'insertOrIgnore', 'upsert', 'updateOrCreate', 'firstOrCreate', 'createOrFirst', 'createMany', 'saveMany'];
+    private const MODEL_WRITES = ['save', 'savequietly', 'push', 'create', 'createquietly', 'forcecreate', 'forcecreatequietly', 'insert', 'insertgetid', 'insertorignore', 'upsert', 'updateorcreate', 'firstorcreate', 'createorfirst', 'createmany', 'savemany', 'update', 'updatequietly', 'increment', 'decrement'];
 
-    private const TABLE_WRITES = ['insert', 'insertGetId', 'insertOrIgnore', 'insertUsing', 'upsert', 'update', 'updateOrInsert'];
+    private const TABLE_WRITES = ['insert', 'insertgetid', 'insertorignore', 'insertusing', 'upsert', 'update', 'updateorinsert', 'increment', 'decrement'];
 
-    private const MODEL_REFERENCES = ['tokenModel', 'personalAccessTokenModel'];
+    private const MODEL_REFERENCES = ['tokenmodel', 'personalaccesstokenmodel'];
 
-    /** @param  list<string>  $tables  the token table names (Sanctum's default, plus any a host renamed it to) */
-    public function __construct(private array $tables = ['personal_access_tokens']) {}
+    /** @var list<string> lower-cased */
+    private array $tables;
+
+    /** @var list<string> lower-cased fully qualified class names, no leading backslash */
+    private array $modelClasses;
+
+    /**
+     * @param  list<string>  $tables  the token table names (Sanctum's default, plus any a host renamed it to)
+     * @param  list<string>  $modelClasses  configured token model classes whose names need not end in PersonalAccessToken
+     */
+    public function __construct(array $tables = ['personal_access_tokens'], array $modelClasses = [])
+    {
+        $this->tables = array_map('strtolower', $tables);
+        $this->modelClasses = array_map(fn (string $c) => strtolower(ltrim($c, '\\')), $modelClasses);
+    }
 
     /**
      * @param  iterable<string>  $roots  files or directories
-     * @return list<array{file: string, rule: string, line: int}>
+     * @return list<array{file: string, rule: string, line: int, function: string}>
      */
     public function scan(iterable $roots): array
     {
@@ -76,76 +95,107 @@ final class TokenWriteScanner
     }
 
     /**
-     * @return list<array{rule: string, line: int}>
+     * @return list<array{rule: string, line: int, function: string}>
      */
     public function scanSource(string $source): array
     {
         $tokens = array_values(array_filter(
             token_get_all($source),
-            fn ($t) => ! is_array($t) || ! in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true),
+            fn ($t) => ! is_array($t) || ! in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT, T_OPEN_TAG, T_CLOSE_TAG, T_INLINE_HTML], true),
         ));
 
-        $findings = [];
+        $imports = $this->imports($tokens);
         $namesTable = false;
-
         foreach ($tokens as $t) {
-            if (is_array($t) && $t[0] === T_CONSTANT_ENCAPSED_STRING && in_array(trim($t[1], '\'"'), $this->tables, true)) {
+            if (is_array($t) && $t[0] === T_CONSTANT_ENCAPSED_STRING && in_array(strtolower(trim($t[1], '\'"')), $this->tables, true)) {
                 $namesTable = true;
             }
         }
 
-        // create-token and deterministic-key: single-token shapes.
-        foreach ($tokens as $i => $t) {
-            if ($this->isMethodCall($tokens, $i, ['createToken']) && $this->previousIsObjectOperator($tokens, $i)
-                && ! $this->onPasswordBroker($tokens, $i)) {
-                $findings[] = ['rule' => 'create-token', 'line' => $t[2]];
-            }
-
-            if (is_array($t) && in_array($t[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)
-                && $this->shortName($t[1]) === 'DeterministicToken'
-                && $this->isInstantiationOrStaticCall($tokens, $i)) {
-                $findings[] = ['rule' => 'deterministic-key', 'line' => $t[2]];
+        $findings = [];
+        foreach ($this->scopes($tokens) as [$name, $scope]) {
+            foreach ($this->scanScope($scope, $imports, $namesTable) as $finding) {
+                $findings[] = [...$finding, 'function' => $name];
             }
         }
 
-        // token-table-write and the ->tokens() relation write: statement shapes.
-        foreach ($this->statements($tokens) as $statement) {
-            $write = $this->firstMethodCall($statement, self::TABLE_WRITES);
-            $table = $this->tableCall($statement);
+        usort($findings, fn ($a, $b) => [$a['line'], $a['rule']] <=> [$b['line'], $b['rule']]);
 
-            if ($write !== null && ($table === true || ($table === null && $namesTable))) {
-                $findings[] = ['rule' => 'token-table-write', 'line' => $write];
+        return $findings;
+    }
+
+    /**
+     * @param  list<mixed>  $scope
+     * @param  array<string, string>  $imports
+     * @return list<array{rule: string, line: int}>
+     */
+    private function scanScope(array $scope, array $imports, bool $namesTable): array
+    {
+        /** @var array<int, array{rule: string, line: int}> $found keyed by token position in the scope */
+        $found = [];
+        $mark = function (int $pos, string $rule, int $line) use (&$found): void {
+            $found[$pos] ??= ['rule' => $rule, 'line' => $line];
+        };
+
+        // Single-token shapes.
+        foreach ($scope as $i => $t) {
+            if ($this->isCallAt($scope, $i, ['createtoken']) && ! $this->onPasswordBroker($scope, $i)) {
+                $mark($i, 'create-token', $t[2]);
             }
 
-            $relation = $this->firstMethodCall($statement, ['tokens']);
-            $relationWrite = $this->firstMethodCall($statement, self::MODEL_WRITES);
-
-            if ($relation !== null && $relationWrite !== null) {
-                $findings[] = ['rule' => 'token-model-write', 'line' => $relationWrite];
+            if ($this->isClassName($t) && $this->shortName($this->resolve($t[1], $imports)) === 'deterministictoken'
+                && $this->isInstantiationOrStaticCall($scope, $i)) {
+                $mark($i, 'deterministic-key', $t[2]);
             }
         }
 
-        // token-model-write: a function body that references the token model and writes a model.
-        foreach ($this->functionBodies($tokens) as $body) {
-            if (! $this->referencesTokenModel($body)) {
-                continue;
+        // The scope-wide rule: a scope that references the token model writes it wherever it writes a model.
+        $scopeReferencesModel = $this->referencesTokenModel($scope, $imports);
+
+        // Statement shapes, with taint carried through assignments in this scope.
+        /** @var array<string, string> $tainted variable name => 'table' | 'model' */
+        $tainted = [];
+        foreach ($this->statements($scope) as $statement) {
+            $table = $this->selectsTokenTable($statement, $namesTable);
+            $model = $this->referencesTokenModel(array_map(fn ($e) => $e[1], $statement), $imports)
+                || $this->callsAny($statement, ['tokens']);
+            $carried = $this->taintIn($statement, $tainted);
+
+            if ($carried === 'table') {
+                $table = true;
+            } elseif ($carried === 'model') {
+                $model = true;
             }
 
-            $write = $this->firstMethodCall($body, self::MODEL_WRITES);
+            // `$x = <token expression>` taints $x for the rest of the scope.
+            [$p0, $p1] = [$statement[0][1] ?? null, $statement[1][1] ?? null];
+            if (is_array($p0) && $p0[0] === T_VARIABLE && $p1 === '=') {
+                if ($table) {
+                    $tainted[$p0[1]] = 'table';
+                } elseif ($model) {
+                    $tainted[$p0[1]] = 'model';
+                }
+            }
 
-            if ($write !== null) {
-                $findings[] = ['rule' => 'token-model-write', 'line' => $write];
+            $plain = array_map(fn ($e) => $e[1], $statement);
+            foreach ($statement as $k => [$pos, $t]) {
+                if (! (is_array($t) && $this->isCallAt($plain, $k, [strtolower($t[1])]))) {
+                    continue;
+                }
+
+                $method = strtolower($t[1]);
+
+                if ($table && in_array($method, self::TABLE_WRITES, true)) {
+                    $mark($pos, 'token-table-write', $t[2]);
+                } elseif (($model || $scopeReferencesModel) && in_array($method, self::MODEL_WRITES, true)) {
+                    $mark($pos, 'token-model-write', $t[2]);
+                }
             }
         }
 
-        $unique = [];
-        foreach ($findings as $finding) {
-            $unique[$finding['rule'].':'.$finding['line']] = $finding;
-        }
+        ksort($found);
 
-        usort($unique, fn ($a, $b) => [$a['line'], $a['rule']] <=> [$b['line'], $b['rule']]);
-
-        return array_values($unique);
+        return array_values($found);
     }
 
     private function allowed(string $file): bool
@@ -176,7 +226,7 @@ final class TokenWriteScanner
             return;
         }
 
-        $directories = new \RecursiveCallbackFilterIterator(
+        $directories = new RecursiveCallbackFilterIterator(
             new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS),
             fn (SplFileInfo $file) => ! ($file->isDir() && in_array($file->getFilename(), self::SKIPPED_DIRECTORIES, true)),
         );
@@ -193,26 +243,221 @@ final class TokenWriteScanner
         yield from $files;
     }
 
-    /** @param  list<mixed>  $tokens */
-    private function isMethodCall(array $tokens, int $i, array $names): bool
+    /**
+     * `use A\B\C;` and `use A\B\C as D;` (and grouped `use A\{B, C as D};`) at any depth: lower-cased alias => FQCN.
+     *
+     * @param  list<mixed>  $tokens
+     * @return array<string, string>
+     */
+    private function imports(array $tokens): array
     {
-        $t = $tokens[$i];
+        $imports = [];
+        $count = count($tokens);
 
-        return is_array($t) && $t[0] === T_STRING && in_array($t[1], $names, true)
-            && ($tokens[$i + 1] ?? null) === '(';
+        for ($i = 0; $i < $count; $i++) {
+            if (! (is_array($tokens[$i]) && $tokens[$i][0] === T_USE)) {
+                continue;
+            }
+
+            // A closure's `use (` binds variables, not names.
+            if (($tokens[$i + 1] ?? null) === '(') {
+                continue;
+            }
+
+            $prefix = '';
+            $name = null;
+            $alias = null;
+            for ($j = $i + 1; $j < $count && $tokens[$j] !== ';'; $j++) {
+                $t = $tokens[$j];
+
+                if (is_array($t) && in_array($t[0], [T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED, T_STRING], true)) {
+                    if (($tokens[$j - 1][0] ?? null) === T_AS) {
+                        $alias = $t[1];
+                    } elseif (! (is_array($t) && in_array(strtolower($t[1]), ['function', 'const'], true))) {
+                        $name = $t[1];
+                    }
+                } elseif ($t === '{') {
+                    $prefix = rtrim((string) $name, '\\').'\\';
+                    $name = null;
+                } elseif ($t === ',' || $t === '}') {
+                    $this->addImport($imports, $prefix, $name, $alias);
+                    [$name, $alias] = [null, null];
+                }
+            }
+
+            $this->addImport($imports, $prefix, $name, $alias);
+            $i = $j;
+        }
+
+        return $imports;
     }
 
-    /** @param  list<mixed>  $tokens */
-    private function previousIsObjectOperator(array $tokens, int $i): bool
+    /** @param  array<string, string>  $imports */
+    private function addImport(array &$imports, string $prefix, ?string $name, ?string $alias): void
     {
+        if ($name === null) {
+            return;
+        }
+
+        $fqcn = ltrim($prefix.ltrim($name, '\\'), '\\');
+        $imports[strtolower($alias ?? $this->shortName($fqcn))] = $fqcn;
+    }
+
+    /** @param  array<string, string>  $imports */
+    private function resolve(string $name, array $imports): string
+    {
+        if (str_starts_with($name, '\\')) {
+            return ltrim($name, '\\');
+        }
+
+        $first = strtolower(explode('\\', $name)[0]);
+
+        if (isset($imports[$first])) {
+            $rest = substr($name, strlen($first));
+
+            return $imports[$first].$rest;
+        }
+
+        return $name;
+    }
+
+    private function isClassName(mixed $t): bool
+    {
+        return is_array($t) && in_array($t[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true);
+    }
+
+    /**
+     * Whether `$tokens` reference the token model: a class (through imports) whose name ends in PersonalAccessToken or
+     * is a configured model, or a `tokenModel()` / `personalAccessTokenModel()` call.
+     *
+     * @param  list<mixed>  $tokens  plain tokens
+     * @param  array<string, string>  $imports
+     */
+    private function referencesTokenModel(array $tokens, array $imports): bool
+    {
+        $plain = array_values($tokens);
+
+        foreach ($plain as $i => $t) {
+            if ($this->isClassName($t) && ! $this->isCallAt($plain, $i, [strtolower($t[1])])) {
+                $fqcn = strtolower($this->resolve($t[1], $imports));
+
+                if (str_ends_with($fqcn, 'personalaccesstoken') || in_array($fqcn, $this->modelClasses, true)) {
+                    return true;
+                }
+            }
+
+            if ($this->isCallAt($plain, $i, self::MODEL_REFERENCES, requireOperator: false)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a statement selects the token table: `table('<token table>')`, or `table(<non-literal>)` in a file that
+     * names the token table.
+     *
+     * @param  list<array{0: int, 1: mixed}>  $statement
+     */
+    private function selectsTokenTable(array $statement, bool $namesTable): bool
+    {
+        $plain = array_map(fn ($e) => $e[1], $statement);
+
+        foreach ($plain as $i => $t) {
+            if (! $this->isCallAt($plain, $i, ['table'])) {
+                continue;
+            }
+
+            $argument = $plain[$i + 2] ?? null;
+            $closes = in_array($plain[$i + 3] ?? null, [')', ','], true);
+
+            if (is_array($argument) && $argument[0] === T_CONSTANT_ENCAPSED_STRING && $closes) {
+                if (in_array(strtolower(trim($argument[1], '\'"')), $this->tables, true)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($namesTable) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<array{0: int, 1: mixed}>  $statement
+     * @param  list<string>  $names  lower-cased
+     */
+    private function callsAny(array $statement, array $names): bool
+    {
+        $plain = array_map(fn ($e) => $e[1], $statement);
+
+        foreach (array_keys($plain) as $i) {
+            if ($this->isCallAt($plain, $i, $names)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The taint a statement reads from an earlier assignment in its scope: 'table' wins over 'model'.
+     *
+     * @param  list<array{0: int, 1: mixed}>  $statement
+     * @param  array<string, string>  $tainted
+     */
+    private function taintIn(array $statement, array $tainted): ?string
+    {
+        $seen = null;
+
+        foreach ($statement as $k => [, $t]) {
+            // The assigned variable itself (`$q = …`) is not a read.
+            if ($k === 0 && ($statement[1][1] ?? null) === '=') {
+                continue;
+            }
+
+            if (is_array($t) && $t[0] === T_VARIABLE && isset($tainted[$t[1]])) {
+                if ($tainted[$t[1]] === 'table') {
+                    return 'table';
+                }
+                $seen = 'model';
+            }
+        }
+
+        return $seen;
+    }
+
+    /**
+     * Whether the token at `$i` is a call `->name(`, `?->name(`, `::name(` (or a plain `name(` when
+     * `$requireOperator` is false) for any of `$names`, case-insensitively.
+     *
+     * @param  list<mixed>  $tokens
+     * @param  list<string>  $names  lower-cased
+     */
+    private function isCallAt(array $tokens, int $i, array $names, bool $requireOperator = true): bool
+    {
+        $t = $tokens[$i] ?? null;
+
+        if (! (is_array($t) && $t[0] === T_STRING && in_array(strtolower($t[1]), $names, true) && ($tokens[$i + 1] ?? null) === '(')) {
+            return false;
+        }
+
+        if (! $requireOperator) {
+            return true;
+        }
+
         $p = $tokens[$i - 1] ?? null;
 
         return is_array($p) && in_array($p[0], [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON], true);
     }
 
     /**
-     * `Password::broker()->createToken($user)` mints a password-reset token, not an API token: the receiver is a
-     * `broker()` call.
+     * `Password::broker()->createToken($user)` mints a password-reset token, not an API token.
      *
      * @param  list<mixed>  $tokens
      */
@@ -221,7 +466,7 @@ final class TokenWriteScanner
         $receiver = $tokens[$i - 4] ?? null;
 
         return ($tokens[$i - 2] ?? null) === ')' && ($tokens[$i - 3] ?? null) === '('
-            && is_array($receiver) && $receiver[0] === T_STRING && $receiver[1] === 'broker';
+            && is_array($receiver) && $receiver[0] === T_STRING && strtolower($receiver[1]) === 'broker';
     }
 
     /** @param  list<mixed>  $tokens */
@@ -235,82 +480,17 @@ final class TokenWriteScanner
     }
 
     /**
-     * The line of the first `->name(` / `::name(` call in `$tokens` for any of `$names`, or null.
+     * Statements of a scope as lists of [position, token], split at `;`, `{` and `}`.
      *
-     * @param  list<mixed>  $tokens
+     * @param  list<mixed>  $scope
+     * @return list<list<array{0: int, 1: mixed}>>
      */
-    private function firstMethodCall(array $tokens, array $names): ?int
-    {
-        foreach ($tokens as $i => $t) {
-            if ($this->isMethodCall($tokens, $i, $names) && $this->previousIsObjectOperator($tokens, $i)) {
-                return $t[2];
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Whether a statement calls `table(`: true when its first argument is a token-table literal, null when it is
-     * not a literal (a variable or a config read), and false when it is no table call or names another table.
-     *
-     * @param  list<mixed>  $statement
-     */
-    private function tableCall(array $statement): ?bool
-    {
-        foreach ($statement as $i => $t) {
-            if (! ($this->isMethodCall($statement, $i, ['table']) && $this->previousIsObjectOperator($statement, $i))) {
-                continue;
-            }
-
-            $argument = $statement[$i + 2] ?? null;
-            $closes = ($statement[$i + 3] ?? null) === ')' || ($statement[$i + 3] ?? null) === ',';
-
-            if (is_array($argument) && $argument[0] === T_CONSTANT_ENCAPSED_STRING && $closes) {
-                if (in_array(trim($argument[1], '\'"'), $this->tables, true)) {
-                    return true;
-                }
-
-                continue;
-            }
-
-            return null;
-        }
-
-        return false;
-    }
-
-    /** @param  list<mixed>  $body */
-    private function referencesTokenModel(array $body): bool
-    {
-        foreach ($body as $i => $t) {
-            if (! is_array($t)) {
-                continue;
-            }
-
-            if (in_array($t[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)
-                && str_ends_with($this->shortName($t[1]), 'PersonalAccessToken')) {
-                return true;
-            }
-
-            if ($this->isMethodCall($body, $i, self::MODEL_REFERENCES)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param  list<mixed>  $tokens
-     * @return list<list<mixed>>
-     */
-    private function statements(array $tokens): array
+    private function statements(array $scope): array
     {
         $statements = [];
         $current = [];
 
-        foreach ($tokens as $t) {
+        foreach ($scope as $pos => $t) {
             if ($t === ';' || $t === '{' || $t === '}') {
                 if ($current !== []) {
                     $statements[] = $current;
@@ -320,7 +500,7 @@ final class TokenWriteScanner
                 continue;
             }
 
-            $current[] = $t;
+            $current[] = [$pos, $t];
         }
 
         if ($current !== []) {
@@ -331,28 +511,43 @@ final class TokenWriteScanner
     }
 
     /**
-     * Each top-level function or method body (closures stay inside the body that holds them).
+     * Each top-level function or method body (closures stay inside the body that holds them; a closure outside every
+     * function is its own scope), plus everything outside them as one more scope.
      *
      * @param  list<mixed>  $tokens
-     * @return list<list<mixed>>
+     * @return list<array{0: string, 1: list<mixed>}>
      */
-    private function functionBodies(array $tokens): array
+    private function scopes(array $tokens): array
     {
-        $bodies = [];
+        $scopes = [];
+        $outside = [];
         $count = count($tokens);
 
         for ($i = 0; $i < $count; $i++) {
             if (! (is_array($tokens[$i]) && $tokens[$i][0] === T_FUNCTION)) {
+                $outside[] = $tokens[$i];
+
                 continue;
             }
 
-            // Find the opening brace of this function (skip an abstract or interface signature ending in `;`).
+            $name = '{closure}';
             $j = $i + 1;
+            if (($tokens[$j] ?? null) === '&') {
+                $j++;
+            }
+            // A reserved word is a legal method name (`function for(`) and is not always lexed as T_STRING.
+            if (is_array($tokens[$j] ?? null) && preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $tokens[$j][1]) === 1) {
+                $name = $tokens[$j][1];
+            }
+
             while ($j < $count && $tokens[$j] !== '{' && $tokens[$j] !== ';') {
                 $j++;
             }
 
+            // An abstract or interface signature has no body.
             if ($j >= $count || $tokens[$j] === ';') {
+                $i = $j;
+
                 continue;
             }
 
@@ -371,17 +566,19 @@ final class TokenWriteScanner
                 $body[] = $t;
             }
 
-            $bodies[] = $body;
+            $scopes[] = [$name, $body];
             $i = $k;
         }
 
-        return $bodies;
+        $scopes[] = ['{file}', $outside];
+
+        return $scopes;
     }
 
     private function shortName(string $name): string
     {
         $parts = explode('\\', $name);
 
-        return (string) end($parts);
+        return strtolower((string) end($parts));
     }
 }
