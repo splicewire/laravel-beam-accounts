@@ -36,7 +36,8 @@ class TokenAbilitiesScopeResolver implements CredentialScopeResolver
      * and the scope narrows the token instead.
      *
      * The setting is read on every validation, not at install, so one installation serves both states. A callback a
-     * host installed before this one still runs after it.
+     * host installed before this one still runs after it, but only for a token this veto lets through: neither the
+     * guard's own answer nor that callback can admit a scoped token while enforcement is off.
      */
     public static function refuseScopedTokensWhileUnenforced(): void
     {
@@ -48,7 +49,9 @@ class TokenAbilitiesScopeResolver implements CredentialScopeResolver
         $previous = Sanctum::$accessTokenAuthenticationCallback;
 
         self::$refusal = static function ($token, bool $isValid) use ($previous): bool {
-            if ($isValid && ! config('beam.accounts.api.scope_enforcement', false) && self::isScoped($token)) {
+            // An unconditional veto, ahead of the host's callback and whatever validity Sanctum computed: a callback that
+            // turns false into true must not admit a scoped token either (codex cs02, blocking 2).
+            if (! config('beam.accounts.api.scope_enforcement', false) && self::isScoped($token)) {
                 return false;
             }
 

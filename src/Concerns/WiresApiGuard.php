@@ -65,6 +65,9 @@ trait WiresApiGuard
     protected function bootApiGuardEnforcement(): void
     {
         TokenAbilitiesScopeResolver::refuseScopedTokensWhileUnenforced();
+        // Again once every provider booted, so a callback a host sets in its own boot is composed under the veto, not
+        // installed over it.
+        $this->app->booted(fn () => TokenAbilitiesScopeResolver::refuseScopedTokensWhileUnenforced());
 
         if (! config('beam.accounts.api.scope_enforcement', false)) {
             return;

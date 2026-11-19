@@ -107,3 +107,34 @@ it('still runs a validation callback the host installed first', function () {
     $this->withToken($user->createToken('scoped', ['entity.view'])->plainTextToken)->getJson('/api/v1/cs02/whoami')->assertUnauthorized();
     $this->withToken($user->createToken('fine', ['*'])->plainTextToken)->getJson('/api/v1/cs02/whoami')->assertOk();
 });
+
+it('refuses a scoped or empty-ability token even when a preceding callback turns an invalid token valid', function () {
+    // codex cs02 (blocking 2): the host callback runs after the veto, so it cannot readmit a scoped token by answering
+    // true for one Sanctum judged invalid (here: expired).
+    Sanctum::$accessTokenAuthenticationCallback = null;
+    Sanctum::authenticateAccessTokensUsing(fn ($token, bool $isValid) => true);
+    bootEnforcement();
+    $user = enforcementUser();
+
+    foreach (['scoped' => ['entity.view'], 'empty' => []] as $name => $abilities) {
+        $token = $user->createToken($name, $abilities, now()->subMinute());
+        app('auth')->forgetGuards();
+        $this->withToken($token->plainTextToken)->getJson('/api/v1/cs02/whoami')->assertUnauthorized();
+    }
+
+    // The same callback still decides for a `*` token: it admits an expired one, as the host wrote it.
+    app('auth')->forgetGuards();
+    $this->withToken($user->createToken('star', ['*'], now()->subMinute())->plainTextToken)->getJson('/api/v1/cs02/whoami')->assertOk();
+});
+
+it('composes a callback a host installs after the package booted under the veto, once the app has booted', function () {
+    Sanctum::$accessTokenAuthenticationCallback = null;
+    bootEnforcement();
+    // A host's own boot replaces Sanctum's single callback slot...
+    Sanctum::authenticateAccessTokensUsing(fn ($token, bool $isValid) => true);
+    // ...and the booted hook installs the veto over it again.
+    TokenAbilitiesScopeResolver::refuseScopedTokensWhileUnenforced();
+    $user = enforcementUser();
+
+    $this->withToken($user->createToken('late', ['entity.view'])->plainTextToken)->getJson('/api/v1/cs02/whoami')->assertUnauthorized();
+});
