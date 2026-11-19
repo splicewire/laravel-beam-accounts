@@ -8,6 +8,7 @@ use Rushing\PermissionCascade\Policies\ConfiguredModelPolicy;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
+use Splicewire\Beam\Authorization\CredentialScopeGate;
 
 /**
  * `Invitation`'s write policy: the cascade tokens, OR the team role that already governs invitations.
@@ -28,6 +29,12 @@ use Splicewire\Beam\Accounts\Models\Invitation;
  * keeps its grant, and a principal the membership line admits is admitted even where no host synced
  * tokens. Nothing is admitted that `InvitationData::prepare()` / `assertManages()` would then refuse.
  *
+ * Under a scoped token (ADR-0109, standwell gap-assessment-build 39) the team-role arm is narrowed like the cascade
+ * it sits beside: it admits only when the token carries the invitation permission the cascade would have asked
+ * (`invitation.create`, `invitation.delete` or `invitation.{id}.delete`; {@see CredentialScopeGate::superuserMay()}).
+ * Without that, an owner token scoped to `entity.view` was refused by the cascade and readmitted here. A session or
+ * a `*` token is unchanged.
+ *
  * Every other ability (`viewAny`, `view`, `update`, `restore`, `forceDelete`) is the cascade's, unchanged.
  * It stays under the cascade's container key, so {@see RolePermissions::policedModels()} still counts
  * `Invitation` and a beam-provisioned team keeps receiving its tokens.
@@ -41,7 +48,8 @@ class InvitationPolicy extends ConfiguredModelPolicy
 
     public function create(Authenticatable $user)
     {
-        return parent::create($user) || $this->managesCurrentTeam($user);
+        return parent::create($user)
+            || ($this->managesCurrentTeam($user) && $this->scopeCarries($user, 'create', Invitation::class));
     }
 
     public function delete(Authenticatable $user, Model $instance)
@@ -52,9 +60,17 @@ class InvitationPolicy extends ConfiguredModelPolicy
 
         // An unsaved instance is the class-level probe ("may you revoke invitations at all?"); a persisted
         // one must belong to the team the caller manages.
-        return $instance->exists && $instance instanceof Invitation
+        $managed = $instance->exists && $instance instanceof Invitation
             ? app(MembershipPolicy::class)->manageInvitation($user, $instance)
             : $this->managesCurrentTeam($user);
+
+        return $managed && $this->scopeCarries($user, 'delete', $instance);
+    }
+
+    /** Whether a scoped token carries the cascade's name for `$verb` (unscoped: always). */
+    private function scopeCarries(Authenticatable $user, string $verb, Model|string $subject): bool
+    {
+        return app(CredentialScopeGate::class)->superuserMay($user, $verb, $subject);
     }
 
     private function managesCurrentTeam(Authenticatable $user): bool

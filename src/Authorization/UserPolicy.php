@@ -9,6 +9,7 @@ use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Doors\AccountDoors;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
+use Splicewire\Beam\Authorization\CredentialScopeGate;
 
 /**
  * The write gate for the `users` particle resource.
@@ -27,6 +28,11 @@ use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
  * Both transports reach this class: the HTTP path through Laravel's policy resolution on the
  * configured user model, the Frame path through the `policy:` slot on {@see UserData}'s
  * `#[ParticleResource]` (which beam wraps in a `PolicyWriteGate`).
+ *
+ * Under a scoped token (ADR-0109, standwell gap-assessment-build 39) the central Root arm keeps a verb only when the
+ * token carries its derived name (`user.update`, `user.{id}.update`; {@see CredentialScopeGate::superuserMay()}), so a
+ * Root token scoped to `entity.view` cannot edit, delete or log in as another user. The self arm and the staff
+ * (`entitlement:os.operate`) arm are not permission checks and are unchanged; a session or a `*` token is unchanged.
  */
 class UserPolicy
 {
@@ -52,7 +58,7 @@ class UserPolicy
     {
         // The staff lookup reads the actor's realm grants; an actor that cannot answer it (no team relation) is reported
         // and is not staff, rather than turning a list or its filter schema into a 500.
-        return $actor !== null && (BeamAccounts::isRoot($actor)
+        return $actor !== null && ($this->root($actor, 'viewAny')
             || rescue(fn () => Gate::forUser($actor)->allows('entitlement:os.operate'), false));
     }
 
@@ -62,12 +68,12 @@ class UserPolicy
      */
     public function create(?Authenticatable $actor): bool
     {
-        return BeamAccounts::isRoot($actor) && app(AccountDoors::class)->policy()->operator;
+        return $this->root($actor, 'create') && app(AccountDoors::class)->policy()->operator;
     }
 
     public function update(?Authenticatable $actor, Model $user): bool
     {
-        return $this->isSelf($actor, $user) || BeamAccounts::isRoot($actor);
+        return $this->isSelf($actor, $user) || $this->root($actor, 'update', $user);
     }
 
     /**
@@ -78,7 +84,7 @@ class UserPolicy
      */
     public function delete(?Authenticatable $actor, Model $user): bool
     {
-        return $this->isSelf($actor, $user) || BeamAccounts::isRoot($actor);
+        return $this->isSelf($actor, $user) || $this->root($actor, 'delete', $user);
     }
 
     /**
@@ -88,7 +94,7 @@ class UserPolicy
      */
     public function loginAs(?Authenticatable $actor, Model $user): bool
     {
-        return BeamAccounts::isRoot($actor);
+        return $this->root($actor, 'loginAs', $user);
     }
 
     /**
@@ -127,6 +133,13 @@ class UserPolicy
         }
 
         return ! Gate::forUser($user)->allows('entitlement:os.operate');
+    }
+
+    /** The central Root, narrowed under a scoped token to the verb's derived name (gap-assessment-build 39). */
+    private function root(?Authenticatable $actor, string $verb, ?Model $user = null): bool
+    {
+        return BeamAccounts::isRoot($actor)
+            && app(CredentialScopeGate::class)->superuserMay($actor, $verb, $user ?? BeamAccounts::userModel());
     }
 
     /**

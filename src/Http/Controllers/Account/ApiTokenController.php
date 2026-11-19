@@ -25,6 +25,7 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Keys\TokenLastFour;
 use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
+use Splicewire\Beam\Authorization\CredentialScopeGate;
 
 /**
  * The ACCOUNT-TIER personal-access-token lifecycle — the "host REST survivor" half of the tokens
@@ -194,11 +195,15 @@ class ApiTokenController extends Controller
             return response()->json((new AccountErrorData(AccountError::RotateArchived->message(), AccountError::RotateArchived->code()))->toArray(), 422);
         }
 
-        // Same name + scope, carried verbatim: the scope was clamped when first minted.
+        // Same name + scope, carried verbatim: the scope was clamped when first minted. A scoped acting token may not
+        // replace a token wider than itself (owner ruling 2026-11-19).
+        $abilities = $old->abilities ?: ['*'];
+        $this->assertWithinActingToken(in_array('*', $abilities, true) ? null : array_values($abilities));
+
         [$new, $plainText] = $this->mint(
             $this->tokenOwner($request),
             (string) $old->name,
-            $old->abilities ?: ['*'],
+            $abilities,
             $this->expiresAtFor($this->optional($input->expiresInDays)),
         );
 
@@ -495,8 +500,11 @@ class ApiTokenController extends Controller
     protected function clampAbilities(Authenticatable $user, ?array $requested): array
     {
         $requested = array_values(array_unique($requested ?? ['*']));
+        $unscoped = $requested === [] || in_array('*', $requested, true);
 
-        if ($requested === [] || in_array('*', $requested, true)) {
+        $this->assertWithinActingToken($unscoped ? null : $requested);
+
+        if ($unscoped) {
             return ['*'];
         }
 
@@ -507,6 +515,22 @@ class ApiTokenController extends Controller
         }
 
         return $requested;
+    }
+
+    /**
+     * Owner ruling 2026-11-19 (standwell gap-assessment-build 39): a token minted or replaced by a call that is itself
+     * authenticated with a scoped token can carry no ability outside the acting token's abilities. More is refused with
+     * a coded 422, never trimmed; `null` asks for an unscoped (`*`) token. A session or a `*` acting token is unchanged.
+     *
+     * @param  array<int, string>|null  $abilities
+     */
+    protected function assertWithinActingToken(?array $abilities): void
+    {
+        $beyond = app(CredentialScopeGate::class)->beyondActingCredential($abilities);
+
+        if ($beyond !== []) {
+            throw \Splicewire\Beam\Localization\CodedValidationException::for('abilities', AccountError::TokenAbilitiesBeyondActingToken, ['abilities' => implode(', ', $beyond)]);
+        }
     }
 
     /**

@@ -107,6 +107,9 @@ enum AccountError: string implements CodedError
     #[Message('A token can only be scoped to permissions you hold. Not held: :permissions.')]
     case TokenAbilities = 'token_abilities';
 
+    #[Message('A token made with a scoped token can only carry what that token carries. Not carried: :abilities.')]
+    case TokenAbilitiesBeyondActingToken = 'token_abilities_beyond_acting_token';
+
     #[Message('The :role role cannot be assigned by invitation.')]
     case RoleNotInvitable = 'role_not_invitable';
 
