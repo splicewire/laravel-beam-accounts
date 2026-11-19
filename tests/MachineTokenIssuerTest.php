@@ -299,6 +299,27 @@ it('refuses a delegated request that names abilities, and one whose target does 
         ->toBe('token_target_unresolved');
 });
 
+it('refuses a delegated kind whose target resolves to the actor, under a scoped token, and writes nothing (codex cs03 #1)', function () {
+    config(['beam.accounts.tokens.kinds.cs03-self' => Cs03SelfKind::class]);
+    cs03ActingScope(['cs03-self:issue']);
+
+    expect(cs03RefusalCode(fn () => $this->issuer->issue('cs03-self', new TokenIssuance(actor: $this->owner, name: 'self'))))
+        ->toBe('token_target_is_actor')
+        ->and(BeamAccounts::tokenModel()::count())->toBe(0);
+});
+
+it('refuses a caller-named tenant when the kind resolves no tenant of its own, even one the actor owns (codex cs03 #2)', function () {
+    cs03DeclareSatelliteKind();
+    $noCurrent = User::create(['name' => 'NoCurrent', 'email' => 'cs03-nocurrent@example.test', 'password' => 'x']);
+    $owned = Team::create(['user_id' => $noCurrent->id, 'name' => 'Owned', 'personal_team' => false]);
+    Membership::create(['team_id' => $owned->id, 'user_id' => $noCurrent->id, 'role' => Role::Owner->value]);
+
+    expect($noCurrent->fresh()->currentTeam)->toBeNull()
+        ->and(cs03RefusalCode(fn () => $this->issuer->issue('cs03-satellite', new TokenIssuance(actor: $noCurrent->fresh(), name: 's', subject: $owned))))
+        ->toBe('token_target_mismatch')
+        ->and(BeamAccounts::tokenModel()::count())->toBe(0);
+});
+
 // ── the widest set and its decision-name seam ─────────────────────────────────────────────────
 
 it('computes the widest set as the permission snapshot plus every registered decision-name source, never `*`', function () {
@@ -370,6 +391,35 @@ class Cs03SatelliteKind extends DelegatedTokenKind
     public function abilities(Model $target, mixed $subject): array
     {
         return ['widget.view', 'widget.update'];
+    }
+}
+
+/** A delegated kind whose resolver (wrongly) answers the actor: the issuer must refuse it. */
+class Cs03SelfKind extends DelegatedTokenKind
+{
+    public function issuanceAbility(): string
+    {
+        return 'cs03-self:issue';
+    }
+
+    public function boundSubject(?Authenticatable $actor): mixed
+    {
+        return $actor?->currentTeam;
+    }
+
+    public function resolveTarget(?Authenticatable $actor, mixed $subject): ?Model
+    {
+        return $actor;
+    }
+
+    public function authorizes(?Authenticatable $actor, Model $target, mixed $subject): bool
+    {
+        return true;
+    }
+
+    public function abilities(Model $target, mixed $subject): array
+    {
+        return ['cs03.read', 'cs03.write', 'widget.delete'];
     }
 }
 

@@ -14,10 +14,10 @@ use Illuminate\Database\Eloquent\Model;
  * instead. The issuer, in order:
  *
  *  1. requires {@see issuanceAbility()} on the acting credential when that credential is scoped;
- *  2. asks {@see boundSubject()} what the kind binds to (the current tenant, say) and refuses a request that names
- *     a different subject;
+ *  2. asks {@see boundSubject()} what the kind binds to from its own context (the current tenant, say) and
+ *     refuses a request that names any other subject, or names one when the kind resolves none;
  *  3. resolves the token's principal with {@see resolveTarget()}, and refuses a request that names a different one,
- *     so the caller never picks the principal or the tenant;
+ *     and a target that is the actor itself, so the caller never picks the principal or the tenant;
  *  4. checks {@see authorizes()}: the actor's live authority over that resolved principal;
  *  5. mints {@see abilities()}, the kind's declared set. A request that names abilities is refused.
  */
@@ -27,15 +27,14 @@ abstract class DelegatedTokenKind extends TokenKind
     abstract public function issuanceAbility(): string;
 
     /**
-     * The subject this kind binds to from its own context (the current tenant, the grant in hand), or null when
-     * it binds to none and takes the request's subject as it is.
+     * The subject this kind binds to, resolved from its OWN context (the current tenant, the grant in hand, the
+     * tenant an operator command is bound to), or null when that context is missing.
      *
-     * When this returns a subject and the request names another, the issuer refuses (`token_target_mismatch`).
+     * Required, with no default: the issuer resolves the target only from this. A request's subject is a claim
+     * checked against it, and is refused (`token_target_mismatch`) when it names another subject or when this
+     * returns null; it is never used in its place.
      */
-    public function boundSubject(?Authenticatable $actor): mixed
-    {
-        return null;
-    }
+    abstract public function boundSubject(?Authenticatable $actor): mixed;
 
     /**
      * The principal the token is for, resolved by the kind from the subject, or null when there is none (refused

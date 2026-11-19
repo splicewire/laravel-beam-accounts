@@ -47,8 +47,8 @@ A **delegated** kind (`DelegatedTokenKind`) mints for a principal the kind resol
 | method | what it declares |
 |---|---|
 | `issuanceAbility()` | the ability a scoped acting credential must carry (`token_issuance_ability_missing`) |
-| `boundSubject($actor)` | the subject it binds to, such as the current tenant; a request naming another is `token_target_mismatch` |
-| `resolveTarget($actor, $subject)` | the token's principal; null is `token_target_unresolved`, and a request naming another is `token_target_mismatch` |
+| `boundSubject($actor)` | the subject it binds to from its own context, such as the current tenant (required). A request naming another subject, or naming one when this is null, is `token_target_mismatch`; the request's subject is never used instead |
+| `resolveTarget($actor, $subject)` | the token's principal; null is `token_target_unresolved`, a request naming another is `token_target_mismatch`, and the actor itself is `token_target_is_actor` |
 | `authorizes($actor, $target, $subject)` | the actor's live authority over the target (`token_target_no_authority`) |
 | `abilities($target, $subject)` | the declared set, exactly what the consumer calls; a request naming abilities is `token_kind_declares_abilities` |
 

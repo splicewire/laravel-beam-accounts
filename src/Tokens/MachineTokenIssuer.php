@@ -22,8 +22,8 @@ use Splicewire\Beam\Localization\CodedValidationException;
  *  - an undeclared kind, and `*` from any kind (C7);
  *  - for a same-principal kind under a scoped acting credential, any ability that credential lacks (C6);
  *  - for a delegated kind, a scoped acting credential without the kind's issuance ability, a request naming a
- *    principal or subject other than the one the kind resolves, and an actor without live authority over the
- *    resolved principal (C6).
+ *    principal or subject other than the one the kind resolves (or any subject when the kind resolves none), a
+ *    target that is the actor itself, and an actor without live authority over the resolved principal (C6).
  *
  * Every refusal is coded ({@see AccountError}); nothing is trimmed. The row is written through
  * {@see BeamAccounts::tokenModel()}, the model the Tokens page lists, with the kind recorded in its `kind` column.
@@ -131,20 +131,29 @@ class MachineTokenIssuer
             ['kind' => $kind, 'ability' => $declared->issuanceAbility()],
         );
 
-        $bound = $declared->boundSubject($actor);
+        // The subject is the kind's own context and nothing else. A request's subject is only a claim checked against
+        // it: when the kind resolves none, a named subject is refused, never substituted (codex cs03 finding 2).
+        $subject = $declared->boundSubject($actor);
 
         AccountError::TokenTargetMismatch->abortIf(
-            $bound !== null && $request->subject !== null && ! $this->same($bound, $request->subject),
+            $request->subject !== null && ($subject === null || ! $this->same($subject, $request->subject)),
             403,
             ['kind' => $kind],
         );
 
-        $subject = $bound ?? $request->subject;
         $target = $declared->resolveTarget($actor, $subject);
 
         AccountError::TokenTargetUnresolved->abortIf($target === null, 422, ['kind' => $kind]);
         AccountError::TokenTargetMismatch->abortIf(
             $request->principal !== null && ! $request->principal->is($target),
+            403,
+            ['kind' => $kind],
+        );
+        // A delegated kind is for ANOTHER principal. One that resolves to the actor would mint a same-principal token
+        // past the acting-token cap, so it is refused (codex cs03 finding 1); the actor's own token is a
+        // same-principal kind.
+        AccountError::TokenTargetIsActor->abortIf(
+            $actor instanceof Model && $actor->getMorphClass() === $target->getMorphClass() && (string) $actor->getKey() === (string) $target->getKey(),
             403,
             ['kind' => $kind],
         );

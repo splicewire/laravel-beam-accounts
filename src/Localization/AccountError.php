@@ -136,6 +136,9 @@ enum AccountError: string implements CodedError
     #[Message('A :kind token is issued only for the principal and tenant its kind resolves.')]
     case TokenTargetMismatch = 'token_target_mismatch';
 
+    #[Message('A :kind token is for another principal; your own token is a personal access token.')]
+    case TokenTargetIsActor = 'token_target_is_actor';
+
     #[Message('You do not have authority to issue a :kind token for that principal.')]
     case TokenTargetNoAuthority = 'token_target_no_authority';
 
