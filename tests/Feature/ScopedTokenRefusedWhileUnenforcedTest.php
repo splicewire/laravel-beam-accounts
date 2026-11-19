@@ -128,13 +128,22 @@ it('refuses a scoped or empty-ability token even when a preceding callback turns
 });
 
 it('composes a callback a host installs after the package booted under the veto, once the app has booted', function () {
+    // An application still booting: the package's link runs, then a host's own boot replaces Sanctum's single callback
+    // slot, then the app finishes booting and the booted hook installs the veto over it again.
+    $booting = new Illuminate\Foundation\Application(base_path());
+    // The constructor makes itself the global container; the request below runs on the test app.
+    Illuminate\Container\Container::setInstance($this->app);
+    Illuminate\Support\Facades\Facade::setFacadeApplication($this->app);
+    $provider = new BeamAccountsServiceProvider($booting);
     Sanctum::$accessTokenAuthenticationCallback = null;
-    bootEnforcement();
-    // A host's own boot replaces Sanctum's single callback slot...
+    $method = new ReflectionMethod($provider, 'bootApiGuardEnforcement');
+    $method->setAccessible(true);
+    $method->invoke($provider);
     Sanctum::authenticateAccessTokensUsing(fn ($token, bool $isValid) => true);
-    // ...and the booted hook installs the veto over it again.
-    TokenAbilitiesScopeResolver::refuseScopedTokensWhileUnenforced();
-    $user = enforcementUser();
+    $booting->boot();
 
+    $user = enforcementUser();
     $this->withToken($user->createToken('late', ['entity.view'])->plainTextToken)->getJson('/api/v1/cs02/whoami')->assertUnauthorized();
+    app('auth')->forgetGuards();
+    $this->withToken($user->createToken('late-star', ['*'], now()->subMinute())->plainTextToken)->getJson('/api/v1/cs02/whoami')->assertOk();
 });
