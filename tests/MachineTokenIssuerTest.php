@@ -386,6 +386,47 @@ it('applies every delegated rule to an operation kind: issuance ability, enforce
         ->toBe('token_issuer_enforcement_off');
 });
 
+// ── one principal in either representation (codex cs04 #1) ─────────────────────────────────
+
+it('refuses a delegated kind whose target is the actor\'s central user when the actor arrives as its tenant mirror', function () {
+    config(['beam.accounts.tokens.kinds.cs04-central' => Cs04CentralKind::class]);
+    cs03ActingScope(['cs04-central:issue']);
+    $mirror = Cs04MirrorUser::query()->findOrFail($this->owner->getKey());
+
+    expect($mirror)->not->toBeInstanceOf(User::class)
+        ->and(cs03RefusalCode(fn () => $this->issuer->issue('cs04-central', new TokenIssuance(actor: $mirror, name: 'loop'))))
+        ->toBe('token_target_is_actor')
+        ->and(BeamAccounts::tokenModel()::count())->toBe(0);
+});
+
+it('owns a personal token by the central user and caps it at the acting scope when the actor is a mirror', function () {
+    cs03ActingScope(['cs03.read']);
+    $mirror = Cs04MirrorUser::query()->findOrFail($this->owner->getKey());
+
+    expect(cs03RefusalCode(fn () => $this->issuer->issue('personal-access-token', cs03Pat($mirror, ['cs03.write']))))
+        ->toBe('token_abilities_beyond_acting_token');
+
+    $issued = $this->issuer->issue('personal-access-token', cs03Pat($mirror, ['cs03.read']));
+    expect($issued->token->tokenable_type)->toBe($this->owner->getMorphClass())
+        ->and((string) $issued->token->tokenable_id)->toBe((string) $this->owner->getKey());
+});
+
+it('refuses before any write a kind the acting credential cannot issue (authorizeIssuance, codex cs04 #4)', function () {
+    cs03DeclareSatelliteKind();
+    cs03ActingScope(['widget.view']);
+
+    expect(cs03RefusalCode(fn () => $this->issuer->authorizeIssuance('cs03-satellite')))->toBe('token_issuance_ability_missing')
+        ->and(cs03RefusalCode(fn () => $this->issuer->authorizeIssuance('cs04-nothing')))->toBe('token_kind_undeclared');
+
+    cs03ActingScope(['cs03-satellite:issue']);
+    $this->issuer->authorizeIssuance('cs03-satellite');
+    cs03ActingScope(null);
+    $this->issuer->authorizeIssuance('cs03-satellite');
+
+    config(['beam.accounts.api.scope_enforcement' => false]);
+    expect(cs03RefusalCode(fn () => $this->issuer->authorizeIssuance('cs03-satellite')))->toBe('token_issuer_enforcement_off');
+});
+
 // ── the widest set and its decision-name seam ─────────────────────────────────────────────────
 
 it('computes the widest set as the permission snapshot plus every registered decision-name source, never `*`', function () {
@@ -548,6 +589,52 @@ class Cs04WidgetPolicy
     public function publish(Authenticatable $user, PolicedWidget $widget): bool
     {
         return true;
+    }
+}
+
+/** A tenant-side mirror of a central user: another model class over the same key (tower's TenantUser shape). */
+class Cs04MirrorUser extends Illuminate\Foundation\Auth\User
+{
+    protected $table = 'users';
+
+    protected $keyType = 'string';
+
+    public $incrementing = false;
+
+    protected $guarded = [];
+
+    public function getMorphClass()
+    {
+        return 'tenant_user';
+    }
+}
+
+/** A delegated kind whose target is the actor's central user (the engine loopback's shape for the sync identity). */
+class Cs04CentralKind extends DelegatedTokenKind
+{
+    public function issuanceAbility(): string
+    {
+        return 'cs04-central:issue';
+    }
+
+    public function boundSubject(?Authenticatable $actor): mixed
+    {
+        return 'central';
+    }
+
+    public function resolveTarget(?Authenticatable $actor, mixed $subject): ?Model
+    {
+        return $actor === null ? null : User::query()->find($actor->getAuthIdentifier());
+    }
+
+    public function authorizes(?Authenticatable $actor, Model $target, mixed $subject): bool
+    {
+        return true;
+    }
+
+    public function abilities(Model $target, mixed $subject): array
+    {
+        return ['cs03.read', 'cs03.write'];
     }
 }
 

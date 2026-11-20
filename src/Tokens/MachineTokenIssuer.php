@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Tokens;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
@@ -45,7 +46,32 @@ class MachineTokenIssuer
 
         AccountError::TokenKindUndeclared->abortIf($declared === null, 422, ['kind' => $kind]);
 
-        return $this->issueDeclared($kind, $declared, $request);
+        return $this->issueDeclared($kind, $declared, $this->canonical($request));
+    }
+
+    /**
+     * Refuse, before the caller changes anything, an issuance of `$kind` that would be refused for its credential alone:
+     * enforcement off, an undeclared kind, or (for a delegated kind) a scoped acting credential without the kind's
+     * issuance ability. A caller whose issuance follows writes of its own (a broker grant, an entitlement) calls this
+     * first, so a refusal leaves its state intact (codex cs04 #4). The target and authority checks still run at issue.
+     */
+    public function authorizeIssuance(string $kind): void
+    {
+        AccountError::TokenIssuerEnforcementOff->abortUnless((bool) config('beam.accounts.api.scope_enforcement', false), 403, ['kind' => $kind]);
+
+        $declared = $this->kinds->kind($kind);
+
+        AccountError::TokenKindUndeclared->abortIf($declared === null, 422, ['kind' => $kind]);
+
+        if ($declared instanceof DelegatedTokenKind) {
+            $scope = app(CredentialScopeResolver::class)->resolve();
+
+            AccountError::TokenIssuanceAbilityMissing->abortIf(
+                $scope !== null && ! in_array($declared->issuanceAbility(), $scope, true),
+                403,
+                ['kind' => $kind, 'ability' => $declared->issuanceAbility()],
+            );
+        }
     }
 
     /**
@@ -63,7 +89,42 @@ class MachineTokenIssuer
         AccountError::TokenKindNotOperationBound->abortUnless($declared instanceof OperationTokenKind, 422, ['kind' => $kind]);
 
         /** @var OperationTokenKind $declared */
-        return $this->issueDeclared($kind, $declared->forOperation($operation), $request);
+        return $this->issueDeclared($kind, $declared->forOperation($operation), $this->canonical($request));
+    }
+
+    /**
+     * The request with its actor as the CREDENTIAL principal (codex cs04 #1). A tenanted host authenticates a central
+     * `User` and then swaps in its in-schema mirror (tower `ResolveTenantUser` → a `TenantUser` sharing the user's key),
+     * so the same identity reaches the issuer in two model shapes. Every rule that compares the actor with a principal
+     * — the same-principal cap's owner, the delegated kind's target-is-actor refusal, a kind's authority check — must see
+     * one shape, so an actor that is not the host's user model (`auth.providers.users.model`) but whose key names a
+     * user of it is replaced by that user. Anything else (a console's null actor, a non-user tokenable) is unchanged.
+     */
+    private function canonical(TokenIssuance $request): TokenIssuance
+    {
+        $actor = $request->actor;
+        $model = config('auth.providers.users.model');
+
+        if (! $actor instanceof Model || ! is_string($model) || ! is_subclass_of($model, Model::class) || $actor instanceof $model) {
+            return $request;
+        }
+
+        $central = $model::query()->find($actor->getAuthIdentifier());
+
+        if (! $central instanceof Authenticatable) {
+            return $request;
+        }
+
+        return new TokenIssuance(
+            actor: $central,
+            name: $request->name,
+            abilities: $request->abilities,
+            expiresAt: $request->expiresAt,
+            subject: $request->subject,
+            principal: $request->principal,
+            deterministicId: $request->deterministicId,
+            deterministicPlaintext: $request->deterministicPlaintext,
+        );
     }
 
     private function issueDeclared(string $kind, TokenKind $declared, TokenIssuance $request): IssuedToken
@@ -90,6 +151,7 @@ class MachineTokenIssuer
         AccountError::TokenKindUndeclared->abortIf($declared === null, 422, ['kind' => $kind === '' ? '(none)' : $kind]);
         AccountError::TokenKindNotRotatable->abortIf($declared instanceof DelegatedTokenKind, 422, ['kind' => $kind]);
 
+        $request = $this->canonical($request);
         $actor = $request->actor;
         $owned = $actor instanceof Model
             && (string) $old->getAttribute('tokenable_type') === $actor->getMorphClass()

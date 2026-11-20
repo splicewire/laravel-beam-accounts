@@ -65,6 +65,12 @@ with `deterministicId` and `deterministicPlaintext`; the row is upserted under t
 `splicewire:beam:accounts:mint-key {kind} {id} {plaintext}` (gated on `beam.accounts.keys.enabled`) issues one for
 a declared kind that admits a console issuance.
 
+The actor is the **credential principal**: an actor that is not the host's user model but shares the key of one of its
+users (a tenant mirror such as tower's `TenantUser`) is read as that user, so the same-principal cap and the delegated
+`token_target_is_actor` refusal see one identity in either shape. A caller that writes state of its own before issuing
+(a broker grant) calls `authorizeIssuance($kind)` first: the credential-only refusals (enforcement off, undeclared kind,
+missing issuance ability) then land before anything changed.
+
 Nothing is issued while `beam.accounts.api.scope_enforcement` is off (`token_issuer_enforcement_off`).
 
 ## Who reads it
