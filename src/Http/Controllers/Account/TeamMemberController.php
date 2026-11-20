@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Rushing\LaravelDataSchemasScribe\Attributes\ResponseFromData;
+use Splicewire\Beam\Accounts\Authorization\TeamMemberDecisions;
 use Splicewire\Beam\Accounts\Contracts\TeamContract;
 use Splicewire\Beam\Accounts\Data\AccountErrorData;
 use Splicewire\Beam\Accounts\Data\MembershipData;
@@ -58,7 +59,7 @@ class TeamMemberController extends Controller
     #[ResponseFromData(MembershipData::class)]
     public function index(Request $request): JsonResponse
     {
-        $this->team($request);
+        TeamMemberDecisions::authorize($request->user(), TeamMemberDecisions::VIEW, $this->team($request));
 
         return response()->json(['data' => $this->roster()]);
     }
@@ -73,7 +74,7 @@ class TeamMemberController extends Controller
     #[ResponseFromData(RoleOptionsData::class)]
     public function roles(Request $request): JsonResponse
     {
-        $this->team($request);
+        TeamMemberDecisions::authorize($request->user(), TeamMemberDecisions::VIEW, $this->team($request));
 
         return response()->json(['data' => RoleOptionsData::current()]);
     }
@@ -162,9 +163,15 @@ class TeamMemberController extends Controller
         return $team;
     }
 
+    /**
+     * The owner check is made outside the Gate, so it also asks the scope for `manageMembers` on the team (credential-scope
+     * 07 R2; {@see TeamMemberDecisions}); the membership check in {@see team()} is the principal half of the reads, which
+     * ask `viewMembers`.
+     */
     protected function assertOwner(TeamContract $team, ?Authenticatable $user): void
     {
         AccountError::TeamOwnerRequired->abortUnless($user !== null && $team->memberRole($user) === Role::Owner, 403);
+        TeamMemberDecisions::authorize($user, TeamMemberDecisions::MANAGE, $team);
     }
 
     /** One member of this team by their opaque id, or null. */

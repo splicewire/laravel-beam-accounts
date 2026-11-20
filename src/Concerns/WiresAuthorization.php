@@ -4,16 +4,19 @@ namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
+use Rushing\PermissionCascade\Authorization\DecisionNames;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Rushing\PermissionCascade\Support\CascadePolicyRegistrar;
 use Rushing\Popcorn\Concerns\Chained;
 use Splicewire\Beam\Accounts\Authorization\InvitationPolicy;
 use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
+use Splicewire\Beam\Accounts\Authorization\TeamMemberDecisions;
 use Splicewire\Beam\Accounts\Authorization\TokenPolicy;
 use Splicewire\Beam\Accounts\Authorization\UserPolicy;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Http\Controllers\Api\V1\PasskeyController;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Realm\RealmRegistry;
@@ -43,6 +46,11 @@ trait WiresAuthorization
     {
         Gate::define('manageMembers', [MembershipPolicy::class, 'manageMembers']);
         Gate::define('manageInvitations', [MembershipPolicy::class, 'manageInvitations']);
+
+        // credential-scope 07: the names this package's checks OUTSIDE the Gate ask a scoped token for (the passkey
+        // verbs, the team roster's view and manage decisions), offered to the widest token set so a principal who can
+        // reach them can still mint a token that carries them. Offering never grants.
+        app(DecisionNames::class)->offer(fn (): array => [...PasskeyController::NAMES, ...TeamMemberDecisions::offered()]);
 
         // The same decision subjected onto ONE invitation — what a particle operation on an
         // `Invitation` declares, since `ability:` is checked against the subject the operation

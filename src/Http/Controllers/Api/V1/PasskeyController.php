@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Support\WebAuthn;
 use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
+use Rushing\PermissionCascade\Authorization\CredentialScopeGate;
 use Splicewire\Beam\Accounts\Data\PasskeyRegisterInputData;
 use Splicewire\Beam\Accounts\Data\PasskeyRenameInputData;
 use Splicewire\Beam\Accounts\Localization\AccountError;
@@ -42,6 +43,7 @@ class PasskeyController extends Controller
     /** Attestation challenge for the current user against the central RP. */
     public function registrationOptions(Request $request, PasskeyChallengeStore $store, PasskeyAuthenticator $authenticator): ResponseBody
     {
+        self::authorizeScope($request, 'create');
         $options = $authenticator->registrationOptions($request->user());
         $handle = $store->put($options, PublicKeyCredentialCreationOptions::class);
 
@@ -64,6 +66,7 @@ class PasskeyController extends Controller
     {
         // Hydrated below any gate, never injected as a typed parameter — injection validates during
         // container resolution and would put 422 ahead of authorization (ticket 27's measured trap).
+        self::authorizeScope($request, 'create');
         $input = PasskeyRegisterInputData::validateAndCreate($request);
 
         $options = $this->pullOptions($store, $input->handle, PublicKeyCredentialCreationOptions::class);
@@ -85,6 +88,7 @@ class PasskeyController extends Controller
     /** The current user's credentials, name + when last used. */
     public function index(Request $request): ResponseBody
     {
+        self::authorizeScope($request, 'view');
         $passkeys = $request->user()->passkeys()->latest()->get()
             ->map(fn ($passkey) => $this->present($passkey))
             ->all();
@@ -102,6 +106,7 @@ class PasskeyController extends Controller
         // user-scoped, so enforce ownership here — a caller may only rename their own credential
         // (a missing id 404s in the binding; an other-owned id 404s here, never leaking it).
         abort_unless((string) $passkey->user_id === (string) $request->user()->getAuthIdentifier(), 404);
+        self::authorizeScope($request, 'update', $passkey);
 
         // Below the ownership gate, so a caller who does not own the credential still gets 404 rather
         // than a 422 that would confirm the id exists and leak the field vocabulary.
@@ -119,6 +124,7 @@ class PasskeyController extends Controller
         // update() — gate ownership explicitly. Prior `int $passkey` typing 500'd here because
         // the bound model was passed to an int parameter (latent: no test hit an authed delete).
         abort_unless((string) $passkey->user_id === (string) $request->user()->getAuthIdentifier(), 404);
+        self::authorizeScope($request, 'delete', $passkey);
 
         // Snapshot the row before deletion so the data slot carries the removed credential's
         // final state (the destroy-returns-the-resource envelope rule), matching PasskeyData.
@@ -127,6 +133,30 @@ class PasskeyController extends Controller
         $passkey->delete();
 
         return ResponseBody::from(['message' => __('beam-accounts::messages.passkey_removed'), 'data' => $snapshot])->deleted();
+    }
+
+    /**
+     * The names a scoped credential carries for a passkey verb (fleet ADR 0006 C2; credential-scope 07 R2): the
+     * ownership checks here are made outside the Gate, so each verb asks the scope for `passkey.{verb}` (or
+     * `passkey.{id}.{verb}` for one credential) after the principal half. Offered to the widest token set by
+     * {@see self::NAMES}; a session or a `*` token is unchanged.
+     *
+     * @return list<string>
+     */
+    public static function decisionNames(string $verb, ?Passkey $passkey = null): array
+    {
+        return array_values(array_filter([
+            "passkey.{$verb}",
+            $passkey?->getKey() !== null ? "passkey.{$passkey->getKey()}.{$verb}" : null,
+        ]));
+    }
+
+    /** The class-level names this controller asks, offered to the widest set (`DecisionNames::offer()`). */
+    public const NAMES = ['passkey.view', 'passkey.create', 'passkey.update', 'passkey.delete'];
+
+    private static function authorizeScope(Request $request, string $verb, ?Passkey $passkey = null): void
+    {
+        app(CredentialScopeGate::class)->authorizeCarried($request->user(), "passkey.{$verb}", self::decisionNames($verb, $passkey));
     }
 
     /**

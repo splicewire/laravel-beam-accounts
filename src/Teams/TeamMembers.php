@@ -6,6 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
+use Splicewire\Beam\Accounts\Authorization\TeamMemberDecisions;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
@@ -104,5 +105,8 @@ class TeamMembers
         if (! $isOwner) {
             throw new \Splicewire\Beam\Accounts\Localization\AccountAuthorizationException(AccountError::TeamManageRequired);
         }
+
+        // An owner check outside the Gate: a scoped credential also carries `manageMembers`' names (credential-scope 07).
+        TeamMemberDecisions::authorize($actor, TeamMemberDecisions::MANAGE, $team);
     }
 }

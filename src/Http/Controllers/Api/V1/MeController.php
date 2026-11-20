@@ -4,7 +4,11 @@ namespace Splicewire\Beam\Accounts\Http\Controllers\Api\V1;
 
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
+use Rushing\PermissionCascade\Authorization\CredentialScopeGate;
+use Rushing\PermissionCascade\Facades\PermissionNamer;
 use Splicewire\Beam\Accounts\Data\AuthUserData;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Authorization\ResourceReadGuard;
 use Splicewire\Beam\Http\Particle\ParticleController;
 use Splicewire\Beam\Particle\Contribution\ResourceContribution;
 use Splicewire\Beam\Particle\ParticleResource;
@@ -31,6 +35,11 @@ use Splicewire\Beam\Particle\ParticleResource;
  * and there is no id to forge (ticket 16 §A6). A policy check here would additionally make `/me`
  * depend on whether a host happens to have registered a `UserPolicy@view`, which most do not.
  *
+ * **Under a scoped credential the self-read is still a read** (fleet ADR 0006 C2, Option 3; credential-scope 07 R5).
+ * This projection never reaches the ResourceReadGuard or a policy, so the scope is asked here, before projecting: the
+ * token carries `me.view`, or the configured user model's `user.view` / `user.{id}.view` ({@see decisionNames()}), or it is refused with the coded scope refusal. A session or a `*` token is
+ * unchanged.
+ *
  * Permission-cache freshness belongs to the identity projection: {@see AuthUserData::fromUser()}
  * checks central Root membership through BeamAccounts::isRoot(), which refreshes the registrar and
  * restores its current team. Both canonical Frame reads and this subject resolver use that projection.
@@ -54,7 +63,11 @@ class MeController extends ParticleController
      */
     public function show(Request $request, string $id = ''): Responsable
     {
-        return $this->respond($this->particleResource($request), $request->user(), $request);
+        $resource = $this->particleResource($request);
+        app(CredentialScopeGate::class)->authorizeCarried($request->user(), ResourceReadGuard::SCOPE_DECISION.':'.static::KEY,
+            self::decisionNames($request->user()));
+
+        return $this->respond($resource, $request->user(), $request);
     }
 
     /**
@@ -64,6 +77,24 @@ class MeController extends ParticleController
      * no `{id}` and no index — so there is no `_particle` default for the inherited resolver to read.
      * Naming the key here is the override the base class's own docblock invites for exactly this case.
      */
+    /**
+     * The names that admit the self-read: the resource's `me.view`, or the configured user model's `view`, class-level
+     * or for this user's own id, as `UserPolicy::view` derives them for the central user of record (a tenant mirror
+     * shares its key; `PATCH /me` names its write the same way).
+     *
+     * @return list<string>
+     */
+    public static function decisionNames(mixed $user): array
+    {
+        $model = BeamAccounts::userModel();
+
+        return [
+            static::KEY.'.view',
+            PermissionNamer::assemble($model, 'view'),
+            PermissionNamer::assemble($model, (string) $user->getAuthIdentifier(), 'view'),
+        ];
+    }
+
     protected function particleResource(Request $request): ParticleResource
     {
         return $this->registry->get(static::KEY);

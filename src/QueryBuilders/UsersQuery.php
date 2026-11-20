@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\QueryBuilders;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
+use Rushing\PermissionCascade\Authorization\CredentialScopeGate;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Membership;
 
@@ -39,7 +40,10 @@ class UsersQuery
             return $query->whereRaw('1 = 0');
         }
 
-        if (BeamAccounts::isRoot($user)) {
+        // Root sees every user: a Root grant, so under a scoped credential it answers only for the strict name
+        // `user.view` (fleet ADR 0006 C3; credential-scope 07 R2), else Root falls through to the shared-teams scope below.
+        if (BeamAccounts::isRoot($user)
+            && app(CredentialScopeGate::class)->superuserMay($user, 'viewAny', $query->getModel()::class)) {
             return $query;
         }
 
