@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts;
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -38,6 +39,7 @@ use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\EntitlementComposer;
 use Splicewire\Beam\Accounts\Entitlements\ModuleEntitlementResolver;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
+use Splicewire\Beam\Accounts\Flows\AccountFlows;
 use Splicewire\Beam\Accounts\Models\AccessGrant;
 use Splicewire\Beam\Accounts\Oidc\IdentityTokenMinter;
 use Splicewire\Beam\Accounts\Oidc\SigningKey;
@@ -45,7 +47,13 @@ use Splicewire\Beam\Accounts\Support\IdentityAccountShellProvider;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Doctor\BeamDoctorManifest;
 use Splicewire\Beam\Entitlements\EntitlementKeyUniverse;
+use Splicewire\Beam\Flows\FlowCatalog;
 use Splicewire\Beam\Install\BeamInstallManifest;
+use Splicewire\Beam\Localization\Contracts\PersonLocaleSource;
+use Splicewire\Beam\Nav\NavAudience;
+use Splicewire\Beam\Nav\NavSection;
+use Splicewire\Beam\Nav\NavSectionRegistry;
+use Splicewire\Beam\Particle\ParticleOperation;
 use Splicewire\Beam\Realm\RealmRegistry;
 
 /**
@@ -140,7 +148,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
     /**
      * The two independently-gated publish estates, keyed by the config-key suffix that gates each.
      *
-     * PUBLIC and static because {@see \Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit} reads
+     * PUBLIC and static because {@see PublishGateCoverageAudit} reads
      * the same lists to verify the claim a host makes by turning a gate off ("this estate is already
      * committed on my disk"). Two copies of these names would be two copies that drift, and the whole
      * point of the audit is that a second statement of the estate went stale without anyone noticing —
@@ -270,7 +278,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
      * tower outage and told it to do one of two things it must not do.
      *
      * So the estate's own idiom applies — an omission and a decision must not be spelled identically
-     * ({@see \Splicewire\Beam\Particle\ParticleOperation}'s `ability:`/`input:`/`abilityModel:`, all
+     * ({@see ParticleOperation}'s `ability:`/`input:`/`abilityModel:`, all
      * three-state for exactly this reason). One slot, three values:
      *
      *   - **`true`** (default) — publish this estate's stubs onto the host's disk;
@@ -321,7 +329,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
      *
      * So a reader that needs "are these tables part of this host" must NOT read `publishesEstateNamed()`:
      * that collapses `false` into `'absent'` and treats a host that committed the migrations itself as
-     * a host that declined them. {@see \Splicewire\Beam\Accounts\Concerns\WiresSeed} did exactly that
+     * a host that declined them. {@see WiresSeed} did exactly that
      * and silently stopped seeding `laravel-tower-starter`, whose gate is `false` for the ordinary
      * reason (ux-demo-convergence `G1-TOWER-FRESH-INSTALL`, measured 2026-09-12 on a fresh tower
      * checkout: the tables were migrated, the demo gate was on, and no demo team was written).
@@ -461,7 +469,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
 
         // localization 36: beam's person slot reads the central preferred_locale. A plain bind(), not bindIf(): beam-core
         // registered its null adapter with bindIf() first, and this package is the slot's owner (ruling 03 §1).
-        $this->app->bind(\Splicewire\Beam\Localization\Contracts\PersonLocaleSource::class, Localization\PreferredLocaleSource::class);
+        $this->app->bind(PersonLocaleSource::class, Localization\PreferredLocaleSource::class);
 
         // The OIDC-issuer module's two primitives, always bindable from PHP regardless of the
         // `oidc.enabled` gate (mirrors the `keys` seam's DeterministicToken posture) — only the
@@ -524,21 +532,30 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         // `ordered_traits` fixer resorts alphabetically.
         $this->chainTraitMethods('boot');
 
-        $this->callAfterResolving(\Illuminate\Contracts\Debug\ExceptionHandler::class, function ($handler): void {
+        $this->callAfterResolving(ExceptionHandler::class, function ($handler): void {
             $handler->renderable(Localization\AccountErrorResponses::render(...));
         });
 
         // ux-walkthrough UX-09 (IA-10; lead 09:01Z): the operator rail's People task section. `users` and `teams` declare
         // `section: people`; this seat is what they join. A host whose operator realm lists neither (collapse_user_realm,
         // the flagship) gets an empty seat, which the projection drops.
-        if ($this->app->bound(\Splicewire\Beam\Nav\NavSectionRegistry::class)) {
-            $this->app->make(\Splicewire\Beam\Nav\NavSectionRegistry::class)->register(
-                new \Splicewire\Beam\Nav\NavSection(
+        if ($this->app->bound(NavSectionRegistry::class)) {
+            $this->app->make(NavSectionRegistry::class)->register(
+                new NavSection(
                     key: 'people', realm: 'operator', label: 'People', icon: 'Users', href: '/people', order: 20,
-                    entitlement: null, permission: null, audience: \Splicewire\Beam\Nav\NavAudience::Product,
+                    entitlement: null, permission: null, audience: NavAudience::Product,
                 ),
                 by: 'splicewire/laravel-beam-accounts',
             );
+        }
+
+        // browser-journeys 08: declare this package's flows into beam-core's `beam.flows` catalog.
+        // This runs inside the provider's ScopesRegistrant scope, so every flow records
+        // `splicewire/laravel-beam-accounts` as its registrant with no explicit `by:`. Guarded because
+        // the catalog is beam-core's — beam-accounts requires beam, so it is always present.
+        if (class_exists(FlowCatalog::class)) {
+            $this->app->make(FlowCatalog::class)
+                ->declare(AccountFlows::class);
         }
 
         // Self-register into beam-core's install manifest (order 5: users/permission_tables are
