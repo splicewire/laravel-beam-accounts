@@ -5,11 +5,11 @@ namespace Splicewire\Beam\Accounts\Authorization;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
+use Rushing\PermissionCascade\Authorization\CredentialScopeGate;
 use Splicewire\Beam\Accounts\Data\UserData;
 use Splicewire\Beam\Accounts\Doors\AccountDoors;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\QueryBuilders\UsersQuery;
-use Splicewire\Beam\Authorization\CredentialScopeGate;
 
 /**
  * The write gate for the `users` particle resource.

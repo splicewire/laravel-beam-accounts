@@ -46,11 +46,16 @@ trait WiresApiGuard
     }
 
     /**
-     * The scoped-PAT enforcement seam (ADR-0109). When a host opts in, source the
+     * The scoped-PAT enforcement seam (ADR-0109; fleet ADR 0006). When a host opts in, source the
      * permission-cascade's credential-scope from the acting API token's abilities, so
-     * `effective authority = token abilities ∩ user's live permissions` is applied at
-     * every policy-gated route through the cascade's one decision point. Default-off and
-     * a pure no-op when off (the cascade's null resolver leaves authorization unchanged).
+     * `effective authority = token abilities ∩ user's live permissions` is applied at every Gate
+     * decision through the cascade's credential-scope gate, which fails closed.
+     *
+     * With enforcement OFF a scoped token is REFUSED, never treated as unscoped (fleet ADR 0006 C5):
+     * {@see TokenAbilitiesScopeResolver::refuseScopedTokensWhileUnenforced()} makes Sanctum reject a
+     * bearer whose abilities are not `*`, so turning enforcement off cannot widen an existing scoped
+     * token, a restored or imported row included. A session and a `*` token are unchanged. The default
+     * stays off here; flipping it is credential-scope 06's, after every host's consumer proof.
      *
      * This binds the *scope source* only; the cascade owns the narrowing rule and takes no
      * Sanctum dependency. Bound in boot (after the cascade's register-time default) so this
@@ -59,6 +64,11 @@ trait WiresApiGuard
     #[Chained('boot', order: 70)]
     protected function bootApiGuardEnforcement(): void
     {
+        TokenAbilitiesScopeResolver::refuseScopedTokensWhileUnenforced();
+        // Again once every provider booted, so a callback a host sets in its own boot is composed under the veto, not
+        // installed over it.
+        $this->app->booted(fn () => TokenAbilitiesScopeResolver::refuseScopedTokensWhileUnenforced());
+
         if (! config('beam.accounts.api.scope_enforcement', false)) {
             return;
         }
