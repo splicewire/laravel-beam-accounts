@@ -5,37 +5,23 @@ use Splicewire\Beam\Accounts\Tokens\TokenWriteScanner;
 /**
  * credential-scope 03, fleet ADR 0006 C7: no token row is written outside AuthTokenFactory and MachineTokenIssuer.
  *
- * ## Why the package scan pins a list instead of asserting empty
+ * ## The pinned list, now empty
  *
- * The check is RED today, by design: ticket 03 builds the issuer, and ticket 04 moves every existing writer onto it.
- * Asserting `[]` here would fail this package's own suite until 04 lands; skipping it would make the check
- * invisible. So the package scan pins every write SITE it finds, `file::function rule => count`, and asserts the
- * findings equal that list exactly:
- *
- *  - a new token writer anywhere fails: a new file, a new method in a listed file, or one more write in a listed
- *    method (the count) — codex cs03 finding 4;
- *  - a writer 04 moves fails until its entry is lowered or deleted here, so 04's acceptance is the list at `[]`;
- *  - the list may only shrink: every entry must sit inside the reviewed ceiling below (same key, count no higher).
- *    The ceiling is the list as reviewed at credential-scope 03; 04 deletes from both, never adds to either.
+ * Ticket 03 built the issuer while this package still had three writers, so the scan pinned every write SITE it
+ * found (`file::function rule => count`) and asserted the findings equal that list exactly: a new writer anywhere
+ * fails (a new file, a new method in a listed file, one more write in a listed method — codex cs03 finding 4), and
+ * the list may only shrink within the reviewed ceiling. Ticket 04 moved those writers onto the issuer (the Tokens
+ * page store and rotate, `MintKeyCommand`; `Keys\DeterministicToken` is gone), so both lists are empty and this
+ * package's own scan asserts no token write at all outside `AuthTokenFactory` and `MachineTokenIssuer`.
  *
  * The fleet half (tower, the flagship, satellites, seeders) is the `splicewire:beam:accounts:token-writes` command,
- * which exits 1 on any finding; its current fleet offenders are recorded in the credential-scope 03 proof.
+ * which exits 1 on any finding and names every path it was told to leave out (`--exclude`); its fleet run is in the
+ * credential-scope 04 proof.
  */
-const CS03_CURRENT_OFFENDERS = [
-    // The Tokens page's own minter: writes the configured model directly and turns an empty request into `*`.
-    'src/Http/Controllers/Account/ApiTokenController.php::mint token-model-write' => 1,
-    // The deterministic key writer: a query-builder update and insert whose abilities default to `*`.
-    'src/Keys/DeterministicToken.php::mint token-table-write' => 2,
-    // The console door onto it, whose `--ability` defaults to `*`.
-    'src/Console/MintKeyCommand.php::handle deterministic-key' => 1,
-];
+const CS03_CURRENT_OFFENDERS = [];
 
-/** The reviewed ceiling (credential-scope 03): CS03_CURRENT_OFFENDERS may only fall within it. */
-const CS03_REVIEWED_CEILING = [
-    'src/Http/Controllers/Account/ApiTokenController.php::mint token-model-write' => 1,
-    'src/Keys/DeterministicToken.php::mint token-table-write' => 2,
-    'src/Console/MintKeyCommand.php::handle deterministic-key' => 1,
-];
+/** The reviewed ceiling: CS03_CURRENT_OFFENDERS may only fall within it. Emptied by credential-scope 04. */
+const CS03_REVIEWED_CEILING = [];
 
 function cs03PackageRoot(): string
 {
@@ -75,7 +61,9 @@ it('finds exactly the pinned token write sites in this package, with their multi
     expect(cs03PackageFindings())->toBe($expected);
 });
 
-it('lets the pinned list only shrink within the reviewed ceiling', function () {
+it('lets the pinned list only shrink within the reviewed ceiling, and both are empty since credential-scope 04', function () {
+    expect(CS03_CURRENT_OFFENDERS)->toBe([])->and(CS03_REVIEWED_CEILING)->toBe([]);
+
     foreach (CS03_CURRENT_OFFENDERS as $site => $count) {
         expect(CS03_REVIEWED_CEILING)->toHaveKey($site)
             ->and($count)->toBeLessThanOrEqual(CS03_REVIEWED_CEILING[$site]);
@@ -83,8 +71,26 @@ it('lets the pinned list only shrink within the reviewed ceiling', function () {
 });
 
 it('fails the pin for a new writer in a listed file and for one more write in a listed method (codex cs03 #4)', function () {
+    // The Tokens page's minter as it stood before credential-scope 04 moved it onto the issuer: a frozen fixture now,
+    // so the pin's own behaviour stays tested once the package has nothing left to pin.
     $file = 'src/Http/Controllers/Account/ApiTokenController.php';
-    $source = (string) file_get_contents(cs03PackageRoot().'/'.$file);
+    $source = <<<'PHP'
+        <?php
+        class ApiTokenController
+        {
+            protected function mint($user, string $name, array $abilities, $expiresAt): array
+            {
+                $model = BeamAccounts::tokenModel();
+                $token = new $model;
+                $token->forceFill([
+                    'tokenable_type' => $user->getMorphClass(),
+                    'abilities' => $abilities,
+                ] + TokenLastFour::attributesFor($token, $plainText))->save();
+
+                return [$token, $plainText];
+            }
+        }
+        PHP;
     $pinned = ["{$file}::mint token-model-write" => 1];
 
     expect(cs03Sites((new TokenWriteScanner)->scanSource($source), $file))->toBe($pinned);
@@ -160,12 +166,46 @@ it('does not report reads, revokes, other tables or a password-reset token', fun
 it('exits 1 with the findings from the fleet command, and 0 on a clean tree', function () {
     $root = cs03PackageRoot();
 
-    $this->artisan('splicewire:beam:accounts:token-writes', ['paths' => ["{$root}/src/Keys"]])
-        ->expectsOutputToContain('DeterministicToken.php')
-        ->assertExitCode(1);
+    $dir = sys_get_temp_dir().'/cs04-token-writes-'.bin2hex(random_bytes(4));
+    mkdir($dir);
+    file_put_contents("{$dir}/Writer.php", '<?php class Writer { public function mint($u) { return $u->createToken("x", ["*"]); } }');
 
-    $this->artisan('splicewire:beam:accounts:token-writes', ['paths' => ["{$root}/src/Tokens", "{$root}/src/Auth"]])
-        ->assertExitCode(0);
+    try {
+        $this->artisan('splicewire:beam:accounts:token-writes', ['paths' => [$dir]])
+            ->expectsOutputToContain('Writer.php')
+            ->assertExitCode(1);
+
+        $this->artisan('splicewire:beam:accounts:token-writes', ['paths' => ["{$root}/src"]])
+            ->assertExitCode(0);
+    } finally {
+        unlink("{$dir}/Writer.php");
+        rmdir($dir);
+    }
+});
+
+it('leaves an excluded path out of the scan and names it in the output, so an exclusion is never silent', function () {
+    $dir = sys_get_temp_dir().'/cs04-token-writes-'.bin2hex(random_bytes(4));
+    mkdir("{$dir}/legacy", 0777, true);
+    mkdir("{$dir}/beam");
+    file_put_contents("{$dir}/legacy/Login.php", '<?php class Login { public function login($u) { return $u->createToken("x"); } }');
+    file_put_contents("{$dir}/beam/Clean.php", '<?php class Clean {}');
+
+    try {
+        $this->artisan('splicewire:beam:accounts:token-writes', ['paths' => ["{$dir}/legacy", "{$dir}/beam"], '--exclude' => ["{$dir}/legacy"]])
+            ->expectsOutputToContain('excluded: '.realpath("{$dir}/legacy"))
+            ->expectsOutputToContain('0 token write(s)')
+            ->assertExitCode(0);
+
+        // An excluded directory that is a parent of a scanned root takes the root with it.
+        $this->artisan('splicewire:beam:accounts:token-writes', ['paths' => ["{$dir}/legacy"], '--exclude' => [$dir]])
+            ->assertExitCode(0);
+    } finally {
+        unlink("{$dir}/legacy/Login.php");
+        unlink("{$dir}/beam/Clean.php");
+        rmdir("{$dir}/legacy");
+        rmdir("{$dir}/beam");
+        rmdir($dir);
+    }
 });
 
 it('names the enclosing method of a write, a reserved-word method name included', function () {

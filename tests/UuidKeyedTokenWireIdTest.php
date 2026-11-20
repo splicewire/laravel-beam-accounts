@@ -40,6 +40,9 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\UuidPersonalAccessToken;
  * REST DTOs to it.
  */
 beforeEach(function () {
+    // The Tokens page mints through the machine-token issuer, which issues nothing while scope enforcement is off
+    // (fleet ADR 0006 C5; credential-scope 04). A host that serves this page enforces.
+    config(['beam.accounts.api.scope_enforcement' => true]);
     $this->withoutMiddleware(ValidateCsrfToken::class);
 
     // The uuid-keyed table every splicewire-operated host runs, plus the model that keys it.
@@ -54,6 +57,8 @@ beforeEach(function () {
         $table->timestamp('expires_at')->nullable();
         $table->string('provenance')->nullable();
         $table->timestamp('archived_at')->nullable();
+        // From the kind ALTER stub (credential-scope 03): the issuer records every token's kind.
+        $table->string('kind', 64)->nullable();
         $table->timestamps();
         $table->index(['tokenable_type', 'tokenable_id']);
     });

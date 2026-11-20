@@ -2,8 +2,12 @@
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\HasApiTokens;
+use Rushing\PermissionCascade\Authorization\CredentialScopeGate;
+use Rushing\PermissionCascade\Authorization\DecisionNames;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
 use Rushing\Popcorn\Registries\RegistryIndex;
 use Spatie\Permission\PermissionRegistrar;
@@ -14,9 +18,12 @@ use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Accounts\Tests\Fixtures\PolicedWidget;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Accounts\Tokens\CascadeDecisionNameSource;
 use Splicewire\Beam\Accounts\Tokens\DelegatedTokenKind;
 use Splicewire\Beam\Accounts\Tokens\MachineTokenIssuer;
+use Splicewire\Beam\Accounts\Tokens\OperationTokenKind;
 use Splicewire\Beam\Accounts\Tokens\SamePrincipalTokenKind;
 use Splicewire\Beam\Accounts\Tokens\TokenIssuance;
 use Splicewire\Beam\Accounts\Tokens\TokenKindRegistry;
@@ -105,7 +112,8 @@ it('turns a `*` or empty personal-token request into the widest named set, never
     foreach ([['*'], [], null] as $requested) {
         $issued = $this->issuer->issue('personal-access-token', cs03Pat($this->owner, $requested));
 
-        expect($issued->token->abilities)->toEqualCanonicalizing(['cs03.read', 'cs03.write'])
+        expect($issued->token->abilities)->toEqualCanonicalizing(app(WidestTokenScope::class)->for($this->owner))
+            ->toContain('cs03.read', 'cs03.write')
             ->and($issued->token->abilities)->not->toContain('*');
     }
 });
@@ -186,7 +194,8 @@ it('leaves a session or `*` acting credential uncapped (it still cannot get `*`)
     cs03ActingScope(null);
 
     expect($this->issuer->issue('personal-access-token', cs03Pat($this->owner, null))->token->abilities)
-        ->toEqualCanonicalizing(['cs03.read', 'cs03.write']);
+        ->toEqualCanonicalizing(app(WidestTokenScope::class)->for($this->owner))
+        ->not->toContain('*');
 });
 
 it('refuses a same-principal kind with no actor, or for a principal other than the actor', function () {
@@ -320,13 +329,92 @@ it('refuses a caller-named tenant when the kind resolves no tenant of its own, e
         ->and(BeamAccounts::tokenModel()::count())->toBe(0);
 });
 
+// ── an operation-bound delegated kind (credential-scope 04) ──────────────────────────────────
+
+it('mints an operation kind for the operation in hand, its target resolved from it and the actor\'s authority over it checked', function () {
+    config(['beam.accounts.tokens.kinds.cs04-team-service' => Cs04TeamServiceKind::class]);
+    $issued = $this->issuer->issueFor('cs04-team-service', $this->team, new TokenIssuance(actor: $this->owner, name: 'svc'));
+
+    expect((string) $issued->token->tokenable_id)->toBe((string) cs03ServicePrincipal($this->team)->getKey())
+        ->and($issued->token->abilities)->toBe(['widget.view'])
+        ->and($issued->token->fresh()->kind)->toBe('cs04-team-service');
+
+    // A team the actor does not own: the operation is not authority, so it is refused and nothing is written.
+    $stranger = User::create(['name' => 'Stranger', 'email' => 'cs04-stranger@example.test', 'password' => 'x']);
+    $foreign = Team::create(['user_id' => $stranger->id, 'name' => 'Foreign', 'personal_team' => false]);
+    $before = BeamAccounts::tokenModel()::count();
+
+    expect(cs03RefusalCode(fn () => $this->issuer->issueFor('cs04-team-service', $foreign, new TokenIssuance(actor: $this->owner, name: 'svc'))))
+        ->toBe('token_target_no_authority')
+        ->and(BeamAccounts::tokenModel()::count())->toBe($before);
+});
+
+it('refuses an operation kind issued without its operation, a caller claim of another subject, and an operation for a kind of any other shape', function () {
+    config(['beam.accounts.tokens.kinds.cs04-team-service' => Cs04TeamServiceKind::class]);
+    cs03DeclareSatelliteKind();
+    $other = Team::create(['user_id' => $this->owner->id, 'name' => 'Other', 'personal_team' => false]);
+
+    expect(cs03RefusalCode(fn () => $this->issuer->issue('cs04-team-service', new TokenIssuance(actor: $this->owner, name: 'svc'))))
+        ->toBe('token_target_unresolved')
+        ->and(cs03RefusalCode(fn () => $this->issuer->issueFor('cs04-team-service', null, new TokenIssuance(actor: $this->owner, name: 'svc'))))
+        ->toBe('token_target_unresolved')
+        ->and(cs03RefusalCode(fn () => $this->issuer->issueFor('cs04-team-service', $this->team, new TokenIssuance(actor: $this->owner, name: 'svc', subject: $other))))
+        ->toBe('token_target_mismatch')
+        ->and(cs03RefusalCode(fn () => $this->issuer->issueFor('cs03-satellite', $this->team, new TokenIssuance(actor: $this->owner, name: 's'))))
+        ->toBe('token_kind_not_operation_bound')
+        ->and(cs03RefusalCode(fn () => $this->issuer->issueFor('personal-access-token', $this->team, cs03Pat($this->owner, null))))
+        ->toBe('token_kind_not_operation_bound')
+        ->and(BeamAccounts::tokenModel()::count())->toBe(0);
+});
+
+it('applies every delegated rule to an operation kind: issuance ability, enforcement, and no `*`', function () {
+    config(['beam.accounts.tokens.kinds.cs04-team-service' => Cs04TeamServiceKind::class]);
+
+    cs03ActingScope(['widget.view']);
+    expect(cs03RefusalCode(fn () => $this->issuer->issueFor('cs04-team-service', $this->team, new TokenIssuance(actor: $this->owner, name: 'svc'))))
+        ->toBe('token_issuance_ability_missing');
+
+    cs03ActingScope(['cs04-team-service:issue']);
+    expect($this->issuer->issueFor('cs04-team-service', $this->team, new TokenIssuance(actor: $this->owner, name: 'svc'))->token->abilities)->toBe(['widget.view']);
+
+    config(['beam.accounts.tokens.kinds.cs04-team-wildcard' => Cs04TeamWildcardKind::class]);
+    expect(cs03RefusalCode(fn () => $this->issuer->issueFor('cs04-team-wildcard', $this->team, new TokenIssuance(actor: $this->owner, name: 'svc'))))
+        ->toBe('token_wildcard_refused');
+
+    config(['beam.accounts.api.scope_enforcement' => false]);
+    expect(cs03RefusalCode(fn () => $this->issuer->issueFor('cs04-team-service', $this->team, new TokenIssuance(actor: $this->owner, name: 'svc'))))
+        ->toBe('token_issuer_enforcement_off');
+});
+
 // ── the widest set and its decision-name seam ─────────────────────────────────────────────────
 
 it('computes the widest set as the permission snapshot plus every registered decision-name source, never `*`', function () {
     config(['beam.accounts.tokens.decision_name_sources' => [Cs03DecisionNames::class]]);
 
-    expect(app(WidestTokenScope::class)->for($this->owner))->toBe(['cs03.read', 'cs03.write', 'team.join', 'membership.view'])
+    $widest = app(WidestTokenScope::class)->for($this->owner);
+
+    expect(array_slice($widest, 0, 2))->toBe(['cs03.read', 'cs03.write'])
+        ->and($widest)->toContain('team.join', 'membership.view')->not->toContain('*')
+        ->and(array_count_values($widest)['cs03.read'])->toBe(1)
         ->and($this->issuer->issue('personal-access-token', cs03Pat($this->owner, ['team.join']))->token->abilities)->toBe(['team.join']);
+});
+
+it('builds the cascade\'s decision names in, even where a host\'s published tokens config has no source key (credential-scope 04)', function () {
+    config(['beam.accounts.tokens' => ['model' => null, 'scope' => null]]);
+    app(DecisionNames::class)->name('cs04Reboot', 'cs04.reboot');
+    Relation::morphMap(['policed-widget' => PolicedWidget::class]);
+    Gate::policy(PolicedWidget::class, Cs04WidgetPolicy::class);
+
+    $widest = app(WidestTokenScope::class)->for($this->owner);
+
+    // a registered name, and a policy verb's class-level name: what a scoped token must carry at those decisions
+    expect($widest)->toContain('cs03.read', 'cs04.reboot', 'policed-widget.publish')
+        ->and(WidestTokenScope::BUILT_IN_SOURCES)->toContain(CascadeDecisionNameSource::class)
+        ->and(collect(app(CascadeDecisionNameSource::class)->namesFor($this->owner))->all())
+        ->toBe(app(CredentialScopeGate::class)->offerableNames());
+
+    // and the name it offers is the name the cascade asks at the decision
+    expect(app(CredentialScopeGate::class)->namesFor('publish', [PolicedWidget::class]))->toContain('policed-widget.publish');
 });
 
 // ── deterministic keys ───────────────────────────────────────────────────────────────────────
@@ -420,6 +508,46 @@ class Cs03SelfKind extends DelegatedTokenKind
     public function abilities(Model $target, mixed $subject): array
     {
         return ['cs03.read', 'cs03.write', 'widget.delete'];
+    }
+}
+
+/** A team's service principal, minted for the team the calling code is operating on, by that team's owner. */
+class Cs04TeamServiceKind extends OperationTokenKind
+{
+    public function issuanceAbility(): string
+    {
+        return 'cs04-team-service:issue';
+    }
+
+    public function resolveTarget(?Authenticatable $actor, mixed $subject): ?Model
+    {
+        return $subject instanceof Team ? cs03ServicePrincipal($subject) : null;
+    }
+
+    public function authorizes(?Authenticatable $actor, Model $target, mixed $subject): bool
+    {
+        return $actor !== null && $subject instanceof Team && (string) $subject->user_id === (string) $actor->getAuthIdentifier();
+    }
+
+    public function abilities(Model $target, mixed $subject): array
+    {
+        return ['widget.view'];
+    }
+}
+
+class Cs04TeamWildcardKind extends Cs04TeamServiceKind
+{
+    public function abilities(Model $target, mixed $subject): array
+    {
+        return ['*'];
+    }
+}
+
+class Cs04WidgetPolicy
+{
+    public function publish(Authenticatable $user, PolicedWidget $widget): bool
+    {
+        return true;
     }
 }
 

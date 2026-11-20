@@ -263,23 +263,26 @@ return [
         // token (abilities other than `*`) is REFUSED at authentication, never treated as
         // unscoped; a session and a `*` login token are unchanged. Blast-radius control, not a
         // trust boundary — a scoped token is still not safe to hand to an untrusted party.
+        // Off also stops the machine-token issuer: no token of any kind is minted (the Tokens page,
+        // mint-key, a satellite's engine key, every delegated kind): `token_issuer_enforcement_off`.
         // Default-off until every host's consumer proof (credential-scope 06 flips it).
         'scope_enforcement' => false,
     ],
 
     // The per-host KEY-MANAGEMENT seam. beam operates separately from splicewire, so a
     // beam site manages keys only for ITSELF — each site owns its own keys, there is no
-    // central token store and no cross-host reach. The core primitive
-    // (Keys\DeterministicToken — a reproducible, reset-surviving PAT minter) is always
-    // available to call from PHP (seeders use it directly); this toggle only gates the
-    // HOST-FACING affordance: the `splicewire:beam:accounts:mint-key` artisan command, so a
-    // non-satellite beam site that never seeds keys gets nothing extra. Default-off,
-    // mirroring the `api` seam — prepared, opt-in, no rebuild to activate.
+    // central token store and no cross-host reach. A deterministic, reset-surviving key is
+    // a machine-token issuer request of a declared kind (Tokens\MachineTokenIssuer with a
+    // deterministicId + deterministicPlaintext; credential-scope 04 retired the query-builder
+    // Keys\DeterministicToken), always available to call from PHP (seeders use it directly);
+    // this toggle only gates the HOST-FACING affordance: the `splicewire:beam:accounts:mint-key`
+    // artisan command, so a non-satellite beam site that never seeds keys gets nothing extra.
+    // Default-off, mirroring the `api` seam — prepared, opt-in, no rebuild to activate.
     'keys' => [
         'enabled' => env('ACCOUNT_KEYS_ENABLED', false),
 
-        // The table the deterministic minter upserts into (Sanctum's shape). Override
-        // only if the host renamed its personal-access-tokens table.
+        // A renamed personal-access-tokens table, read by the token-writes scan so a write to it is
+        // still found. Keys are written through `tokens.model` by the issuer, not to this name.
         'table' => 'personal_access_tokens',
     ],
 
@@ -430,8 +433,9 @@ return [
         ],
 
         // Contracts\DecisionNameSource classes whose names join a user's permission snapshot in the widest set a
-        // token can be scoped to (Tokens\WidestTokenScope). Empty here: the permission cascade's decision-name
-        // registry (credential-scope 02) is the first source.
+        // token can be scoped to (Tokens\WidestTokenScope). Empty here: the permission cascade's names
+        // (Tokens\CascadeDecisionNameSource: registered names and each policy verb's class-level names) are built
+        // in and always read; list a host's own sources here.
         'decision_name_sources' => [],
     ],
 

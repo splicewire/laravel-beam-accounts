@@ -25,6 +25,11 @@ use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Keys\TokenLastFour;
 use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
+use Splicewire\Beam\Accounts\Tokens\IssuedToken;
+use Splicewire\Beam\Accounts\Tokens\Kinds\PersonalAccessTokenKind;
+use Splicewire\Beam\Accounts\Tokens\MachineTokenIssuer;
+use Splicewire\Beam\Accounts\Tokens\TokenIssuance;
+use Splicewire\Beam\Accounts\Tokens\WidestTokenScope;
 
 /**
  * The ACCOUNT-TIER personal-access-token lifecycle — the "host REST survivor" half of the tokens
@@ -91,10 +96,11 @@ class ApiTokenController extends Controller
     }
 
     /**
-     * The permission names you hold
+     * The names you can scope a token to
      *
-     * The ceiling a scoped token may draw from — what the scoped-create picker offers, and what
-     * {@see self::clampAbilities()} validates a requested scope against, so the picker and the mint
+     * The ceiling a scoped token may draw from: your permission names plus the decision names you can reach
+     * ({@see WidestTokenScope}, fleet ADR 0006 "Everything I hold"). It is what the scoped-create picker offers and
+     * exactly what the `personal-access-token` kind validates a requested scope against, so the picker and the mint
      * can never disagree about what is offerable.
      */
     #[ResponseFromData(HeldPermissionsData::class)]
@@ -102,7 +108,7 @@ class ApiTokenController extends Controller
     {
         return response()->json([
             'data' => new HeldPermissionsData(
-                permissions: array_values($this->heldPermissionNames($this->tokenOwner($request))),
+                permissions: app(WidestTokenScope::class)->for($this->tokenOwner($request)),
             ),
         ]);
     }
@@ -122,22 +128,14 @@ class ApiTokenController extends Controller
         // route's own auth gate.
         $input = ApiTokenCreateInputData::validateAndCreate($request);
 
-        $user = $this->tokenOwner($request);
+        $issued = app(MachineTokenIssuer::class)->issue(PersonalAccessTokenKind::NAME, new TokenIssuance(
+            actor: $this->tokenOwner($request),
+            name: $input->name,
+            abilities: $this->optional($input->abilities),
+            expiresAt: $this->expiresAtFor($this->optional($input->expiresInDays)),
+        ));
 
-        [$token, $plainText] = $this->mint(
-            $user,
-            $input->name,
-            $this->clampAbilities($user, $this->optional($input->abilities)),
-            $this->expiresAtFor($this->optional($input->expiresInDays)),
-        );
-
-        return response()->json([
-            'data' => new CreatedTokenData(
-                id: (string) $token->getKey(),
-                name: (string) $token->name,
-                token: $plainText,
-            ),
-        ], 201);
+        return $this->created($issued);
     }
 
     /**
@@ -194,23 +192,25 @@ class ApiTokenController extends Controller
             return response()->json((new AccountErrorData(AccountError::RotateArchived->message(), AccountError::RotateArchived->code()))->toArray(), 422);
         }
 
-        // Same name + scope, carried verbatim: the scope was clamped when first minted.
-        [$new, $plainText] = $this->mint(
-            $this->tokenOwner($request),
-            (string) $old->name,
-            $old->abilities ?: ['*'],
-            $this->expiresAtFor($this->optional($input->expiresInDays)),
-        );
+        // Same name + scope, through the issuer: a row of a declared kind rotates as that kind (refused for a delegated
+        // kind, capped by a scoped acting token); a row minted before kinds were recorded is re-issued as a personal
+        // access token, so a legacy `*` scope becomes the widest named set and never `*` again (ADR 0006 C7).
+        $issuer = app(MachineTokenIssuer::class);
+        $owner = $this->tokenOwner($request);
+        $expiresAt = $this->expiresAtFor($this->optional($input->expiresInDays));
+
+        $issued = filled($old->getAttribute(MachineTokenIssuer::KIND_COLUMN))
+            ? $issuer->rotate($old, new TokenIssuance(actor: $owner, name: (string) $old->name, expiresAt: $expiresAt))
+            : $issuer->issue(PersonalAccessTokenKind::NAME, new TokenIssuance(
+                actor: $owner,
+                name: (string) $old->name,
+                abilities: is_array($old->abilities) ? array_values($old->abilities) : null,
+                expiresAt: $expiresAt,
+            ));
 
         $this->neutralize($old);
 
-        return response()->json([
-            'data' => new CreatedTokenData(
-                id: (string) $new->getKey(),
-                name: (string) $new->name,
-                token: $plainText,
-            ),
-        ], 201);
+        return $this->created($issued);
     }
 
     /**
@@ -302,50 +302,16 @@ class ApiTokenController extends Controller
         ]);
     }
 
-    /**
-     * Mint a personal access token on {@see BeamAccounts::tokenModel()} and return
-     * `[$model, $plainTextSecret]`.
-     *
-     * ⚠️ **Deliberately NOT `$user->createToken()`.** Sanctum's trait method writes through
-     * `Sanctum::personalAccessTokenModel()` — a GLOBAL, set by `Sanctum::usePersonalAccessTokenModel()`,
-     * which this package does not call and has no business calling (it would decide the model for
-     * every other Sanctum consumer at the host). The result would be a mint into Sanctum's default
-     * model while every read below queries the configured one: at a host that has bound
-     * `beam.accounts.tokens.model` to a bespoke PAT (its own connection, a uuid key) the token would
-     * land in the wrong table and the list would never show it. Reading and writing through the one
-     * seam is what makes that impossible.
-     *
-     * It also means the acting principal needs no `HasApiTokens` trait — this surface's contract is
-     * `beam.accounts.tokens.{model,scope}`, not Sanctum's trait.
-     *
-     * The secret and the hash are generated exactly as `HasApiTokens::createToken()` does, prefix
-     * included, so a token minted here authenticates through Sanctum's ordinary guard unchanged.
-     *
-     * @param  array<int, string>  $abilities
-     * @return array{0: Model, 1: string}
-     */
-    protected function mint(Authenticatable $user, string $name, array $abilities, ?CarbonInterface $expiresAt): array
+    /** The 201 body for a token the issuer just wrote: its plaintext is shown here once and never again. */
+    protected function created(IssuedToken $issued): JsonResponse
     {
-        $model = BeamAccounts::tokenModel();
-
-        $entropy = Str::random(40);
-        $plainText = sprintf('%s%s%s', config('sanctum.token_prefix', ''), $entropy, hash('crc32b', $entropy));
-
-        $token = new $model;
-        $token->forceFill([
-            'tokenable_type' => $user->getMorphClass(),
-            'tokenable_id' => $user->getAuthIdentifier(),
-            'name' => $name,
-            'token' => hash('sha256', $plainText),
-            'abilities' => $abilities,
-            'expires_at' => $expiresAt,
-            // Deliberately-created token — the provenance this surface exists to keep a stable list of.
-            'provenance' => TokenProvenance::Api->value,
-            // The plaintext is in hand only here, so this is the one place its last four can be kept
-            // (owner-review-20261102 K-28). Empty where the host has not migrated the column yet.
-        ] + TokenLastFour::attributesFor($token, $plainText))->save();
-
-        return [$token, $token->getKey().'|'.$plainText];
+        return response()->json([
+            'data' => new CreatedTokenData(
+                id: (string) $issued->token->getKey(),
+                name: (string) $issued->token->name,
+                token: $issued->plainTextToken,
+            ),
+        ], 201);
     }
 
     /**
@@ -480,51 +446,6 @@ class ApiTokenController extends Controller
         $abilities ??= ['*'];
 
         return in_array('*', $abilities, true) ? null : array_values($abilities);
-    }
-
-    /**
-     * Clamp a requested scope to permissions the minting principal actually holds — you can only
-     * scope DOWN from yourself, so a stored scope can never over-state what the token may do.
-     *
-     * Exactly `['*']`, an empty list, or a list containing `'*'` is unscoped. Any other list is a
-     * real permission-name scope and every entry must be held.
-     *
-     * @param  array<int, string>|null  $requested
-     * @return array<int, string>
-     */
-    protected function clampAbilities(Authenticatable $user, ?array $requested): array
-    {
-        $requested = array_values(array_unique($requested ?? ['*']));
-
-        if ($requested === [] || in_array('*', $requested, true)) {
-            return ['*'];
-        }
-
-        $overreach = array_values(array_diff($requested, $this->heldPermissionNames($user)));
-
-        if ($overreach !== []) {
-            throw \Splicewire\Beam\Localization\CodedValidationException::for('abilities', AccountError::TokenAbilities, ['permissions' => implode(', ', $overreach)]);
-        }
-
-        return $requested;
-    }
-
-    /**
-     * The permission names the acting principal holds — the ceiling a scoped token draws from.
-     *
-     * A principal whose model carries no spatie permission trait holds none as far as this surface is
-     * concerned, which makes every non-`*` scope a 422 rather than a 500. "Does this host's user model
-     * have permissions" is a host fact and must not throw.
-     *
-     * @return array<int, string>
-     */
-    protected function heldPermissionNames(Authenticatable $user): array
-    {
-        if (! method_exists($user, 'getAllPermissions')) {
-            return [];
-        }
-
-        return $user->getAllPermissions()->pluck('name')->all();
     }
 
     /**

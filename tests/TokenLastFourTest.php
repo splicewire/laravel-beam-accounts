@@ -50,6 +50,8 @@ function createPreLastFourTokensTable(): void
         $table->timestamp('expires_at')->nullable();
         $table->string('provenance')->nullable();
         $table->timestamp('archived_at')->nullable();
+        // From the kind ALTER stub (credential-scope 03): the issuer records every token's kind.
+        $table->string('kind', 64)->nullable();
         $table->timestamps();
     });
 }
@@ -74,6 +76,9 @@ function listedToken($test, string $id): array
 }
 
 beforeEach(function () {
+    // The Tokens page mints through the machine-token issuer, which issues nothing while scope enforcement is off
+    // (fleet ADR 0006 C5; credential-scope 04). A host that serves this page enforces.
+    config(['beam.accounts.api.scope_enforcement' => true]);
     $this->withoutMiddleware(ValidateCsrfToken::class);
     $this->createPersonalAccessTokensSchema();
     Route::splicewireAccountApiRoutes();

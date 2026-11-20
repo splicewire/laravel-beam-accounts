@@ -7,14 +7,20 @@ use Splicewire\Beam\Accounts\Contracts\DecisionNameSource;
 
 /**
  * The widest named set a user can scope a token to (ADR 0006, "Everything I hold changes meaning"): the user's
- * permission-name snapshot plus the names every {@see DecisionNameSource} in
- * `beam.accounts.tokens.decision_name_sources` says the user can reach.
+ * permission-name snapshot plus the names every {@see DecisionNameSource} offers: the cascade's own
+ * ({@see CascadeDecisionNameSource}, built in) and each one listed in `beam.accounts.tokens.decision_name_sources`.
  *
  * This is what an empty or "everything" personal-token request becomes ({@see Kinds\PersonalAccessTokenKind}),
  * and the ceiling the Tokens page picker validates against. Never `*`.
  */
 class WidestTokenScope
 {
+    /**
+     * Sources read whatever a host's config says: `mergeConfigFrom` merges only the top level, so a host's published
+     * `tokens` array replaces the package's whole and would otherwise drop the cascade's names from the widest set.
+     */
+    public const BUILT_IN_SOURCES = [CascadeDecisionNameSource::class];
+
     /** @return list<string> */
     public function for(Authenticatable $user): array
     {
@@ -22,7 +28,9 @@ class WidestTokenScope
             ? $user->getAllPermissions()->pluck('name')->all()
             : [];
 
-        foreach ((array) config('beam.accounts.tokens.decision_name_sources', []) as $source) {
+        $sources = array_unique([...self::BUILT_IN_SOURCES, ...(array) config('beam.accounts.tokens.decision_name_sources', [])], SORT_REGULAR);
+
+        foreach ($sources as $source) {
             $resolved = is_string($source) ? app($source) : $source;
 
             if ($resolved instanceof DecisionNameSource) {

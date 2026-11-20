@@ -145,6 +145,9 @@ enum AccountError: string implements CodedError
     #[Message('A :kind token cannot be rotated; issue it again.')]
     case TokenKindNotRotatable = 'token_kind_not_rotatable';
 
+    #[Message('A :kind token is not issued for an operation; its kind resolves its own subject.')]
+    case TokenKindNotOperationBound = 'token_kind_not_operation_bound';
+
     #[Message('The :role role cannot be assigned by invitation.')]
     case RoleNotInvitable = 'role_not_invitable';
 

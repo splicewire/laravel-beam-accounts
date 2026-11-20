@@ -45,6 +45,29 @@ class MachineTokenIssuer
 
         AccountError::TokenKindUndeclared->abortIf($declared === null, 422, ['kind' => $kind]);
 
+        return $this->issueDeclared($kind, $declared, $request);
+    }
+
+    /**
+     * Issue an {@see OperationTokenKind} bound to `$operation`, the object the calling code is performing (the grant,
+     * the child tenant). A kind of any other shape is refused (`token_kind_not_operation_bound`): its subject comes
+     * from its own context, and an operation must never stand in for it. Every rule {@see issue()} applies still does.
+     */
+    public function issueFor(string $kind, mixed $operation, TokenIssuance $request): IssuedToken
+    {
+        AccountError::TokenIssuerEnforcementOff->abortUnless((bool) config('beam.accounts.api.scope_enforcement', false), 403, ['kind' => $kind]);
+
+        $declared = $this->kinds->kind($kind);
+
+        AccountError::TokenKindUndeclared->abortIf($declared === null, 422, ['kind' => $kind]);
+        AccountError::TokenKindNotOperationBound->abortUnless($declared instanceof OperationTokenKind, 422, ['kind' => $kind]);
+
+        /** @var OperationTokenKind $declared */
+        return $this->issueDeclared($kind, $declared->forOperation($operation), $request);
+    }
+
+    private function issueDeclared(string $kind, TokenKind $declared, TokenIssuance $request): IssuedToken
+    {
         $scope = app(CredentialScopeResolver::class)->resolve();
 
         [$principal, $abilities] = $declared instanceof DelegatedTokenKind

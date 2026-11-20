@@ -31,9 +31,15 @@ beam-accounts   (account engine — Fortify default + self-service account UI + 
   ability set, never `*`. It refuses to mint while `api.scope_enforcement` is off, caps a same-principal token at a
   scoped acting token, and issues a different principal's token only through a delegated kind (resolved target,
   live authority, issuance ability). `Tokens\WidestTokenScope` is what an empty or `*` personal-token request
-  becomes. `splicewire:beam:accounts:token-writes` lists any token write outside `AuthTokenFactory` and the issuer;
-  the existing writers (the Tokens page controller, `DeterministicToken`, `MintKeyCommand`) move onto it in
-  credential-scope 04. See [the kinds registry page](docs/registries/beam.accounts.tokens.kinds.mdx).
+  becomes, and what the Tokens page picker offers and validates: the permission snapshot plus the permission
+  cascade's offerable decision names (`Tokens\CascadeDecisionNameSource`, built in). `issueFor($kind, $operation, …)`
+  mints an `OperationTokenKind` bound to the object the calling code is operating on (a grant, a child tenant).
+  `splicewire:beam:accounts:token-writes [--exclude=…]` lists any token write outside `AuthTokenFactory` and the
+  issuer, and names what it left out. Since credential-scope 04 every writer goes through the issuer: the Tokens page
+  (create and rotate; a pre-kind row rotates as a personal access token) and `splicewire:beam:accounts:mint-key
+  {kind} {id} {plaintext}`, a deterministic key of a declared kind (the kind names the principal and the abilities;
+  `Keys\DeterministicToken`, a query-builder writer whose abilities defaulted to `*`, is gone). While
+  `api.scope_enforcement` is off none of them mints. See [the kinds registry page](docs/registries/beam.accounts.tokens.kinds.mdx).
 - **The auth API HTTP surface** — five `Http/Controllers/Api/V1/*` on the canonical InputData
   shape (`Login`, `PasskeyLogin`, `PasswordReset`, `Passkey` CRUD, and the API/JSON `Profile`
   variant beside the Inertia one), plus their `Data/*InputData` bodies. Relocated here from

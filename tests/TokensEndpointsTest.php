@@ -15,6 +15,9 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
  * a host that moved the root: the props point at the new mount, and the roster still lists through them.
  */
 beforeEach(function () {
+    // The Tokens page mints through the machine-token issuer, which issues nothing while scope enforcement is off
+    // (fleet ADR 0006 C5; credential-scope 04). A host that serves this page enforces.
+    config(['beam.accounts.api.scope_enforcement' => true]);
     $this->withoutMiddleware(ValidateCsrfToken::class);
     $this->createPersonalAccessTokensSchema();
 });

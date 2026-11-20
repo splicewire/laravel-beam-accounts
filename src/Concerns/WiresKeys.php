@@ -18,8 +18,9 @@ trait WiresKeys
     /**
      * The per-host key-management module. beam operates separately from splicewire, so a
      * beam site manages keys only for itself — this registers no cross-host reach and no
-     * central store. The reproducible primitive ({@see \Splicewire\Beam\Accounts\Keys\DeterministicToken}) is always
-     * available to PHP callers; only the host-facing `splicewire:beam:accounts:mint-key` command is
+     * central store. The reproducible primitive (a deterministic request to
+     * {@see \Splicewire\Beam\Accounts\Tokens\MachineTokenIssuer}) is always available to PHP callers; only the
+     * host-facing `splicewire:beam:accounts:mint-key` command is
      * gated, opt-in per host (default-off), mirroring the `api` seam.
      */
     #[Chained('boot', order: 90)]

@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  * that names a different principal or tenant is refused rather than obeyed (ADR 0006 C6).
  *
  * `deterministicId` and `deterministicPlaintext` together ask for a reset-surviving key with a fixed bearer
- * (`{id}|{plaintext}`), the storage need {@see \Splicewire\Beam\Accounts\Keys\DeterministicToken} serves today.
+ * (`{id}|{plaintext}`), the storage need the retired `Keys\DeterministicToken` served before credential-scope 04.
  */
 final class TokenIssuance
 {

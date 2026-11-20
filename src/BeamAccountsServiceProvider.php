@@ -464,7 +464,7 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
         $this->app->bind(\Splicewire\Beam\Localization\Contracts\PersonLocaleSource::class, Localization\PreferredLocaleSource::class);
 
         // The OIDC-issuer module's two primitives, always bindable from PHP regardless of the
-        // `oidc.enabled` gate (mirrors the `keys` seam's DeterministicToken posture) — only the
+        // `oidc.enabled` gate (mirrors the `keys` seam's posture) — only the
         // host-facing command + routes are config-gated, in bootOidc() below.
         $this->app->singleton(SigningKey::class, fn () => new SigningKey(
             path: config('beam.accounts.oidc.signing_key_path'),

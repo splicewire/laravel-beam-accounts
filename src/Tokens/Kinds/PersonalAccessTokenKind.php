@@ -17,6 +17,9 @@ use Splicewire\Beam\Localization\CodedValidationException;
  */
 class PersonalAccessTokenKind extends SamePrincipalTokenKind
 {
+    /** The kind's registry name ({@see \Splicewire\Beam\Accounts\Tokens\TokenKindRegistry::BUILT_IN}). */
+    public const NAME = 'personal-access-token';
+
     public function __construct(private WidestTokenScope $widest) {}
 
     public function abilities(Authenticatable $principal, ?array $requested): array

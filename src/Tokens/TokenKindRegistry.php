@@ -34,7 +34,7 @@ class TokenKindRegistry extends ConfigRegistry
      * same name supersedes it.
      */
     public const BUILT_IN = [
-        'personal-access-token' => Kinds\PersonalAccessTokenKind::class,
+        Kinds\PersonalAccessTokenKind::NAME => Kinds\PersonalAccessTokenKind::class,
     ];
 
     protected function configKey(): string

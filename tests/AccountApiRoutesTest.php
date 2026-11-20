@@ -17,6 +17,7 @@ use Splicewire\Beam\Accounts\Models\PersonalAccessToken;
 use Splicewire\Beam\Accounts\Models\Team;
 use Splicewire\Beam\Accounts\Tests\Fixtures\AltPersonalAccessToken;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
+use Splicewire\Beam\Accounts\Tokens\WidestTokenScope;
 
 /**
  * The ACCOUNT-TIER REST survivors — `Route::splicewireAccountApiRoutes()` and the three controllers
@@ -39,6 +40,9 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
  * than passed by not running.
  */
 beforeEach(function () {
+    // The Tokens page mints through the machine-token issuer, which issues nothing while scope enforcement is off
+    // (fleet ADR 0006 C5; credential-scope 04). A host that serves this page enforces.
+    config(['beam.accounts.api.scope_enforcement' => true]);
     $this->withoutMiddleware(ValidateCsrfToken::class);
     $this->createPersonalAccessTokensSchema();
 
@@ -165,6 +169,8 @@ it('mints through the CONFIGURED token model, not Sanctum\'s global', function (
         $table->timestamp('expires_at')->nullable();
         $table->string('provenance')->nullable();
         $table->timestamp('archived_at')->nullable();
+        // From the kind ALTER stub (credential-scope 03): the issuer records every token's kind.
+        $table->string('kind', 64)->nullable();
         $table->timestamps();
     });
 
@@ -179,16 +185,24 @@ it('mints through the CONFIGURED token model, not Sanctum\'s global', function (
         ->toBe(['elsewhere']);
 });
 
-it('offers the scoped-create picker exactly the permissions the clamp will accept', function () {
+it('offers the scoped-create picker exactly the widest set the personal-access-token kind will accept', function () {
     [$owner] = apiOwner();
 
     $offered = $this->getJson('/beam/accounts/tokens/permissions')->json('data.permissions');
 
-    // The picker's vocabulary and the mint's clamp must be one list, or the UI offers a scope the
-    // server refuses. Asserted by construction: everything offered mints, and a name that is not
-    // offered is a 422.
-    expect($offered)->toBe($owner->getAllPermissions()->pluck('name')->all());
+    // The picker's vocabulary and the mint's validation must be one list, or the UI offers a scope the
+    // server refuses. Since credential-scope 04 that list is WidestTokenScope: the permission snapshot plus the
+    // decision names the cascade offers (fleet ADR 0006 "Everything I hold"), never `*`.
+    expect($offered)->toBe(app(WidestTokenScope::class)->for($owner))
+        ->toContain(...$owner->getAllPermissions()->pluck('name')->all())
+        ->toContain('invitation.create', 'invitation.own.update')
+        ->not->toContain('*');
 
+    // Everything offered mints (one name per decision a policy names, so the picker's whole list is accepted) …
+    $this->postJson('/beam/accounts/tokens', ['name' => 'offered', 'abilities' => $offered])->assertCreated();
+    expect(PersonalAccessToken::firstWhere('name', 'offered')->abilities)->toEqualCanonicalizing($offered);
+
+    // … and a name that is not offered is a 422.
     $this->postJson('/beam/accounts/tokens', ['name' => 'unheld', 'abilities' => ['definitely.not.held']])
         ->assertStatus(422);
 });
@@ -258,16 +272,24 @@ it('permanently deletes only an already-archived token', function () {
     expect(PersonalAccessToken::find($created['id']))->toBeNull();
 });
 
-it('clamps a requested scope to permissions the minting principal holds', function () {
-    apiOwner();
+it('clamps a requested scope to the widest set the minting principal can scope to', function () {
+    [$owner] = apiOwner();
 
     $this->postJson('/beam/accounts/tokens', ['name' => 'scoped', 'abilities' => ['nothing.i.hold']])
         ->assertStatus(422)
         ->assertJsonValidationErrors('abilities');
 
-    // An omitted list is the unscoped default — you act fully as yourself.
+    // An omitted list, or `*`, is "everything I hold": the widest named set, never `*` (fleet ADR 0006 C7). A
+    // personal token is not a login token.
     $this->postJson('/beam/accounts/tokens', ['name' => 'full'])->assertCreated();
-    expect(PersonalAccessToken::firstWhere('name', 'full')->abilities)->toBe(['*']);
+    $this->postJson('/beam/accounts/tokens', ['name' => 'star', 'abilities' => ['*']])->assertCreated();
+
+    foreach (['full', 'star'] as $name) {
+        expect(PersonalAccessToken::firstWhere('name', $name)->abilities)
+            ->toEqualCanonicalizing(app(WidestTokenScope::class)->for($owner))
+            ->not->toContain('*')
+            ->and(PersonalAccessToken::firstWhere('name', $name)->kind)->toBe('personal-access-token');
+    }
 });
 
 it('accepts expiresInDays and refuses the old snake spelling without minting a token', function () {

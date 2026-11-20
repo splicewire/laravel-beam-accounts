@@ -15,8 +15,7 @@ use RuntimeException;
  * Federation provider, or any other OIDC-federation consumer) already configured against
  * the old JWKS, so rotation is a deliberate operator action, not an automatic one.
  *
- * Per-host, never cross-host, mirroring {@see \Splicewire\Beam\Accounts\Keys\DeterministicToken}'s
- * own posture — each site that turns this on mints and owns its own issuer identity.
+ * Per-host, never cross-host, mirroring the `keys` seam's own posture (deterministic per-host keys) — each site that turns this on mints and owns its own issuer identity.
  */
 class SigningKey
 {

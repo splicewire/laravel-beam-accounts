@@ -52,6 +52,19 @@ A **delegated** kind (`DelegatedTokenKind`) mints for a principal the kind resol
 | `authorizes($actor, $target, $subject)` | the actor's live authority over the target (`token_target_no_authority`) |
 | `abilities($target, $subject)` | the declared set, exactly what the consumer calls; a request naming abilities is `token_kind_declares_abilities` |
 
+An **operation** kind (`OperationTokenKind`, a delegated kind) binds to the object the calling code is operating
+on rather than to the actor's ambient context: a federation grant, a brokered child tenant, the tenant an operator
+makes a broker. The code that performs the operation passes it, never a request body:
+`$issuer->issueFor('satellite-tenant', $child, new TokenIssuance(actor: …, name: …))`. It is the kind's only
+subject (`boundSubject()` is final); `issue()` on such a kind resolves none and is refused, `issueFor()` on any
+other kind is `token_kind_not_operation_bound`, and `authorizes()` must still establish the actor's live authority
+over the target for that operation.
+
+A **deterministic** key (a reset-surviving `{id}|{plaintext}` bearer two hosts mint independently) is a request
+with `deterministicId` and `deterministicPlaintext`; the row is upserted under the fixed id. From a console,
+`splicewire:beam:accounts:mint-key {kind} {id} {plaintext}` (gated on `beam.accounts.keys.enabled`) issues one for
+a declared kind that admits a console issuance.
+
 Nothing is issued while `beam.accounts.api.scope_enforcement` is off (`token_issuer_enforcement_off`).
 
 ## Who reads it
@@ -61,13 +74,16 @@ is neither shape, is `token_kind_undeclared`.
 
 ## The widest set
 
-`Tokens\WidestTokenScope::for($user)` is what an empty or `*` personal-token request becomes: the user's
-permission-name snapshot plus the names each `Contracts\DecisionNameSource` in
-`beam.accounts.tokens.decision_name_sources` reports. The permission cascade's decision-name registry is the
-first source.
+`Tokens\WidestTokenScope::for($user)` is what an empty or `*` personal-token request becomes, and what the Tokens
+page picker offers: the user's permission-name snapshot plus the names each `Contracts\DecisionNameSource` reports.
+`Tokens\CascadeDecisionNameSource` is built in (read even where a host's published `tokens` config has no
+`decision_name_sources` key): every name registered in the cascade's `DecisionNames` and each policy verb's
+class-level names (`CredentialScopeGate::offerableNames()`), never a per-record name. A host adds its own sources in
+`beam.accounts.tokens.decision_name_sources`. Offering a name grants nothing: the principal half still decides.
 
 ## No other writer
 
-`splicewire:beam:accounts:token-writes [paths…]` lists every token write outside `AuthTokenFactory` and the
-issuer (`createToken`, a token-model write, a query-builder write to the token table, a direct
-`DeterministicToken`) and exits 1 when there is one.
+`splicewire:beam:accounts:token-writes [paths…] [--exclude=path…]` lists every token write outside
+`AuthTokenFactory` and the issuer (`createToken`, a token-model write, a query-builder write to the token table, a
+direct use of the retired `DeterministicToken`) and exits 1 when there is one. Every excluded path is printed
+(`excluded: …`), so a fleet run that leaves a repository out says so.

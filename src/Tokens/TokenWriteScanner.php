@@ -26,8 +26,8 @@ use SplFileInfo;
  *    `personalAccessTokenModel()`; or in a statement on a `->tokens()` relation;
  *  - `token-table-write`: a query-builder write in a statement that selects the token table (`table('…')` with its
  *    name, or with a non-literal in a file that names it);
- *  - `deterministic-key`: a direct use of {@see \Splicewire\Beam\Accounts\Keys\DeterministicToken}, the query-builder
- *    key writer, which is itself a `token-table-write`.
+ *  - `deterministic-key`: a direct use of `Splicewire\Beam\Accounts\Keys\DeterministicToken`, the query-builder
+ *    key writer credential-scope 04 retired (a copy outside this package is still a writer).
  *
  * A variable assigned from a token-model, token-table or `->tokens()` expression (`$q = DB::table('personal_access_tokens')`,
  * `$m = BeamAccounts::tokenModel()`, `$t = new $m`) carries that through later statements in its scope, so

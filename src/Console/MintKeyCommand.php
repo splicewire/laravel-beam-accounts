@@ -3,16 +3,22 @@
 namespace Splicewire\Beam\Accounts\Console;
 
 use Illuminate\Console\Command;
-use Splicewire\Beam\Accounts\Keys\DeterministicToken;
+use Splicewire\Beam\Accounts\Tokens\MachineTokenIssuer;
+use Splicewire\Beam\Accounts\Tokens\TokenIssuance;
+use Splicewire\Beam\Localization\CodedValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
- * Host-facing affordance for the key-management module (gated on
- * `beam.accounts.keys.enabled`): mint a deterministic, reset-surviving key from the
- * CLI. Given the same (id, plaintext) it prints the SAME bearer every run — so a satellite
- * and the engine can each mint the credential they share without a central authority.
+ * Host-facing affordance for the key-management module (gated on `beam.accounts.keys.enabled`): mint a
+ * deterministic, reset-surviving key of a DECLARED kind from the CLI. Given the same (id, plaintext) it prints the
+ * SAME bearer every run, so a satellite and the engine can each mint the credential they share without a central
+ * authority.
  *
- * The reproducible primitive it drives (Keys\DeterministicToken) is always available in
- * PHP; this command is only the console door onto it, which is why it is config-gated.
+ * Through the {@see MachineTokenIssuer} (fleet ADR 0006 C7, credential-scope 04): the KIND resolves the principal
+ * the key hangs off and the abilities it carries, so the console names neither. A key is a token for another
+ * principal than the operator (who has none in a console), so the kind is a delegated one that admits a console
+ * issuance; the issuer refuses `*`, an undeclared kind, and every issuance while `scope_enforcement` is off. Before
+ * 04 this command took `--tokenable-*` and `--ability` (default `*`) and wrote the row with the query builder.
  */
 class MintKeyCommand extends Command
 {
@@ -22,38 +28,36 @@ class MintKeyCommand extends Command
     // argument simply does not exist at runtime. That is exactly what happened to {id}: the
     // command shipped with no way to pass the value the whole primitive is pinned on.
     protected $signature = 'splicewire:beam:accounts:mint-key
-        {id : The fixed token id — an int on a bigint-keyed host (pin one clear of createToken() auto-increment), or a uuid on a uuid-keyed one (pin it deterministically, e.g. uuid5 over the key name, so a re-mint reproduces it)}
+        {kind : A declared token kind (beam.accounts.tokens.kinds); it resolves the principal and the abilities}
+        {id : The fixed token id — an int on a bigint-keyed host (pin one clear of auto-increment), or a uuid on a uuid-keyed one (pin it deterministically, e.g. uuid5 over the key name, so a re-mint reproduces it)}
         {plaintext : The fixed plaintext (the part after "id|")}
-        {--tokenable-id= : The owning model id}
-        {--tokenable-type=user : The owning model morph type/alias}
-        {--name=host-key : A label for the token row}
-        {--ability=* : Abilities to grant (repeatable); defaults to * }';
+        {--name=host-key : A label for the token row}';
 
-    protected $description = 'Mint a deterministic, reset-surviving key for this host (per-host, never cross-host).';
+    protected $description = 'Mint a deterministic, reset-surviving key of a declared kind for this host (per-host, never cross-host).';
 
-    public function handle(): int
+    public function handle(MachineTokenIssuer $issuer): int
     {
-        $abilities = (array) $this->option('ability');
+        try {
+            $issued = $issuer->issue((string) $this->argument('kind'), new TokenIssuance(
+                actor: null,
+                name: (string) $this->option('name'),
+                // NOT cast to int (beam-docs-satellite ticket 25): a uuid-keyed host — every splicewire-operated
+                // host — needs its uuid to survive this line. Non-lossy for bigint hosts.
+                deterministicId: (string) $this->argument('id'),
+                deterministicPlaintext: (string) $this->argument('plaintext'),
+            ));
+        } catch (HttpExceptionInterface $e) {
+            $this->error($e->getMessage());
 
-        $token = new DeterministicToken(
-            // NOT cast to int (beam-docs-satellite ticket 25). `DeterministicToken` is typed
-            // `int|string` and folds the value verbatim into the bearer string, so a uuid-keyed host —
-            // which is every splicewire-operated host — needs its uuid to survive this line. The cast
-            // silently turned any uuid into `0`, which on Postgres is then an invalid uuid literal.
-            // Non-lossy for bigint hosts: a numeric-string argument stays numeric either way.
-            id: $this->argument('id'),
-            plaintext: (string) $this->argument('plaintext'),
-            tokenableType: (string) $this->option('tokenable-type'),
-            tokenableId: $this->option('tokenable-id') ?? '',
-            name: (string) $this->option('name'),
-            abilities: $abilities === [] ? ['*'] : $abilities,
-            table: config('beam.accounts.keys.table', 'personal_access_tokens'),
-        );
+            return self::FAILURE;
+        } catch (CodedValidationException $e) {
+            $this->error(implode(' ', array_merge(...array_values($e->errors()))));
 
-        $bearer = $token->mint();
+            return self::FAILURE;
+        }
 
         $this->info('Minted deterministic key (idempotent — re-running yields the same value):');
-        $this->line($bearer);
+        $this->line($issued->plainTextToken);
 
         return self::SUCCESS;
     }
