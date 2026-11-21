@@ -63,13 +63,19 @@ beforeEach(function () {
 /** @param  list<string>|null  $scope */
 function cs03ActingScope(?array $scope): void
 {
-    app()->instance(CredentialScopeResolver::class, new class($scope) implements CredentialScopeResolver
+    // A never-expiring acting credential: the scope and its lifetime come from one resolution (credential-scope 08).
+    app()->instance(CredentialScopeResolver::class, new class($scope) implements CredentialScopeResolver, Splicewire\Beam\Accounts\Contracts\ResolvesActingCredential
     {
         public function __construct(private ?array $scope) {}
 
         public function resolve(): ?array
         {
             return $this->scope;
+        }
+
+        public function acting(): ?Splicewire\Beam\Accounts\Tokens\ActingCredential
+        {
+            return $this->scope === null ? null : new Splicewire\Beam\Accounts\Tokens\ActingCredential($this->scope, null);
         }
     });
 }

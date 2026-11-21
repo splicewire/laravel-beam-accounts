@@ -40,7 +40,9 @@ declares a delegated kind under its own name:
 ```
 
 A **same-principal** kind (`SamePrincipalTokenKind::abilities($principal, $requested)`) mints for the actor.
-Under a scoped acting token its set may hold nothing that token lacks (`token_abilities_beyond_acting_token`).
+Under a scoped acting token its set may hold nothing that token lacks (`token_abilities_beyond_acting_token`), and
+its expiry may not be later than that token's own, nor "never" when it has one (`token_expiry_beyond_acting_token`): a
+mint never outlives its minter.
 
 A **delegated** kind (`DelegatedTokenKind`) mints for a principal the kind resolves, never one the caller names:
 
@@ -72,6 +74,30 @@ users (a tenant mirror such as tower's `TenantUser`) is read as that user, so th
 missing issuance ability) then land before anything changed.
 
 Nothing is issued while `beam.accounts.api.scope_enforcement` is off (`token_issuer_enforcement_off`).
+
+## Managing existing tokens under a scoped token
+
+The Tokens page verbs that change or remove a row hold a scoped acting token to the same authority (credential-scope 08,
+l145 review F3). `renew($token, …)` (in place, and not an issuance, so it also runs with enforcement off for a session),
+`replace($old, …)` (rotate: a kinded row through `rotate()`, a row with no kind re-issued as a personal access token)
+and `authorizeRevocation($tokens, $actor)` (archive, permanent delete, log out other sessions) refuse a row of another
+principal, a `*` row and a row carrying anything the acting token lacks (`token_beyond_acting_token`); renew and rotate
+also refuse an expiry past the acting token's (`token_expiry_beyond_acting_token`). Every refusal lands before a write. A
+session, a `*` login token and a console call are unchanged.
+
+The lifetime cap reads the acting credential's expiry as resolved TOGETHER with its scope, once per request
+(`Contracts\ResolvesActingCredential`, implemented by the bearer resolver): a revocation racing the request cannot make
+a later lookup miss and read as "never expires". Under a scope whose lifetime the bound resolver cannot state, nothing
+expiry-bearing is admitted (`token_acting_lifetime_unknown`). The same authority predicate (`mayManage()`) also holds
+`TokenPolicy::delete` and `update`, so the Frame `tokens` revoke and the REST verbs cannot disagree.
+
+Each verb first asks its registered decision name of the acting credential (`Tokens\TokenManagement`):
+`personal-access-token.view` to list, `.create` to mint or read the picker's ceiling, `.update` to renew or rotate,
+`.delete` to archive, delete or log out the other sessions; a verb on one token also admits that token's per-record
+name (`personal-access-token.{id}.update`). A scoped token lacking it gets the cascade's coded 403
+(`credential_scope_name_not_carried`). A decision a host registers with no names stays unnamed: no per-record alias
+admits it (`credential_scope_unnamed_decision`). The names are registered in the cascade's `DecisionNames`, so the widest set
+offers them.
 
 ## Who reads it
 
