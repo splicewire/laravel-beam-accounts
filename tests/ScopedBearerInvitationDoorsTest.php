@@ -80,7 +80,7 @@ it('refuses every invitation verb to a scoped bearer lacking its name, writing a
     $manage = PermissionNamer::assemble(Team::class, 'manage-invitations');
     $before = cs08bInvState();
 
-    cs08bInvBearer($this, $owner, [$manage])->getJson('/beam/accounts/invitations')
+    cs08bInvBearer($this, $owner, [$manage, 'entity.view'])->getJson('/beam/accounts/invitations')
         ->assertForbidden()->assertJsonPath('code', 'credential_scope_name_not_carried');
     foreach ([
         ['postJson', '/beam/accounts/invitations', ['email' => 'new@example.test', 'role' => 'member']],
