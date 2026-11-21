@@ -120,6 +120,14 @@ enum AccountError: string implements CodedError
     #[Message('The lifetime of the token making this request could not be established, so it cannot set a token expiry.')]
     case TokenActingLifetimeUnknown = 'token_acting_lifetime_unknown';
 
+    // A token kind's own maximum lifetime (credential-scope 09, l145 review F5).
+
+    #[Message('A :kind token cannot live longer than :days days. Choose an expiry no later than :expires.')]
+    case TokenLifetimeBeyondKind = 'token_lifetime_beyond_kind';
+
+    #[Message('The :kind token kind declares no valid maximum lifetime, so no token of it can be issued, renewed or rotated.')]
+    case TokenKindLifetimeInvalid = 'token_kind_lifetime_invalid';
+
     #[Message('A scoped token can only renew, rotate or revoke a token of its own principal that carries nothing it lacks. Beyond it: :abilities.')]
     case TokenBeyondActingToken = 'token_beyond_acting_token';
 

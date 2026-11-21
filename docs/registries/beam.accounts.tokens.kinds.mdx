@@ -75,6 +75,20 @@ missing issuance ability) then land before anything changed.
 
 Nothing is issued while `beam.accounts.api.scope_enforcement` is off (`token_issuer_enforcement_off`).
 
+## A kind's maximum lifetime
+
+A kind may declare `maxLifetime(): ?CarbonInterval` (credential-scope 09, l145 review F5); the default is null, which
+caps nothing, so every kind that declares none is unchanged. For a kind that declares one, the issuer refuses an
+issuance, a `renew()` and a rotation (`rotate()`, and `replace()` through it) whose expiry is missing ("never") or later
+than now plus the lifetime, whoever asks, a session included (`token_lifetime_beyond_kind`, a coded 422 on
+`expiresInDays`). A zero or negative lifetime is a misconfiguration and refuses every issuance, renewal and rotation of
+the kind (`token_kind_lifetime_invalid`); it never reads as "no cap". `TokenKind::lifetimeInDays($value)` turns a host
+value into a lifetime: anything but a positive whole number (or a string of digits) becomes zero, so a bad config value
+fails closed. `renew()` reads the row's recorded kind, refuses a kind that is no longer declared
+(`token_kind_undeclared`) rather than reading it as uncapped, and leaves a row with no recorded kind (minted before
+kinds) without a kind cap. Tower's `connected-site` kind declares one (90 days by default,
+`tower.connected-sites.token_max_lifetime_days`).
+
 ## Managing existing tokens under a scoped token
 
 The Tokens page verbs that change or remove a row hold a scoped acting token to the same authority (credential-scope 08,

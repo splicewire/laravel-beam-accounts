@@ -2,6 +2,7 @@
 
 namespace Splicewire\Beam\Accounts\Tokens;
 
+use Carbon\CarbonInterval;
 use Splicewire\Beam\Accounts\Enums\TokenProvenance;
 
 /**
@@ -20,6 +21,9 @@ use Splicewire\Beam\Accounts\Enums\TokenProvenance;
  *    over it, and requires its issuance ability on the acting credential; the set is the kind's own (rule 2,
  *    second half).
  *
+ * A kind may also declare a **maximum lifetime** ({@see maxLifetime()}, credential-scope 09): the issuer then refuses a
+ * mint, a renewal or a rotation of that kind with no expiry or one past now plus the lifetime.
+ *
  * Neither shape can produce `*`: the issuer refuses it whatever the kind returns. Only
  * {@see \Splicewire\Beam\Accounts\Auth\AuthTokenFactory} mints `*`, because only a login token stands in for a
  * signed-in session.
@@ -30,5 +34,29 @@ abstract class TokenKind
     public function provenance(): TokenProvenance
     {
         return TokenProvenance::Api;
+    }
+
+    /**
+     * The longest a token of this kind may live, counted from its mint, renewal or rotation; null caps nothing (the
+     * default, so a kind that declares none is unchanged). When a kind declares one, {@see MachineTokenIssuer} refuses
+     * every issuance, renewal and rotation of it whose expiry is missing ("never") or later than now plus this
+     * (`token_lifetime_beyond_kind`), and refuses a zero or negative lifetime as a misconfiguration
+     * (`token_kind_lifetime_invalid`) rather than reading it as no cap.
+     */
+    public function maxLifetime(): ?CarbonInterval
+    {
+        return null;
+    }
+
+    /**
+     * A lifetime of `$days` whole days from a host value (config, env), for {@see maxLifetime()}. Anything that is not a
+     * positive whole number (null, `0`, `-3`, `'90d'`, `1.5`) becomes a zero lifetime, which the issuer refuses: a
+     * misconfigured cap fails closed instead of reading as "no cap".
+     */
+    public static function lifetimeInDays(mixed $days): CarbonInterval
+    {
+        $valid = (is_int($days) || (is_string($days) && preg_match('/^[0-9]+$/', $days) === 1)) && (int) $days > 0;
+
+        return CarbonInterval::days($valid ? (int) $days : 0);
     }
 }

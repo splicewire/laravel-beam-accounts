@@ -28,6 +28,10 @@ use Splicewire\Beam\Localization\CodedValidationException;
  *  - for a delegated kind, a scoped acting credential without the kind's issuance ability, a request naming a
  *    principal or subject other than the one the kind resolves (or any subject when the kind resolves none), a
  *    target that is the actor itself, and an actor without live authority over the resolved principal (C6).
+ *  - for a kind that declares a maximum lifetime ({@see TokenKind::maxLifetime()}, credential-scope 09), an expiry that
+ *    is missing ("never") or later than now plus that lifetime, whoever asks (`token_lifetime_beyond_kind`), and a zero
+ *    or negative lifetime (`token_kind_lifetime_invalid`). The same rule holds {@see renew()} and, through
+ *    {@see issue()}, {@see rotate()} and {@see replace()}.
  *
  * Under a scoped acting credential the token-management verbs that change or remove an existing row are held to the same
  * authority (credential-scope 08, l145 review F3): {@see renew()}, {@see replace()} (rotate) and
@@ -139,6 +143,8 @@ class MachineTokenIssuer
 
     private function issueDeclared(string $kind, TokenKind $declared, TokenIssuance $request): IssuedToken
     {
+        $this->refuseBeyondKindLifetime($kind, $declared, $request->expiresAt);
+
         $scope = app(CredentialScopeResolver::class)->resolve();
 
         [$principal, $abilities] = $declared instanceof DelegatedTokenKind
@@ -224,6 +230,19 @@ class MachineTokenIssuer
         if ($scope !== null) {
             $this->refuseBeyondActingToken($token, $request->actor, $scope);
             $this->refuseExpiryBeyondActingToken($request->expiresAt);
+        }
+
+        // A row of a declared kind is renewed only within that kind's maximum lifetime, for every caller, a session
+        // included (credential-scope 09). A row whose recorded kind is no longer declared is refused rather than read as
+        // uncapped; a row minted before kinds were recorded (no kind) has no kind cap.
+        $kind = (string) ($token->getAttribute(self::KIND_COLUMN) ?? '');
+
+        if ($kind !== '') {
+            $declared = $this->kinds->kind($kind);
+
+            AccountError::TokenKindUndeclared->abortIf($declared === null, 422, ['kind' => $kind]);
+
+            $this->refuseBeyondKindLifetime($kind, $declared, $request->expiresAt);
         }
 
         $token->forceFill(['expires_at' => $request->expiresAt])->save();
@@ -329,6 +348,34 @@ class MachineTokenIssuer
         }
 
         throw CodedValidationException::for('expiresInDays', AccountError::TokenExpiryBeyondActingToken, ['expires' => $ceiling->toIso8601String()]);
+    }
+
+    /**
+     * Refuse an expiry past `$declared`'s maximum lifetime: none ("never"), or later than now plus the lifetime. A kind
+     * that declares no lifetime caps nothing; one that declares a zero or negative lifetime is misconfigured and refuses
+     * everything, so a bad host value never reads as "no cap" (credential-scope 09).
+     */
+    private function refuseBeyondKindLifetime(string $kind, TokenKind $declared, ?CarbonInterface $expiresAt): void
+    {
+        $lifetime = $declared->maxLifetime();
+
+        if ($lifetime === null) {
+            return;
+        }
+
+        AccountError::TokenKindLifetimeInvalid->abortIf($lifetime->totalSeconds <= 0, 403, ['kind' => $kind]);
+
+        $ceiling = now()->add($lifetime);
+
+        if ($expiresAt !== null && $expiresAt->lessThanOrEqualTo($ceiling)) {
+            return;
+        }
+
+        throw CodedValidationException::for('expiresInDays', AccountError::TokenLifetimeBeyondKind, [
+            'kind' => $kind,
+            'days' => (string) (int) floor($lifetime->totalDays),
+            'expires' => $ceiling->toIso8601String(),
+        ]);
     }
 
     /**
