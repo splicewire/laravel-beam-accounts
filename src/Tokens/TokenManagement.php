@@ -77,10 +77,19 @@ final class TokenManagement
      */
     public static function authorize(mixed $user, string $decision, ?Model $token = null): void
     {
-        $names = app(DecisionNames::class)->for($decision, [])
-            ?? (isset(self::VERBS[$decision]) ? [self::SUBJECT.'.'.self::VERBS[$decision]] : []);
+        $registered = app(DecisionNames::class)->for($decision, []);
 
-        if ($token !== null && $token->exists && isset(self::VERBS[$decision])) {
+        // A registration that names nothing is an unnamed decision, and stays one: no per-record alias is added to it,
+        // as the cascade returns an explicit registration unchanged (CredentialScopeGate::namesFor; review cs08a).
+        if ($registered === []) {
+            app(CredentialScopeGate::class)->authorizeCarried($user, $decision, []);
+
+            return;
+        }
+
+        $names = $registered ?? (isset(self::VERBS[$decision]) ? [self::SUBJECT.'.'.self::VERBS[$decision]] : []);
+
+        if ($names !== [] && $token !== null && $token->exists && isset(self::VERBS[$decision])) {
             $names[] = self::SUBJECT.'.'.$token->getKey().'.'.self::VERBS[$decision];
         }
 

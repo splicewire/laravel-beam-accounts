@@ -2,10 +2,15 @@
 
 namespace Splicewire\Beam\Accounts\Authorization;
 
+use Illuminate\Auth\Access\Response;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Rushing\PermissionCascade\Authorization\CredentialScopeGate;
 use Splicewire\Beam\Accounts\Data\TokenData;
+use Splicewire\Beam\Accounts\Localization\AccountAuthorizationResponse;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\QueryBuilders\TokensQuery;
+use Splicewire\Beam\Accounts\Tokens\MachineTokenIssuer;
 
 /**
  * The authorization for personal access tokens — the model behind the `tokens` Frame resource
@@ -99,15 +104,35 @@ class TokenPolicy
      * and defined anyway, so a host that widens `editable` inherits the ownership rule rather than
      * falling through to a policy that has no method and denies for an unrelated reason.
      */
-    public function update(?Authenticatable $user, Model $token): bool
+    public function update(?Authenticatable $user, Model $token): bool|Response
     {
-        return $this->owns($user, $token);
+        return $this->owns($user, $token) ? $this->withinActingToken($user, $token) : false;
     }
 
-    /** Revoke. The one write verb the `tokens` resource actually exposes. */
-    public function delete(?Authenticatable $user, Model $token): bool
+    /**
+     * Revoke. The one write verb the `tokens` resource actually exposes (Frame's revoke-by-id). Under a scoped acting
+     * token it is held to that token's own authority, by the issuer's predicate the REST verbs use: never a `*` token,
+     * nor one carrying anything the acting token lacks (credential-scope 08, review cs08a).
+     */
+    public function delete(?Authenticatable $user, Model $token): bool|Response
     {
-        return $this->owns($user, $token);
+        return $this->owns($user, $token) ? $this->withinActingToken($user, $token) : false;
+    }
+
+    /**
+     * True unless a scoped credential acting for `$user` is narrower than the persisted `$token`
+     * ({@see MachineTokenIssuer::mayManage()}). A class-level probe (an unsaved instance) and a check for anyone but the
+     * acting principal are unchanged.
+     */
+    protected function withinActingToken(?Authenticatable $user, Model $token): bool|Response
+    {
+        if (! $token->exists || ! app(CredentialScopeGate::class)->scopes($user)) {
+            return true;
+        }
+
+        return app(MachineTokenIssuer::class)->mayManage($token, $user)
+            ? true
+            : new AccountAuthorizationResponse(AccountError::TokenBeyondActingToken, ['abilities' => 'a token wider than the acting one']);
     }
 
     /**

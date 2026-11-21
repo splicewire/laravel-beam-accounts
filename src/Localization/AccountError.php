@@ -117,6 +117,9 @@ enum AccountError: string implements CodedError
     #[Message('A token made or renewed with a scoped token cannot outlive it. Choose an expiry no later than :expires.')]
     case TokenExpiryBeyondActingToken = 'token_expiry_beyond_acting_token';
 
+    #[Message('The lifetime of the token making this request could not be established, so it cannot set a token expiry.')]
+    case TokenActingLifetimeUnknown = 'token_acting_lifetime_unknown';
+
     #[Message('A scoped token can only renew, rotate or revoke a token of its own principal that carries nothing it lacks. Beyond it: :abilities.')]
     case TokenBeyondActingToken = 'token_beyond_acting_token';
 

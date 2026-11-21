@@ -334,3 +334,100 @@ it('refuses, at the issuer, a scoped token managing another principal\'s row (th
         ->and($code(fn () => $issuer->authorizeRevocation([$theirs], $this->user)))->toBe('token_beyond_acting_token')
         ->and(cs08State())->toEqual($before);
 });
+
+// ── Amend (review cs08a) ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Revoke the acting token (archive: its hash overwritten, as ApiTokenController::neutralize does) right AFTER the verb's
+ * name is authorized and before the issuer's lifetime check: a concurrent archive or logout landing mid-request,
+ * interleaved deterministically.
+ */
+function cs08RevokeActingAfterNameCheck(PersonalAccessToken $acting): void
+{
+    app()->bind(Rushing\PermissionCascade\Authorization\CredentialScopeGate::class, fn ($app) => new class($app->make(Illuminate\Contracts\Auth\Access\Gate::class), $app->make(Rushing\PermissionCascade\Authorization\DecisionNames::class), $acting) extends Rushing\PermissionCascade\Authorization\CredentialScopeGate
+    {
+        public function __construct($gate, $names, private PersonalAccessToken $acting)
+        {
+            parent::__construct($gate, $names);
+        }
+
+        public function authorizeCarried(mixed $user, string $decision, string|array|null $names = null): void
+        {
+            parent::authorizeCarried($user, $decision, $names);
+
+            if (str_starts_with($decision, 'tokens.')) {
+                PersonalAccessToken::query()->whereKey($this->acting->getKey())->update(['token' => hash('sha256', 'revoked-mid-request'), 'archived_at' => now()]);
+            }
+        }
+    });
+}
+
+it('keeps the acting token\'s lifetime cap when the token is revoked mid-request: no never-expiring renew or mint', function () {
+    [$bearer, $acting] = cs08Token($this->user, 'acting', [...cs08AllNames(), 'entity.view'], now()->addDays(2));
+    [, $narrow] = cs08Token($this->user, 'narrow', ['entity.view'], now()->addHour());
+    cs08RevokeActingAfterNameCheck($acting);
+    $before = cs08State();
+
+    cs08As($bearer)->postJson("/api/v1/beam/accounts/tokens/{$narrow->id}/renew", [])
+        ->assertUnprocessable()->assertJsonPath('codes.expiresInDays.0', 'token_expiry_beyond_acting_token');
+
+    // The interleaving happened: the acting row no longer matches its bearer.
+    expect(PersonalAccessToken::findToken($bearer))->toBeNull()
+        ->and($narrow->fresh()->expires_at->toIso8601String())->toBe(collect($before)->firstWhere('id', $narrow->id)['expires_at'])
+        ->and(PersonalAccessToken::query()->count())->toBe(count($before));
+});
+
+it('refuses an expiry-bearing mint when the scoped credential\'s lifetime is not known (a resolver that cannot say)', function () {
+    app()->instance(CredentialScopeResolver::class, new class implements CredentialScopeResolver
+    {
+        public function resolve(): ?array
+        {
+            return [...cs08AllNames(), 'entity.view'];
+        }
+    });
+    test()->actingAs($this->user);
+    $before = cs08State();
+
+    try {
+        app(Splicewire\Beam\Accounts\Tokens\MachineTokenIssuer::class)->issue('personal-access-token', new Splicewire\Beam\Accounts\Tokens\TokenIssuance(actor: $this->user, name: 'child', abilities: ['entity.view']));
+        $code = null;
+    } catch (Splicewire\Beam\Accounts\Localization\AccountHttpException $e) {
+        $code = $e->error->code();
+    }
+
+    expect($code)->toBe('token_acting_lifetime_unknown')->and(cs08State())->toEqual($before);
+});
+
+it('keeps an explicitly empty registration unnamed: the per-record alias does not admit it', function () {
+    app(Rushing\PermissionCascade\Authorization\DecisionNames::class)->name(TokenManagement::RENEW, []);
+    [, $narrow] = cs08Token($this->user, 'narrow', ['entity.view'], now()->addDay());
+    [$bearer] = cs08Token($this->user, 'acting', ["personal-access-token.{$narrow->id}.update", 'entity.view']);
+    $before = cs08State();
+
+    cs08As($bearer)->postJson("/api/v1/beam/accounts/tokens/{$narrow->id}/renew", ['expiresInDays' => 1])
+        ->assertForbidden()->assertJsonPath('code', 'credential_scope_unnamed_decision');
+
+    expect(cs08State())->toEqual($before);
+});
+
+it('holds the token policy (the Frame revoke) to the acting token\'s authority, by the issuer\'s predicate', function () {
+    // The policy's `delete` is named by the cascade's derivation for the PAT model class (Sanctum's here); the acting
+    // token carries it, so what is under test is the authority half.
+    $model = Splicewire\Beam\Accounts\Facades\BeamAccounts::tokenModel(); // the model TokenPolicy is registered on
+    $derived = app(Rushing\PermissionCascade\Authorization\CredentialScopeGate::class)->derivedNames('delete', $model);
+    [$bearer] = cs08Token($this->user, 'acting', [...cs08AllNames(), ...$derived, 'entity.view']);
+    $star = $model::findOrFail(cs08Token($this->user, 'star', ['*'])[1]->getKey());
+    $narrow = $model::findOrFail(cs08Token($this->user, 'narrow', ['entity.view'])[1]->getKey());
+    $this->app->instance('request', Illuminate\Http\Request::create('/', 'DELETE', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$bearer]));
+    test()->actingAs($this->user);
+    $gate = Illuminate\Support\Facades\Gate::forUser($this->user);
+
+    expect($gate->inspect('delete', $star)->allowed())->toBeFalse()
+        ->and($gate->inspect('delete', $star)->code())->toBe('token_beyond_acting_token')
+        ->and($gate->allows('delete', $narrow))->toBeTrue();
+
+    // A session (no bearer) keeps the ownership rule alone.
+    $this->app->instance('request', Illuminate\Http\Request::create('/', 'DELETE'));
+    app()->forgetInstance(CredentialScope::class);
+    expect(Illuminate\Support\Facades\Gate::forUser($this->user)->allows('delete', $star))->toBeTrue();
+});

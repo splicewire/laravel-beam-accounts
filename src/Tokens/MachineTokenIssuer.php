@@ -6,8 +6,8 @@ use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
-use Laravel\Sanctum\Sanctum;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
+use Splicewire\Beam\Accounts\Contracts\ResolvesActingCredential;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Keys\TokenLastFour;
 use Splicewire\Beam\Accounts\Localization\AccountError;
@@ -255,6 +255,23 @@ class MachineTokenIssuer
     }
 
     /**
+     * Whether the acting credential may manage (renew, rotate, revoke) `$token`: always when it is unscoped; under a scope
+     * only a row of its own principal carrying nothing the scope lacks. The one predicate the REST verbs
+     * ({@see authorizeRevocation()}, {@see renew()}, {@see replace()}) and the token policy (`TokenPolicy::delete`, the
+     * Frame revoke) share, so the two transports cannot disagree (review cs08a).
+     */
+    public function mayManage(Model $token, ?Authenticatable $actor): bool
+    {
+        $scope = app(CredentialScopeResolver::class)->resolve();
+
+        if ($scope === null) {
+            return true;
+        }
+
+        return $this->beyondActingToken($token, $this->canonical(new TokenIssuance(actor: $actor, name: ''))->actor, $scope) === null;
+    }
+
+    /**
      * A scoped acting credential manages only a row of its own principal whose abilities it carries: never another
      * principal's, never a `*` or null (unscoped) row, never one carrying a name it lacks.
      *
@@ -262,75 +279,56 @@ class MachineTokenIssuer
      */
     private function refuseBeyondActingToken(Model $token, ?Authenticatable $actor, array $scope): void
     {
+        $beyond = $this->beyondActingToken($token, $actor, $scope);
+
+        AccountError::TokenBeyondActingToken->abortIf($beyond !== null, 403, ['abilities' => (string) $beyond]);
+    }
+
+    /**
+     * Null when `$token` is within the scoped acting credential's authority; otherwise what lies beyond it.
+     *
+     * @param  list<string>  $scope
+     */
+    private function beyondActingToken(Model $token, ?Authenticatable $actor, array $scope): ?string
+    {
         $owned = $actor instanceof Model
             && (string) $token->getAttribute('tokenable_type') === $actor->getMorphClass()
             && (string) $token->getAttribute('tokenable_id') === (string) $actor->getKey();
+
+        if (! $owned) {
+            return 'another principal\'s token';
+        }
+
         $abilities = $token->getAttribute('abilities');
         $beyond = is_array($abilities) && ! in_array('*', $abilities, true)
             ? array_values(array_diff($abilities, $scope))
             : ['*'];
 
-        AccountError::TokenBeyondActingToken->abortIf(
-            ! $owned || $beyond !== [],
-            403,
-            ['abilities' => $owned ? implode(', ', $beyond) : 'another principal\'s token'],
-        );
+        return $beyond === [] ? null : implode(', ', $beyond);
     }
 
     /**
-     * Refuse an expiry later than the acting credential's own (null = never is later than any expiry). An acting
-     * credential that never expires caps nothing. Only called under a scoped acting credential.
+     * Refuse an expiry later than the acting credential's own (null = never is later than any expiry). Only called under
+     * a scoped acting credential. The ceiling is the lifetime resolved TOGETHER with the scope, in the same request
+     * ({@see ResolvesActingCredential}), never a second lookup: a revocation racing this request (an archive, a logout)
+     * would make that lookup miss, and a miss must not read as "never expires" (review cs08a, blocking). When no such
+     * lifetime is known for the scoped credential, nothing expiry-bearing is admitted (`token_acting_lifetime_unknown`).
+     * An acting credential that never expires caps nothing.
      */
     private function refuseExpiryBeyondActingToken(?CarbonInterface $expiresAt): void
     {
-        $ceiling = $this->actingTokenExpiry();
+        $resolver = app(CredentialScopeResolver::class);
+        $acting = $resolver instanceof ResolvesActingCredential ? $resolver->acting() : null;
+
+        AccountError::TokenActingLifetimeUnknown->abortIf($acting === null, 403);
+
+        $ceiling = $acting->expiresAt;
 
         if ($ceiling === null || ($expiresAt !== null && $expiresAt->lessThanOrEqualTo($ceiling))) {
             return;
         }
 
         throw CodedValidationException::for('expiresInDays', AccountError::TokenExpiryBeyondActingToken, ['expires' => $ceiling->toIso8601String()]);
-    }
-
-    /**
-     * When the request's bearer token stops authenticating: its `expires_at`, or Sanctum's global `sanctum.expiration`
-     * minutes after it was created, whichever is sooner; null when neither applies or the request carries no known
-     * token. Read from the same row the bearer scope resolver reads ({@see \Splicewire\Beam\Accounts\Authorization\TokenAbilitiesScopeResolver}).
-     */
-    private function actingTokenExpiry(): ?CarbonInterface
-    {
-        $bearer = request()?->bearerToken();
-
-        if (! $bearer || ! class_exists(Sanctum::class)) {
-            return null;
-        }
-
-        $model = Sanctum::personalAccessTokenModel();
-        $token = $model::findToken($bearer);
-
-        if ($token === null) {
-            return null;
-        }
-
-        $expiries = [];
-
-        if ($token->expires_at instanceof CarbonInterface) {
-            $expiries[] = $token->expires_at;
-        }
-
-        $minutes = config('sanctum.expiration');
-
-        if (is_numeric($minutes) && $token->created_at instanceof CarbonInterface) {
-            $expiries[] = $token->created_at->copy()->addMinutes((int) $minutes);
-        }
-
-        if ($expiries === []) {
-            return null;
-        }
-
-        usort($expiries, fn (CarbonInterface $a, CarbonInterface $b): int => $a <=> $b);
-
-        return $expiries[0];
     }
 
     /**

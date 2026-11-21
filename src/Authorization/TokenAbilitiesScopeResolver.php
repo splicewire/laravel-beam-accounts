@@ -2,10 +2,13 @@
 
 namespace Splicewire\Beam\Accounts\Authorization;
 
+use Carbon\CarbonInterface;
 use Closure;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
+use Splicewire\Beam\Accounts\Contracts\ResolvesActingCredential;
+use Splicewire\Beam\Accounts\Tokens\ActingCredential;
 
 /**
  * Sources the permission-cascade's credential-scope from the acting Sanctum PAT's
@@ -20,10 +23,14 @@ use Rushing\PermissionCascade\Contracts\CredentialScopeResolver;
  * The token is resolved from the bearer (not `currentAccessToken()`) because the acting
  * principal on a tenant request is a TenantUser, which has no Sanctum token relation — the
  * central User owns the token. Mirrors ApiTokenController's own bearer lookup.
+ *
+ * The scope and the token's lifetime are resolved together, once per bearer ({@see acting()}): the issuer's lifetime
+ * cap reads that memo, never a second lookup a concurrent revocation could make miss (credential-scope 08, review
+ * cs08a).
  */
-class TokenAbilitiesScopeResolver implements CredentialScopeResolver
+class TokenAbilitiesScopeResolver implements CredentialScopeResolver, ResolvesActingCredential
 {
-    /** @var array<string, array<int, string>|null> */
+    /** @var array<string, ActingCredential|null> */
     private array $memo = [];
 
     /** The Sanctum validation callback this class installed, so installing it again is a no-op. */
@@ -71,6 +78,11 @@ class TokenAbilitiesScopeResolver implements CredentialScopeResolver
 
     public function resolve(): ?array
     {
+        return $this->acting()?->scope;
+    }
+
+    public function acting(): ?ActingCredential
+    {
         $bearer = request()?->bearerToken();
 
         // No bearer → cookie/session/SPA or unauthenticated → unscoped (unchanged).
@@ -82,10 +94,10 @@ class TokenAbilitiesScopeResolver implements CredentialScopeResolver
             return $this->memo[$bearer];
         }
 
-        return $this->memo[$bearer] = $this->scopeForBearer($bearer);
+        return $this->memo[$bearer] = $this->credentialForBearer($bearer);
     }
 
-    private function scopeForBearer(string $bearer): ?array
+    private function credentialForBearer(string $bearer): ?ActingCredential
     {
         /** @var class-string<PersonalAccessToken> $model */
         $model = Sanctum::personalAccessTokenModel();
@@ -101,6 +113,33 @@ class TokenAbilitiesScopeResolver implements CredentialScopeResolver
             return null;
         }
 
-        return array_values((array) $token->abilities);
+        return new ActingCredential(array_values((array) $token->abilities), self::expiryOf($token));
+    }
+
+    /**
+     * When a token row stops authenticating: its `expires_at`, or Sanctum's global `sanctum.expiration` minutes after it
+     * was created, whichever is sooner; null when neither applies.
+     */
+    public static function expiryOf(mixed $token): ?CarbonInterface
+    {
+        $expiries = [];
+
+        if ($token->expires_at instanceof CarbonInterface) {
+            $expiries[] = $token->expires_at;
+        }
+
+        $minutes = config('sanctum.expiration');
+
+        if (is_numeric($minutes) && $token->created_at instanceof CarbonInterface) {
+            $expiries[] = $token->created_at->copy()->addMinutes((int) $minutes);
+        }
+
+        if ($expiries === []) {
+            return null;
+        }
+
+        usort($expiries, fn (CarbonInterface $a, CarbonInterface $b): int => $a <=> $b);
+
+        return $expiries[0];
     }
 }

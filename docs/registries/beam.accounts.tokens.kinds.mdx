@@ -85,11 +85,18 @@ principal, a `*` row and a row carrying anything the acting token lacks (`token_
 also refuse an expiry past the acting token's (`token_expiry_beyond_acting_token`). Every refusal lands before a write. A
 session, a `*` login token and a console call are unchanged.
 
+The lifetime cap reads the acting credential's expiry as resolved TOGETHER with its scope, once per request
+(`Contracts\ResolvesActingCredential`, implemented by the bearer resolver): a revocation racing the request cannot make
+a later lookup miss and read as "never expires". Under a scope whose lifetime the bound resolver cannot state, nothing
+expiry-bearing is admitted (`token_acting_lifetime_unknown`). The same authority predicate (`mayManage()`) also holds
+`TokenPolicy::delete` and `update`, so the Frame `tokens` revoke and the REST verbs cannot disagree.
+
 Each verb first asks its registered decision name of the acting credential (`Tokens\TokenManagement`):
 `personal-access-token.view` to list, `.create` to mint or read the picker's ceiling, `.update` to renew or rotate,
 `.delete` to archive, delete or log out the other sessions; a verb on one token also admits that token's per-record
 name (`personal-access-token.{id}.update`). A scoped token lacking it gets the cascade's coded 403
-(`credential_scope_name_not_carried`). The names are registered in the cascade's `DecisionNames`, so the widest set
+(`credential_scope_name_not_carried`). A decision a host registers with no names stays unnamed: no per-record alias
+admits it (`credential_scope_unnamed_decision`). The names are registered in the cascade's `DecisionNames`, so the widest set
 offers them.
 
 ## Who reads it
