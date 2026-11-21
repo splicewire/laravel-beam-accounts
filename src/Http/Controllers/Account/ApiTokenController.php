@@ -29,6 +29,7 @@ use Splicewire\Beam\Accounts\Tokens\IssuedToken;
 use Splicewire\Beam\Accounts\Tokens\Kinds\PersonalAccessTokenKind;
 use Splicewire\Beam\Accounts\Tokens\MachineTokenIssuer;
 use Splicewire\Beam\Accounts\Tokens\TokenIssuance;
+use Splicewire\Beam\Accounts\Tokens\TokenManagement;
 use Splicewire\Beam\Accounts\Tokens\WidestTokenScope;
 
 /**
@@ -63,6 +64,15 @@ use Splicewire\Beam\Accounts\Tokens\WidestTokenScope;
  * two-step fallback {@see \Splicewire\Beam\Accounts\Particle\Backing\ConfiguredTokenBacking} reads,
  * so a host with a bespoke PAT (its own connection, a uuid key) is served without subclassing this.
  *
+ * ## A scoped token manages tokens only within its own authority
+ *
+ * Every verb asks its registered `personal-access-token.*` name of the acting credential ({@see TokenManagement};
+ * fleet ADR 0006 rule 1, credential-scope 08, l145 review F3): a scoped token lacking it gets the cascade's coded 403.
+ * What the verb may then reach is the acting token's own authority, enforced by the issuer and not here: renew and
+ * rotate never produce a token carrying anything the acting token lacks or outliving it, and never touch a `*` token;
+ * archive, delete and "log out other sessions" never revoke a token wider than the acting one. Every refusal lands
+ * before a write. A session and a `*` login token are unchanged.
+ *
  * ## Not a promotion of tower's controller
  *
  * `Splicewire\Tower\Api\V1\ApiTokenController` is the ancestor in shape and is untouched: it resolves
@@ -84,6 +94,8 @@ class ApiTokenController extends Controller
     #[ResponseFromData(ApiTokenData::class)]
     public function index(Request $request): JsonResponse
     {
+        TokenManagement::authorize($request->user(), TokenManagement::INDEX);
+
         $currentId = $this->currentTokenId($request);
 
         $tokens = $this->scoped()
@@ -106,6 +118,8 @@ class ApiTokenController extends Controller
     #[ResponseFromData(HeldPermissionsData::class)]
     public function permissions(Request $request): JsonResponse
     {
+        TokenManagement::authorize($request->user(), TokenManagement::PERMISSIONS);
+
         return response()->json([
             'data' => new HeldPermissionsData(
                 permissions: app(WidestTokenScope::class)->for($this->tokenOwner($request)),
@@ -125,7 +139,9 @@ class ApiTokenController extends Controller
     {
         // Resolved HERE rather than injected as a typed parameter, deliberately: container injection
         // validates during resolution, i.e. BEFORE the method body, which would put 422 ahead of the
-        // route's own auth gate.
+        // route's own auth gate — and behind the scope's, which goes first.
+        TokenManagement::authorize($request->user(), TokenManagement::STORE);
+
         $input = ApiTokenCreateInputData::validateAndCreate($request);
 
         $issued = app(MachineTokenIssuer::class)->issue(PersonalAccessTokenKind::NAME, new TokenIssuance(
@@ -157,11 +173,20 @@ class ApiTokenController extends Controller
         if ($token === null) {
             return response()->json((new AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
+
+        TokenManagement::authorize($request->user(), TokenManagement::RENEW, $token);
+
         if ($token->archived_at) {
             return response()->json((new AccountErrorData(AccountError::RenewArchived->message(), AccountError::RenewArchived->code()))->toArray(), 422);
         }
 
-        $token->forceFill(['expires_at' => $this->expiresAtFor($this->optional($input->expiresInDays))])->save();
+        // Through the issuer, which holds a scoped acting token to its own authority: no `*` or wider target, and no
+        // expiry past its own (l145 review P7b). A refusal writes nothing.
+        app(MachineTokenIssuer::class)->renew($token, new TokenIssuance(
+            actor: $this->tokenOwner($request),
+            name: (string) $token->name,
+            expiresAt: $this->expiresAtFor($this->optional($input->expiresInDays)),
+        ));
 
         return response()->json(['data' => $this->present($token->fresh(), $this->currentTokenId($request))]);
     }
@@ -185,6 +210,9 @@ class ApiTokenController extends Controller
         if ($old === null) {
             return response()->json((new AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
+
+        TokenManagement::authorize($request->user(), TokenManagement::ROTATE, $old);
+
         if ((string) $old->getKey() === (string) $this->currentTokenId($request)) {
             return response()->json((new AccountErrorData(AccountError::RotateCurrent->message(), AccountError::RotateCurrent->code()))->toArray(), 422);
         }
@@ -193,20 +221,15 @@ class ApiTokenController extends Controller
         }
 
         // Same name + scope, through the issuer: a row of a declared kind rotates as that kind (refused for a delegated
-        // kind, capped by a scoped acting token); a row minted before kinds were recorded is re-issued as a personal
-        // access token, so a legacy `*` scope becomes the widest named set and never `*` again (ADR 0006 C7).
-        $issuer = app(MachineTokenIssuer::class);
-        $owner = $this->tokenOwner($request);
-        $expiresAt = $this->expiresAtFor($this->optional($input->expiresInDays));
-
-        $issued = filled($old->getAttribute(MachineTokenIssuer::KIND_COLUMN))
-            ? $issuer->rotate($old, new TokenIssuance(actor: $owner, name: (string) $old->name, expiresAt: $expiresAt))
-            : $issuer->issue(PersonalAccessTokenKind::NAME, new TokenIssuance(
-                actor: $owner,
-                name: (string) $old->name,
-                abilities: is_array($old->abilities) ? array_values($old->abilities) : null,
-                expiresAt: $expiresAt,
-            ));
+        // kind); a row minted before kinds were recorded is re-issued as a personal access token, so a legacy `*` scope
+        // becomes the widest named set and never `*` again (ADR 0006 C7). A scoped acting token may rotate only its own
+        // principal's row carrying nothing it lacks (never a `*` row), into a token no wider and no longer-lived than
+        // itself (credential-scope 08). The old row is archived only once the new one exists.
+        $issued = app(MachineTokenIssuer::class)->replace($old, new TokenIssuance(
+            actor: $this->tokenOwner($request),
+            name: (string) $old->name,
+            expiresAt: $this->expiresAtFor($this->optional($input->expiresInDays)),
+        ));
 
         $this->neutralize($old);
 
@@ -234,12 +257,17 @@ class ApiTokenController extends Controller
         if ($token === null) {
             return response()->json((new AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
+
+        TokenManagement::authorize($request->user(), TokenManagement::ARCHIVE, $token);
+
         if ((string) $token->getKey() === (string) $this->currentTokenId($request)) {
             return response()->json((new AccountErrorData(AccountError::ArchiveCurrent->message(), AccountError::ArchiveCurrent->code()))->toArray(), 422);
         }
         if ($token->archived_at) {
             return response()->json((new AccountErrorData(AccountError::AlreadyArchived->message(), AccountError::AlreadyArchived->code()))->toArray(), 409);
         }
+
+        app(MachineTokenIssuer::class)->authorizeRevocation([$token], $this->tokenOwner($request));
 
         $this->neutralize($token);
 
@@ -265,12 +293,17 @@ class ApiTokenController extends Controller
         if ($token === null) {
             return response()->json((new AccountErrorData(AccountError::TokenNotFound->message(), AccountError::TokenNotFound->code()))->toArray(), 404);
         }
+
+        TokenManagement::authorize($request->user(), TokenManagement::DESTROY, $token);
+
         if ((string) $token->getKey() === (string) $this->currentTokenId($request)) {
             return response()->json((new AccountErrorData(AccountError::DeleteCurrent->message(), AccountError::DeleteCurrent->code()))->toArray(), 422);
         }
         if (! $token->archived_at) {
             return response()->json((new AccountErrorData(AccountError::DeleteActive->message(), AccountError::DeleteActive->code()))->toArray(), 422);
         }
+
+        app(MachineTokenIssuer::class)->authorizeRevocation([$token], $this->tokenOwner($request));
 
         // Snapshot before the row goes, so the data slot carries the deleted token's final state.
         $snapshot = $this->present($token, $this->currentTokenId($request));
@@ -289,12 +322,22 @@ class ApiTokenController extends Controller
     #[ResponseFromData(SessionsRevokedData::class)]
     public function destroyOtherSessions(Request $request): JsonResponse
     {
+        TokenManagement::authorize($request->user(), TokenManagement::SIGN_OUT_OTHERS);
+
         $currentId = $this->currentTokenId($request);
 
-        $revoked = $this->scoped()
+        // Read the targets first, so a scoped acting token wider-than-itself refusal (every session token is a `*` login
+        // token) lands before anything is deleted, and exactly the rows checked are the rows deleted.
+        $targets = $this->scoped()
             ->where('provenance', TokenProvenance::Session->value)
             ->when($currentId !== null, fn (Builder $query) => $query->where($this->keyName(), '!=', $currentId))
-            ->delete();
+            ->get();
+
+        app(MachineTokenIssuer::class)->authorizeRevocation($targets, $this->tokenOwner($request));
+
+        $revoked = $targets->isEmpty()
+            ? 0
+            : $this->scoped()->whereIn($this->keyName(), $targets->modelKeys())->delete();
 
         return response()->json([
             'message' => __('beam-accounts::messages.sessions_revoked', ['count' => $revoked]),

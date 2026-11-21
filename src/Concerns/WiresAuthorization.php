@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Concerns;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
+use Rushing\PermissionCascade\Authorization\DecisionNames;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Rushing\PermissionCascade\Support\CascadePolicyRegistrar;
 use Rushing\Popcorn\Concerns\Chained;
@@ -16,6 +17,7 @@ use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
+use Splicewire\Beam\Accounts\Tokens\TokenManagement;
 use Splicewire\Beam\Realm\RealmRegistry;
 
 /**
@@ -110,6 +112,11 @@ trait WiresAuthorization
                 Gate::policy($tokenModel, TokenPolicy::class);
             }
         });
+
+        // The token-management verbs (the Tokens page REST surface and "log out everywhere else") ask the acting
+        // credential for a registered `personal-access-token.*` name (fleet ADR 0006 rule 1; credential-scope 08, l145
+        // F3). Registered here, so the widest token scope offers them whatever policy the host binds for its PAT model.
+        TokenManagement::register($this->app->make(DecisionNames::class));
 
         // The `users` resource's write gate ({@see UserPolicy}) — needed now that the resource
         // widened `editable`. Registered against the CONFIGURED user model, since hosts routinely
