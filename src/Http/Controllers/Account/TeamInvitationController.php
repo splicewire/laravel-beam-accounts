@@ -7,9 +7,11 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Rushing\LaravelDataSchemasScribe\Attributes\RequestFromData;
 use Rushing\LaravelDataSchemasScribe\Attributes\ResponseFromData;
+use Splicewire\Beam\Accounts\Authorization\TeamMemberDecisions;
 use Splicewire\Beam\Accounts\Data\AccountErrorData;
 use Splicewire\Beam\Accounts\Data\CreateInvitationData;
 use Splicewire\Beam\Accounts\Data\InvitationData;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
 
@@ -56,6 +58,8 @@ class TeamInvitationController extends Controller
     #[ResponseFromData(InvitationData::class)]
     public function index(Request $request): JsonResponse
     {
+        TeamMemberDecisions::authorizeInvitationList($request->user());
+
         $invitations = $this->scoped()
             ->orderByDesc('created_at')
             ->get()
@@ -75,6 +79,8 @@ class TeamInvitationController extends Controller
     #[ResponseFromData(InvitationData::class, status: 201)]
     public function send(Request $request): JsonResponse
     {
+        TeamMemberDecisions::authorize($request->user(), TeamMemberDecisions::MANAGE_INVITATIONS, BeamAccounts::currentTeam());
+
         // Resolved here rather than injected as a typed parameter: container injection validates
         // during resolution, which would put 422 ahead of `prepare()`'s own 403.
         $input = CreateInvitationData::validateAndCreate($request);
@@ -95,6 +101,8 @@ class TeamInvitationController extends Controller
     #[ResponseFromData(AccountErrorData::class, status: 404)]
     public function resend(Request $request, string $id): JsonResponse
     {
+        TeamMemberDecisions::authorize($request->user(), TeamMemberDecisions::MANAGE_INVITATIONS, BeamAccounts::currentTeam());
+
         $existing = $this->scoped()->whereKey($id)->first();
 
         if ($existing === null) {
@@ -120,6 +128,8 @@ class TeamInvitationController extends Controller
     #[ResponseFromData(AccountErrorData::class, status: 404)]
     public function revoke(Request $request, string $id): JsonResponse
     {
+        TeamMemberDecisions::authorize($request->user(), TeamMemberDecisions::MANAGE_INVITATIONS, BeamAccounts::currentTeam());
+
         $invitation = $this->scoped()->whereKey($id)->first();
 
         if ($invitation === null) {
