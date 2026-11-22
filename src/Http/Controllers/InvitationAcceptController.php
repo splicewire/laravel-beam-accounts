@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\LaravelData\Optional;
+use Splicewire\Beam\Accounts\Actions\AgreementPageProps;
 use Splicewire\Beam\Accounts\Data\Pages\AcceptInvitationPageData;
 use Splicewire\Beam\Accounts\Ops\RedeemInvitation;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
@@ -56,6 +58,7 @@ class InvitationAcceptController extends Controller
             registerUrl: self::routeOrNull('register', $live ? ['email' => $invitation->email] : []),
             loginUrl: self::routeOrNull('login'),
             logoutUrl: self::routeOrNull('logout'),
+            agreements: AgreementPageProps::forBehavior('invitations.redeem', $viewer)['agreements'] ?? new Optional,
         ));
     }
 

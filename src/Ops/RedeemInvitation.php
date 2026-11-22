@@ -3,13 +3,18 @@
 namespace Splicewire\Beam\Accounts\Ops;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use Splicewire\Beam\Accounts\Data\InvitationAcceptedData;
+use Splicewire\Beam\Accounts\Data\RedeemInvitationData;
 use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
+use Splicewire\Beam\Agreements\AssentRecorder;
+use Splicewire\Beam\Agreements\Data\AgreementMemberData;
+use Splicewire\Beam\Agreements\Data\RequirementRefusalData;
+use Splicewire\Beam\Agreements\RequirementDeclarations;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
+use Splicewire\Beam\Particle\OperationCall;
 use Splicewire\Beam\Particle\OperationKind;
 use Splicewire\Beam\Particle\Subject\ColumnSubject;
 
@@ -37,8 +42,7 @@ use Splicewire\Beam\Particle\Subject\ColumnSubject;
  *
  * The actor is by construction not yet a member, so every membership ability would deny the one caller
  * this exists for. The controls are the mount's `auth` middleware (you must be signed in), the token
- * (you must hold the link) and the verdict (you must BE the invited address). `input: false`: the token
- * in the path is the whole input.
+ * (you must hold the link) and the verdict (you must BE the invited address).
  *
  * A refusal answers a JSON caller with a status (410 used/expired, 403 wrong address) and the Inertia
  * form with a redirect back to the accept page carrying an `invitation` error, so the page can say why.
@@ -48,14 +52,21 @@ use Splicewire\Beam\Particle\Subject\ColumnSubject;
     name: 'redeem',
     kind: OperationKind::Write,
     ability: false,
-    input: false,
+    input: RedeemInvitationData::class,
     output: InvitationAcceptedData::class,
+    errors: [428 => RequirementRefusalData::class],
     subject: new ColumnSubject('token', throughResource: false),
 )]
 class RedeemInvitation
 {
-    public static function handle(Invitation $invitation, Request $request, mixed $actor): mixed
+    public static function handle(OperationCall $call): mixed
     {
+        /** @var Invitation $invitation */
+        $invitation = $call->context->subject;
+        $request = $call->context->request;
+        $actor = $call->context->actor;
+        /** @var RedeemInvitationData $input */
+        $input = $call->input;
         $redemption = app(InvitationRedemption::class);
 
         $verdict = $redemption->verdict($invitation, $actor);
@@ -64,7 +75,30 @@ class RedeemInvitation
             self::refuse($verdict, $request);
         }
 
-        $team = $redemption->redeem($invitation, $actor);
+        $members = $input->agreementMember instanceof AgreementMemberData
+            ? ['agreementMember' => $input->agreementMember]
+            : [];
+        $behavior = 'invitations.redeem';
+        $requirements = app()->bound(RequirementDeclarations::class)
+            ? app(RequirementDeclarations::class)->requirementsFor($behavior)
+            : [];
+        $team = $invitation->getConnection()->transaction(function () use ($redemption, $invitation, $actor, $requirements, $members, $behavior) {
+            $team = $redemption->redeem($invitation, $actor);
+
+            if ($requirements !== []
+                && app()->bound(AssentRecorder::class)
+                && self::hasDeclaredMember($requirements, $members)) {
+                $membership = $team->memberships()->where('user_id', $actor->getAuthIdentifier())->firstOrFail();
+                app(AssentRecorder::class)->record($membership, new \Splicewire\Beam\Write\WriteRequirement(
+                    behavior: $behavior,
+                    subject: $membership,
+                    submittedMembers: $members,
+                    actor: $actor,
+                ));
+            }
+
+            return $team;
+        });
 
         if ($request->expectsJson()) {
             return new InvitationAcceptedData(
@@ -98,5 +132,21 @@ class RedeemInvitation
         }
 
         throw \Splicewire\Beam\Localization\CodedValidationException::for('invitation', $error);
+    }
+
+    /** @param list<\Splicewire\Beam\Agreements\Requires> $requirements
+     * @param  array<string, AgreementMemberData>  $members
+     */
+    private static function hasDeclaredMember(array $requirements, array $members): bool
+    {
+        foreach ($requirements as $requirement) {
+            foreach ($members as $member) {
+                if ($requirement->agreement === $member->key) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

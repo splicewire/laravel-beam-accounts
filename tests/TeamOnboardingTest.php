@@ -88,7 +88,7 @@ it('declares both operations with every shape slot, ungated on purpose rather th
         ->and($create->input)->toBe(Splicewire\Beam\Accounts\Data\CreateTeamInputData::class)
         ->and($create->output)->toBe(Splicewire\Beam\Accounts\Data\TeamData::class)
         ->and($redeem->ability)->toBeFalse()
-        ->and($redeem->input)->toBeFalse()
+        ->and($redeem->input)->toBe(Splicewire\Beam\Accounts\Data\RedeemInvitationData::class)
         ->and($redeem->output)->toBe(Splicewire\Beam\Accounts\Data\InvitationAcceptedData::class);
 });
 

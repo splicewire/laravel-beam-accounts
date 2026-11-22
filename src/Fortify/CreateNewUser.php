@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Fortify;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 use Splicewire\Beam\Accounts\Concerns\PasswordValidationRules;
@@ -10,7 +11,14 @@ use Splicewire\Beam\Accounts\Concerns\ProfileValidationRules;
 use Splicewire\Beam\Accounts\Doors\AccountDoors;
 use Splicewire\Beam\Accounts\Doors\Door;
 use Splicewire\Beam\Accounts\Doors\NewUserData;
+use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
+use Splicewire\Beam\Agreements\AssentRecorder;
+use Splicewire\Beam\Agreements\Data\AgreementMemberData;
+use Splicewire\Beam\Agreements\RequirementAdmission;
+use Splicewire\Beam\Agreements\RequirementDeclarations;
+use Splicewire\Beam\Agreements\RequirementRefused;
+use Splicewire\Beam\Write\WriteRequirement;
 
 /**
  * The shared registration action, door-checked (purchase-walkthrough M10): validate, then create the user through
@@ -36,11 +44,53 @@ class CreateNewUser implements CreatesNewUsers
             'password_confirmation' => ['prohibited'],
         ])->validate();
 
-        $user = $this->createUser($input);
+        $behavior = 'auth.register';
+        if (! app()->bound(RequirementDeclarations::class)
+            || ! app()->bound(RequirementAdmission::class)
+            || ! app()->bound(AssentRecorder::class)) {
+            $user = $this->createUser($input);
+            $this->afterCreating($user, $input);
 
-        $this->afterCreating($user, $input);
+            return $user;
+        }
 
-        return $user;
+        $declarations = app(RequirementDeclarations::class);
+        $requirements = $declarations->requirementsFor($behavior);
+        $members = self::submittedMembers($input);
+
+        if ($requirements !== []) {
+            $refusal = app(RequirementAdmission::class)->inspect(null, $behavior, null, $members);
+
+            if ($refusal !== null) {
+                throw new RequirementRefused($refusal, $behavior);
+            }
+        }
+
+        if ($requirements === []) {
+            $user = $this->createUser($input);
+            $this->afterCreating($user, $input);
+
+            return $user;
+        }
+
+        $userModel = BeamAccounts::userModel();
+        $connection = (new $userModel)->getConnection();
+
+        return $connection->transaction(function () use ($input, $members, $requirements, $behavior): Authenticatable {
+            $user = $this->createUser($input);
+            $this->afterCreating($user, $input);
+
+            if ($user instanceof Model && self::hasDeclaredMember($requirements, $members)) {
+                app(AssentRecorder::class)->record($user, new WriteRequirement(
+                    behavior: $behavior,
+                    subject: null,
+                    submittedMembers: $members,
+                    actor: $user,
+                ));
+            }
+
+            return $user;
+        });
     }
 
     /**
@@ -63,5 +113,36 @@ class CreateNewUser implements CreatesNewUsers
     protected function afterCreating(Authenticatable $user, array $input): void
     {
         //
+    }
+
+    /** @return array<string, AgreementMemberData> */
+    private static function submittedMembers(array $input): array
+    {
+        $value = $input['agreementMember'] ?? null;
+
+        if (! is_array($value)
+            || ! is_string($value['key'] ?? null)
+            || ! is_int($value['version'] ?? null)
+            || ! is_string($value['digest'] ?? null)) {
+            return [];
+        }
+
+        return ['agreementMember' => new AgreementMemberData($value['key'], $value['version'], $value['digest'])];
+    }
+
+    /** @param list<\Splicewire\Beam\Agreements\Requires> $requirements
+     * @param  array<string, AgreementMemberData>  $members
+     */
+    private static function hasDeclaredMember(array $requirements, array $members): bool
+    {
+        foreach ($requirements as $requirement) {
+            foreach ($members as $member) {
+                if ($requirement->agreement === $member->key) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
