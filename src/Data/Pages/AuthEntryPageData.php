@@ -35,5 +35,7 @@ final class AuthEntryPageData extends Data
         // is not local + demo + picker has no URL to find.
         public string|Optional $demoUserSearchUrl,
         public string|Optional $passwordRules,
+        #[DataCollectionOf(AgreementPromptData::class)]
+        public array|Optional $agreements = new Optional,
     ) {}
 }

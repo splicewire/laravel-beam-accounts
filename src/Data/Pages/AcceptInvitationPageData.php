@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Splicewire\Beam\Accounts\Data\Pages;
 
+use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
 
@@ -35,5 +37,7 @@ final class AcceptInvitationPageData extends Data
         public ?string $registerUrl = null,
         public ?string $loginUrl = null,
         public ?string $logoutUrl = null,
+        #[DataCollectionOf(AgreementPromptData::class)]
+        public array|Optional $agreements = new Optional,
     ) {}
 }
