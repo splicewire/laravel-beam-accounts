@@ -31,6 +31,10 @@ final class AccountFlows implements DeclaresFlows
         return [
             // Account access (Fortify-served; guest flows, no demo-subject role).
             new FlowDeclaration('auth', 'Account access', [], AlwaysOn::class, null, []),
+            // browser-journeys 10 adds auth.login: 08's deviation-focused logic skipped it (login has no
+            // manifest_deviates, so no Deviation to switch), but 10 requires every shipped browser test to name
+            // its flow — the login page is the auth surface's always-available entry. AlwaysOn, guest (no role).
+            new FlowDeclaration('auth.login', 'Sign in', ['login'], AlwaysOn::class, null, []),
             new FlowDeclaration('auth.register', 'Registration', ['register'], RegistrationGate::class, null, []),
             new FlowDeclaration('auth.forgot-password', 'Password reset', ['password.request'], ForgotPasswordGate::class, null, []),
 

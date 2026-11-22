@@ -1,9 +1,10 @@
 <?php
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Team;
+
+use function Splicewire\Beam\Testing\flow;
 
 /*
  * Base-flow TEAMS surface — owned by splicewire/laravel-beam-accounts (the account engine), per the
@@ -39,11 +40,18 @@ use Splicewire\Beam\Accounts\Models\Team;
  * browser writes are visible here.
  */
 
-uses(RefreshDatabase::class);
-
 beforeEach(fn () => $this->seed(DemoTeamSeeder::class));
 
 it('provisions a team-of-one on registration', function () {
+    // browser-journeys 10: names teams.team-of-one (one flow per test). The former
+    // `auth.register || teams.team-of-one` double skip is SUBSUMED, and the subsumption is UNIVERSAL, not
+    // just numero: the ONLY runtime path to a team-of-one is registration
+    // (Fortify's CreateNewUser::afterCreating -> TeamProvisioner::personalTeamFor); no route provisions a
+    // personal team otherwise (confirmed 2026-11-20 — personalTeamFor is called only there and by the demo
+    // seeder). So a host without registration cannot provision a team-of-one and deviates teams.team-of-one
+    // too (as numero does). If a non-registration team-of-one path is ever added, this single key is wrong.
+    $flow = flow('teams.team-of-one');
+
     $email = 'teams-registrant@example.test';
 
     visit('/register')
@@ -54,7 +62,7 @@ it('provisions a team-of-one on registration', function () {
         ->click('[data-test="register-user-button"]')
         ->assertPathIsNot('/register')
         ->assertNoConsoleLogs()
-        ->screenshot(filename: 'teams-team-of-one');
+        ->screenshot(filename: $flow->name());
 
     $user = BeamAccounts::userModel()::query()->where('email', $email)->first();
 
@@ -62,8 +70,4 @@ it('provisions a team-of-one on registration', function () {
     expect(
         Team::query()->where('user_id', $user->getKey())->where('personal_team', true)->exists()
     )->toBeTrue();
-})->group('browser')
-    ->skip(
-        fn () => manifest_deviates('auth.register') || manifest_deviates('teams.team-of-one'),
-        'registration or team-of-one declared off',
-    );
+})->group('browser');
