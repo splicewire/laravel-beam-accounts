@@ -1,8 +1,10 @@
 <?php
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Splicewire\Beam\Accounts\Actions\DemoLoginLinks;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
+use Splicewire\Beam\Accounts\Flows\AccountFlows;
+
+use function Splicewire\Beam\Testing\flow;
 
 /*
  * Base-flow ACCOUNT surface — owned by splicewire/laravel-beam-accounts (the account engine).
@@ -15,24 +17,27 @@ use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
  *
  * Runs inside the consuming satellite via `pest --group=browser`. The in-process browser server
  * shares the test's database connection, so the seeded demo subjects are visible to the browser.
+ *
+ * browser-journeys 10: each test names its flow through `flow()` — which skips on a covering BEAM.md
+ * Deviation with its reason, records a FlowResultData row, and names the screenshot — and takes its role
+ * rows from `AccountFlows`. This file declares no refresh trait: the host test case supplies one.
  */
-
-uses(RefreshDatabase::class);
 
 beforeEach(fn () => $this->seed(DemoTeamSeeder::class));
 
-dataset('roles', ['owner', 'admin', 'member', 'solo']);
-
 it('renders the profile page for each demo subject', function (string $role) {
+    $flow = flow('account.profile', role: $role);
+
     visit(app(DemoLoginLinks::class)->for($role))
         ->navigate('/settings/profile')
         ->assertNoConsoleLogs()
         ->assertPathIs('/settings/profile')
-        ->screenshot(filename: "account-profile-{$role}");
-})->with('roles')->group('browser')
-    ->skip(fn () => manifest_deviates('account.profile'), 'profile declared off');
+        ->screenshot(filename: $flow->name());
+})->with(AccountFlows::flow('account.profile')->roles)->group('browser');
 
 it('renders the security page for each demo subject', function (string $role) {
+    $flow = flow('account.security', role: $role);
+
     $password = config('beam.accounts.demo.password', 'password');
 
     // Fortify guards the security surface behind password confirmation, so the surface
@@ -44,6 +49,5 @@ it('renders the security page for each demo subject', function (string $role) {
         ->click('[data-test="confirm-password-button"]')
         ->assertPathIs('/settings/security')
         ->assertNoConsoleLogs()
-        ->screenshot(filename: "account-security-{$role}");
-})->with('roles')->group('browser')
-    ->skip(fn () => manifest_deviates('account.security'), 'security declared off');
+        ->screenshot(filename: $flow->name());
+})->with(AccountFlows::flow('account.security')->roles)->group('browser');
