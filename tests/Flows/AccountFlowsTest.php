@@ -20,6 +20,7 @@ it('declares every key its browser suite proves, plus the finer security flows a
         'auth', 'account', 'teams',
         // keys the shipped suites name
         'account.profile', 'account.security', 'auth.register', 'auth.forgot-password', 'teams.team-of-one',
+        'teams.invitation-accept',
         // the finer runtime-switched flows + the registration gate
         'account.security.two-factor', 'account.security.passkeys',
     );
