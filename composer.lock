@@ -6443,7 +6443,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/splicewire/laravel-beam.git",
-                "reference": "4c14c92b"
+                "reference": "ad11cc5c03192b4ce77a159b16d4fd37b7ba65ad"
             },
             "require": {
                 "illuminate/contracts": "^11.0|^12.0|^13.0",
@@ -14531,7 +14531,8 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "schemastud/laravel-data-schemas": 20
+        "schemastud/laravel-data-schemas": 20,
+        "splicewire/laravel-beam": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
