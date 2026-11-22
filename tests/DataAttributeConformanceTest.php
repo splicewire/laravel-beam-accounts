@@ -2,8 +2,10 @@
 
 use Rushing\DataFilters\Attributes\Sortable;
 use Schemastud\DataSchemas\Attributes\Description;
+use Schemastud\DataSchemas\Attributes\Title;
 use Splicewire\Beam\Accounts\Data\AccessGrantData;
 use Splicewire\Beam\Accounts\Data\InvitationData;
+use Splicewire\Beam\Accounts\Data\RedeemInvitationData;
 use Splicewire\Beam\Accounts\Data\TeamData;
 use Splicewire\Beam\Accounts\Data\TokenData;
 use Splicewire\Beam\Accounts\Data\UserData;
@@ -53,3 +55,7 @@ it('describes every property of a particle resource', function (string $dataClas
 it('carries the ParticleResource attribute it is being held to', function (string $dataClass) {
     expect((new ReflectionClass($dataClass))->getAttributes(ParticleResource::class))->not->toBeEmpty();
 })->with($resources);
+
+it('labels the request-local assent DTO for rendered identifiers', function () {
+    expect((new ReflectionClass(RedeemInvitationData::class))->getAttributes(Title::class))->not->toBeEmpty();
+});
