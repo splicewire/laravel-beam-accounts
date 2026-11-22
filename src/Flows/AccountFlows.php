@@ -44,6 +44,7 @@ final class AccountFlows implements DeclaresFlows
             // Teams (structurally absent at a host that ships no teams estate).
             new FlowDeclaration('teams', 'Teams', [], TeamsGate::class, null, []),
             new FlowDeclaration('teams.team-of-one', 'Personal team', [], TeamsGate::class, null, []),
+            new FlowDeclaration('teams.invitation-accept', 'Invitation acceptance', ['invitations.accept'], TeamsGate::class, null, []),
         ];
     }
 }
