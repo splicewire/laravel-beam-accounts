@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "869b08ab486c9c70922b9397c77cb44e",
+    "content-hash": "fdd1771b6ee2549208d1f89844338b55",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -13055,6 +13055,66 @@
             "time": "2026-06-29T15:41:09+00:00"
         },
         {
+            "name": "rushing/laravel-agreements",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/stephenr85/laravel-agreements.git",
+                "reference": "a91bebef05fac34f9a09b3efdab376685f0cf0c0"
+            },
+            "require": {
+                "illuminate/contracts": "^11.0 || ^12.0 || ^13.0",
+                "illuminate/database": "^11.0 || ^12.0 || ^13.0",
+                "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^9.0 || ^10.0",
+                "pestphp/pest": "^3.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Rushing\\Agreements\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Rushing\\Agreements\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "pint": [
+                    "@php -d memory_limit=512M vendor/bin/pint"
+                ],
+                "test": [
+                    "@php vendor/bin/pest"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Stephen Rushing",
+                    "email": "stephenr85@gmail.com"
+                }
+            ],
+            "description": "Versioned agreements and an append-only ledger for Laravel: the mechanism half. It freezes a version of an Agreement's presented content with a SHA-256 digest, appends one immutable entry per act (grant or revoke) toward a version, and answers whether a party holds a current Assent. Kinds, keys, acts and methods are bare strings it never validates; the vocabulary, enforcement and authorization belong one tier up. The app owns the migration.",
+            "keywords": [
+                "agreements",
+                "append-only",
+                "consent",
+                "laravel",
+                "ledger",
+                "seam",
+                "terms"
+            ],
+            "time": "2026-11-22T00:45:36+00:00"
+        },
+        {
             "name": "rushing/laravel-notification-status",
             "version": "dev-main",
             "source": {
@@ -14065,6 +14125,98 @@
                 }
             ],
             "time": "2026-11-09T06:30:55+00:00"
+        },
+        {
+            "name": "splicewire/laravel-beam-agreements",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/splicewire/laravel-beam-agreements.git",
+                "reference": "d0c82dce3134d7df700bf4d0be229f00f3b38f2e"
+            },
+            "require": {
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "php": "^8.3",
+                "rushing/laravel-agreements": "*",
+                "rushing/php-popcorn": "dev-main",
+                "spatie/laravel-package-tools": "^1.16",
+                "splicewire/laravel-beam": "*"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^4.0",
+                "splicewire/laravel-beam-workflows": "dev-main",
+                "wikimedia/composer-merge-plugin": "^2.1"
+            },
+            "suggest": {
+                "splicewire/laravel-beam-workflows": "Registers the workflow guard \"Agreement is current\" (agreements 11b)."
+            },
+            "default-branch": true,
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "1.0.x-dev"
+                },
+                "laravel": {
+                    "providers": [
+                        "Splicewire\\Beam\\Agreements\\BeamAgreementsServiceProvider"
+                    ]
+                },
+                "package-topology": {
+                    "because": "an extension is a Composer Beam Extension: it registers DOWN into manifests the host's beam already binds (install steps, nav seats, particle resources), so it requires beam and nothing above it. It never requires the marketplace (an extension that dragged beam-market in could not install on the bare Beam site it exists for; see splicewire/beam-extension-demo), tower, a satellite or a tower-* package: those tiers compose extensions, never the reverse.",
+                    "mustRequire": [
+                        "splicewire/laravel-beam"
+                    ],
+                    "mustNotRequire": [
+                        "splicewire/laravel-beam-market",
+                        "splicewire/tower",
+                        "splicewire/laravel-satellite*",
+                        "splicewire/laravel-tower-*"
+                    ]
+                },
+                "merge-plugin": {
+                    "include": [
+                        "composer.local.json"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Splicewire\\Beam\\Agreements\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Splicewire\\Beam\\Agreements\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "@php vendor/bin/pest"
+                ],
+                "pint": [
+                    "@php -d memory_limit=512M vendor/bin/pint"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Stephen Rushing",
+                    "email": "stephenr85@gmail.com"
+                }
+            ],
+            "description": "Agreements for beam: a registry of the agreements a host declares, a freeze command, read-only resources for agreements and a person's own ledger entries, and an accept operation that records an Assent over HTTP. The beam seam over rushing/laravel-agreements. See AGENTS.md.",
+            "keywords": [
+                "beam",
+                "extension",
+                "laravel",
+                "splicewire"
+            ],
+            "time": "2026-11-22T13:24:17+00:00"
         },
         {
             "name": "splicewire/laravel-beam-analytics",
