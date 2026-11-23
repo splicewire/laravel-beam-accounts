@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Splicewire\Beam\Accounts\Actions\DemoLoginLinks;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Flows\AccountFlows;
@@ -20,8 +21,11 @@ use function Splicewire\Beam\Testing\flow;
  *
  * browser-journeys 10: each test names its flow through `flow()` — which skips on a covering BEAM.md
  * Deviation with its reason, records a FlowResultData row, and names the screenshot — and takes its role
- * rows from `AccountFlows`. This file declares no refresh trait: the host test case supplies one.
+ * rows from `AccountFlows`. This file uses RefreshDatabase: flow() requires the host test case to
+ * carry one of Laravel's four reset traits (FlowRun::assertResetTrait), and no host supplies one.
  */
+
+uses(RefreshDatabase::class);
 
 beforeEach(fn () => $this->seed(DemoTeamSeeder::class));
 

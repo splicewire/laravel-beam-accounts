@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Models\Team;
@@ -39,6 +40,8 @@ use function Splicewire\Beam\Testing\flow;
  * shares the test's database connection, so seeded rows are visible to the browser and rows the
  * browser writes are visible here.
  */
+
+uses(RefreshDatabase::class);
 
 beforeEach(fn () => $this->seed(DemoTeamSeeder::class));
 

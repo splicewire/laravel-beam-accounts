@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
 use function Splicewire\Beam\Testing\flow;
 
 /*
@@ -15,6 +17,10 @@ use function Splicewire\Beam\Testing\flow;
  * reason, record a FlowResultData row, name the screenshot). These are guest flows (no role). 10 adds
  * `auth.login` to AccountFlows so login names a flow too (the gap 08's deviation-focused logic left).
  */
+
+// These guest pages seed nothing, but flow() requires the host test case to carry one of Laravel's
+// four reset traits (FlowRun::assertResetTrait); no host supplies one, so declare it here.
+uses(RefreshDatabase::class);
 
 it('renders the login page', function () {
     $flow = flow('auth.login');
