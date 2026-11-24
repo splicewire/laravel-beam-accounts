@@ -3,6 +3,7 @@
 namespace Splicewire\Beam\Accounts\Tests;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Rushing\Agreements\Ledger;
 use Rushing\Agreements\Models\LedgerEntry;
@@ -21,8 +22,10 @@ use Splicewire\Beam\Agreements\Organisation\ActingOrganisation;
 use Splicewire\Beam\Agreements\Registry\AgreementDefinition;
 use Splicewire\Beam\Agreements\Registry\AgreementRegistry;
 use Splicewire\Beam\Agreements\Registry\RecordSource;
+use Splicewire\Beam\Agreements\Requirements\AgreementLedger;
 use Splicewire\Beam\Agreements\Requirements\AttachedRequirement;
 use Splicewire\Beam\Agreements\Requirements\RequirementRegistry;
+use Splicewire\Beam\Realm\Contracts\TenancyContext;
 
 /** Accounts' write paths against the real seam provider and its ledger, not a recorder double. */
 final class AgreementSeamIntegrationTest extends TestCase
@@ -80,6 +83,49 @@ final class AgreementSeamIntegrationTest extends TestCase
 
         app(AccountAssentRecorder::class)->record([$this->member], $user, $user, null, 'auth.register');
         self::assertSame(1, LedgerEntry::query()->count(), 'an existing party member must not be recorded twice');
+    }
+
+    public function test_signup_writes_to_the_resolved_central_ledger_in_tenant_context(): void
+    {
+        $this->separateCentralLedger();
+
+        $user = app(CreateNewUser::class)->create([
+            'name' => 'Ada',
+            'email' => 'ada-central-seam@example.test',
+            'password' => 'password-1234',
+            'passwordConfirmation' => 'password-1234',
+            'agreementMembers' => [['key' => 'terms', 'version' => $this->member->version, 'digest' => $this->member->digest]],
+        ]);
+
+        self::assertSame('central', AgreementLedger::connectionName());
+        self::assertSame((string) $user->getKey(), LedgerEntry::on('central')->sole()->party_id);
+        self::assertSame(0, LedgerEntry::query()->count(), 'the tenant/default connection must not receive the ledger entry');
+    }
+
+    public function test_signup_does_not_record_a_notice_member_as_assent(): void
+    {
+        app(AgreementRegistry::class)->register(new AgreementDefinition(
+            key: 'privacy-notice',
+            kind: 'notice',
+            title: 'Privacy notice',
+            source: new RecordSource(static fn (): string => 'Privacy notice text.'),
+        ));
+        $noticeVersion = app(Ledger::class)->freeze(app(AgreementRegistry::class)->get('privacy-notice'), 'v1', now()->subDay(), true);
+        app(RequirementRegistry::class)->attach('auth.register', 'privacy-notice', AttachedRequirement::PARTY);
+
+        app(CreateNewUser::class)->create([
+            'name' => 'Ada',
+            'email' => 'ada-notice-seam@example.test',
+            'password' => 'password-1234',
+            'passwordConfirmation' => 'password-1234',
+            'agreementMembers' => [
+                ['key' => 'terms', 'version' => $this->member->version, 'digest' => $this->member->digest],
+                ['key' => 'privacy-notice', 'version' => 1, 'digest' => $noticeVersion->digest],
+            ],
+        ]);
+
+        self::assertSame(1, LedgerEntry::query()->count());
+        self::assertSame('terms', LedgerEntry::query()->sole()->agreement_key);
     }
 
     public function test_invitation_records_the_real_party_entry_when_organisation_assent_is_authorised(): void
@@ -142,6 +188,39 @@ final class AgreementSeamIntegrationTest extends TestCase
             'token' => bin2hex(random_bytes(24)),
             'invited_by' => $owner->getKey(),
         ]);
+    }
+
+    private function separateCentralLedger(): void
+    {
+        $default = DB::getDefaultConnection();
+        config(['database.connections.central' => config("database.connections.{$default}")]);
+        DB::purge('central');
+
+        $migrations = __DIR__.'/../vendor/splicewire/laravel-beam-agreements/database/migrations/shared/';
+        DB::setDefaultConnection('central');
+        try {
+            (require $migrations.'create_agreement_ledger_tables.php.stub')->up();
+            (require $migrations.'add_summary_to_agreement_versions.php.stub')->up();
+            (require $migrations.'create_agreement_consent_requests_table.php.stub')->up();
+        } finally {
+            DB::setDefaultConnection($default);
+        }
+
+        app()->instance(TenancyContext::class, new class implements TenancyContext
+        {
+            public function isMultiTenant(): bool { return true; }
+
+            public function isActive(): bool { return true; }
+
+            public function currentTenant(): ?object { return (object) ['id' => 'tenant-1']; }
+
+            public function currentTenantId(): int|string|null { return 'tenant-1'; }
+
+            public function centralConnection(): ?string { return 'central'; }
+        });
+
+        $version = AgreementLedger::ledger()->freeze(app(AgreementRegistry::class)->get('terms'), 'v1', now()->subDay(), true);
+        $this->member = new AgreementMemberData('terms', 1, $version->digest);
     }
 }
 
