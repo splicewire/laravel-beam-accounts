@@ -23,6 +23,15 @@ enum Role: string implements ProvidesEnumLabel
     case Member = 'member';
 
     /**
+     * The invitable subset, declared once: owner is excluded because the owner is the team creator,
+     * not something you invite someone in as. A constant so the invite input's `#[In]` can read it
+     * (an attribute argument cannot call {@see self::invitable()}).
+     *
+     * @var list<self>
+     */
+    public const INVITABLE = [self::Admin, self::Member];
+
+    /**
      * The roles a team owner may assign to an existing member (every case —
      * ownership transfer included).
      *
@@ -42,10 +51,7 @@ enum Role: string implements ProvidesEnumLabel
      */
     public static function invitable(): array
     {
-        return array_values(array_filter(
-            self::cases(),
-            fn (self $role) => $role !== self::Owner,
-        ));
+        return self::INVITABLE;
     }
 
     /**

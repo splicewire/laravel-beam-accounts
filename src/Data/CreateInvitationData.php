@@ -22,7 +22,7 @@ class CreateInvitationData extends BeamData
     public function __construct(
         #[Required, Email]
         public string $email,
-        #[In(['admin', 'member'])]
+        #[In(Role::INVITABLE)]
         public string $role = 'member',
     ) {}
 
