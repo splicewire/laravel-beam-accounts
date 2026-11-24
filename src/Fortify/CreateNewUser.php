@@ -14,12 +14,10 @@ use Splicewire\Beam\Accounts\Doors\NewUserData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Agreements\AccountAssentRecorder;
-use Splicewire\Beam\Agreements\AssentRecorder;
 use Splicewire\Beam\Agreements\Data\AgreementMemberData;
 use Splicewire\Beam\Agreements\RequirementAdmission;
 use Splicewire\Beam\Agreements\RequirementDeclarations;
 use Splicewire\Beam\Agreements\RequirementRefused;
-use Splicewire\Beam\Write\WriteRequirement;
 
 /**
  * The shared registration action, door-checked (purchase-walkthrough M10): validate, then create the user through
@@ -48,7 +46,7 @@ class CreateNewUser implements CreatesNewUsers
         $behavior = 'auth.register';
         if (! app()->bound(RequirementDeclarations::class)
             || ! app()->bound(RequirementAdmission::class)
-            || ! app()->bound(AssentRecorder::class)) {
+            || ! app()->bound(AccountAssentRecorder::class)) {
             $user = $this->createUser($input);
             $this->afterCreating($user, $input);
 
@@ -82,16 +80,7 @@ class CreateNewUser implements CreatesNewUsers
             $this->afterCreating($user, $input);
 
             if ($user instanceof Model && $members !== []) {
-                if (app()->bound(AccountAssentRecorder::class)) {
-                    app(AccountAssentRecorder::class)->record(array_values($members), $user, $user, null, $behavior);
-                } elseif (app()->bound(AssentRecorder::class)) {
-                    app(AssentRecorder::class)->record($user, new WriteRequirement(
-                        behavior: $behavior,
-                        subject: null,
-                        submittedMembers: $members,
-                        actor: $user,
-                    ));
-                }
+                app(AccountAssentRecorder::class)->record(array_values($members), $user, $user, null, $behavior);
             }
 
             return $user;

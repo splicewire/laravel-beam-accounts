@@ -3,7 +3,7 @@
 use Illuminate\Database\Eloquent\Model;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
-use Splicewire\Beam\Agreements\AssentRecorder;
+use Splicewire\Beam\Agreements\AccountAssentRecorder;
 use Splicewire\Beam\Agreements\Data\AgreementMemberData;
 use Splicewire\Beam\Agreements\Data\OutstandingRequirementData;
 use Splicewire\Beam\Agreements\RequirementAdmission;
@@ -11,14 +11,13 @@ use Splicewire\Beam\Agreements\RequirementDeclarations;
 use Splicewire\Beam\Agreements\RequirementRefused;
 use Splicewire\Beam\Agreements\RequirementResolver;
 use Splicewire\Beam\Agreements\Requires;
-use Splicewire\Beam\Write\WriteRequirement;
 
 beforeEach(function (): void {
     $this->agreementResolver = new Agreements14SignupResolver;
     app()->instance(RequirementAdmission::class, new RequirementAdmission($this->agreementResolver));
     app()->instance(RequirementDeclarations::class, new Agreements14SignupDeclarations);
     $this->assentRecorder = new Agreements14SignupRecorder;
-    app()->instance(AssentRecorder::class, $this->assentRecorder);
+    app()->instance(AccountAssentRecorder::class, $this->assentRecorder);
 });
 
 it('admits signup with the current agreement member and records it against the new account', function (): void {
@@ -32,11 +31,11 @@ it('admits signup with the current agreement member and records it against the n
 
     expect($user)->toBeInstanceOf(User::class)
         ->and($this->assentRecorder->calls)->toHaveCount(1)
-        ->and($this->assentRecorder->calls[0][0]->is($user))->toBeTrue()
-        ->and($this->assentRecorder->calls[0][1]->behavior)->toBe('auth.register')
-        ->and($this->assentRecorder->calls[0][1]->subject)->toBeNull()
-        ->and($this->assentRecorder->calls[0][1]->actor)->toBe($user)
-        ->and($this->assentRecorder->calls[0][1]->submittedMembers['terms']->key)->toBe('terms');
+        ->and($this->assentRecorder->calls[0][1]->is($user))->toBeTrue()
+        ->and($this->assentRecorder->calls[0][2]->is($user))->toBeTrue()
+        ->and($this->assentRecorder->calls[0][3])->toBeNull()
+        ->and($this->assentRecorder->calls[0][4])->toBe('auth.register')
+        ->and($this->assentRecorder->calls[0][0][0]->key)->toBe('terms');
 });
 
 it('admits and forwards one current member for each blocking Agreement', function (): void {
@@ -57,7 +56,7 @@ it('admits and forwards one current member for each blocking Agreement', functio
     ]);
 
     expect($user)->toBeInstanceOf(User::class)
-        ->and(array_keys($recorder->calls[0][1]->submittedMembers))->toBe(['terms', 'privacy']);
+        ->and(array_map(fn (AgreementMemberData $member) => $member->key, $recorder->calls[0][0]))->toBe(['terms', 'privacy']);
 });
 
 it('refuses only the outstanding Agreement when a multi-member signup omits one', function (): void {
@@ -137,7 +136,7 @@ it('keeps the signup wire and recorded writes unchanged when no Requirement is d
 it('keeps signup available when the optional agreements seam is not installed', function (): void {
     app()->forgetInstance(RequirementDeclarations::class);
     app()->forgetInstance(RequirementAdmission::class);
-    app()->forgetInstance(AssentRecorder::class);
+    app()->forgetInstance(AccountAssentRecorder::class);
 
     $user = app(CreateNewUser::class)->create([
         'name' => 'Ada',
@@ -209,16 +208,16 @@ final class Agreements14SignupResolver implements RequirementResolver
     }
 }
 
-final class Agreements14SignupRecorder implements AssentRecorder
+final class Agreements14SignupRecorder implements AccountAssentRecorder
 {
-    /** @var list<array{Model, WriteRequirement}> */
+    /** @var list<array{list<AgreementMemberData>, Model, Model, ?Model, string}> */
     public array $calls = [];
 
     public bool $fail = false;
 
-    public function record(Model $subject, WriteRequirement $requirement): void
+    public function record(array $members, Model $party, Model $subject, ?Model $organisation, string $behavior): void
     {
-        $this->calls[] = [$subject, $requirement];
+        $this->calls[] = [$members, $party, $subject, $organisation, $behavior];
 
         if ($this->fail) {
             throw new RuntimeException('assent append failed');

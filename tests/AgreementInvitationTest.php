@@ -6,14 +6,13 @@ use Splicewire\Beam\Accounts\Models\Membership;
 use Splicewire\Beam\Accounts\Models\Team;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
-use Splicewire\Beam\Agreements\AssentRecorder;
+use Splicewire\Beam\Agreements\AccountAssentRecorder;
 use Splicewire\Beam\Agreements\Data\AgreementMemberData;
 use Splicewire\Beam\Agreements\Data\OutstandingRequirementData;
 use Splicewire\Beam\Agreements\RequirementAdmission;
 use Splicewire\Beam\Agreements\RequirementDeclarations;
 use Splicewire\Beam\Agreements\RequirementResolver;
 use Splicewire\Beam\Agreements\Requires;
-use Splicewire\Beam\Write\WriteRequirement;
 
 beforeEach(function (): void {
     $this->withoutMiddleware(Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
@@ -21,7 +20,7 @@ beforeEach(function (): void {
     app()->instance(RequirementAdmission::class, new RequirementAdmission($this->agreementResolver));
     app()->instance(RequirementDeclarations::class, new Agreements14InvitationDeclarations);
     $this->assentRecorder = new Agreements14InvitationRecorder;
-    app()->instance(AssentRecorder::class, $this->assentRecorder);
+    app()->instance(AccountAssentRecorder::class, $this->assentRecorder);
 });
 
 function agreements14Invitation(User $owner, Team $team, string $email): Invitation
@@ -85,10 +84,11 @@ it('records the invitee and the resulting membership exactly once after admitted
 
     expect($invitation->fresh()->accepted_at)->not->toBeNull()
         ->and($this->assentRecorder->calls)->toHaveCount(1)
-        ->and($this->assentRecorder->calls[0][0]->is($membership))->toBeTrue()
-        ->and($this->assentRecorder->calls[0][1]->behavior)->toBe('invitations.redeem')
-        ->and($this->assentRecorder->calls[0][1]->actor->is($invitee))->toBeTrue()
-        ->and($this->assentRecorder->calls[0][1]->submittedMembers['terms']->key)->toBe('terms');
+        ->and($this->assentRecorder->calls[0][0][0]->key)->toBe('terms')
+        ->and($this->assentRecorder->calls[0][1]->is($invitee))->toBeTrue()
+        ->and($this->assentRecorder->calls[0][2]->is($membership))->toBeTrue()
+        ->and($this->assentRecorder->calls[0][3])->toBeNull()
+        ->and($this->assentRecorder->calls[0][4])->toBe('invitations.redeem');
 });
 
 it('admits an invitation only when every blocking agreement has its own submitted member', function (): void {
@@ -104,7 +104,7 @@ it('admits an invitation only when every blocking agreement has its own submitte
         ],
     ])->assertOk();
 
-    expect(array_keys($this->assentRecorder->calls[0][1]->submittedMembers))->toBe(['terms', 'privacy'])
+    expect(array_map(fn (AgreementMemberData $member) => $member->key, $this->assentRecorder->calls[0][0]))->toBe(['terms', 'privacy'])
         ->and(Membership::query()->where('team_id', $team->getKey())->where('user_id', $invitee->getKey())->exists())->toBeTrue();
 });
 
@@ -139,7 +139,7 @@ it('keeps invitation redemption available when the optional agreements seam is n
     [, $team, $invitee, $invitation] = agreements14TeamAndInvitee('ivy@example.test');
     app()->forgetInstance(RequirementDeclarations::class);
     app()->forgetInstance(RequirementAdmission::class);
-    app()->forgetInstance(AssentRecorder::class);
+    app()->forgetInstance(AccountAssentRecorder::class);
 
     $this->actingAs($invitee)
         ->postJson("/invitations/{$invitation->token}/redeem")
@@ -208,16 +208,22 @@ final class Agreements14InvitationDeclarations implements RequirementDeclaration
     }
 }
 
-final class Agreements14InvitationRecorder implements AssentRecorder
+final class Agreements14InvitationRecorder implements AccountAssentRecorder
 {
-    /** @var list<array{\Illuminate\Database\Eloquent\Model, WriteRequirement}> */
+    /** @var list<array{list<AgreementMemberData>, \Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model, ?\Illuminate\Database\Eloquent\Model, string}> */
     public array $calls = [];
 
     public bool $fail = false;
 
-    public function record(Illuminate\Database\Eloquent\Model $subject, WriteRequirement $requirement): void
+    public function record(
+        array $members,
+        Illuminate\Database\Eloquent\Model $party,
+        Illuminate\Database\Eloquent\Model $subject,
+        ?Illuminate\Database\Eloquent\Model $organisation,
+        string $behavior,
+    ): void
     {
-        $this->calls[] = [$subject, $requirement];
+        $this->calls[] = [$members, $party, $subject, $organisation, $behavior];
 
         if ($this->fail) {
             throw new RuntimeException('assent append failed');

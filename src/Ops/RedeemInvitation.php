@@ -10,7 +10,6 @@ use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
 use Splicewire\Beam\Agreements\AccountAssentRecorder;
-use Splicewire\Beam\Agreements\AssentRecorder;
 use Splicewire\Beam\Agreements\Data\AgreementMemberData;
 use Splicewire\Beam\Agreements\RequirementDeclarations;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
@@ -82,7 +81,7 @@ class RedeemInvitation
             }
         }
         $behavior = 'invitations.redeem';
-        $requirements = app()->bound(RequirementDeclarations::class)
+        $requirements = app()->bound(AccountAssentRecorder::class) && app()->bound(RequirementDeclarations::class)
             ? app(RequirementDeclarations::class)->requirementsFor($behavior)
             : [];
         $team = $invitation->getConnection()->transaction(function () use ($redemption, $invitation, $actor, $requirements, $members, $behavior) {
@@ -90,17 +89,8 @@ class RedeemInvitation
 
             if ($requirements !== [] && $members !== []) {
                 $membership = $team->memberships()->where('user_id', $actor->getAuthIdentifier())->firstOrFail();
-                if (app()->bound(AccountAssentRecorder::class)) {
-                    $organisation = app(\Splicewire\Beam\Agreements\Organisation\ActingOrganisation::class)->current();
-                    app(AccountAssentRecorder::class)->record(array_values($members), $actor, $membership, $organisation, $behavior);
-                } elseif (app()->bound(AssentRecorder::class)) {
-                    app(AssentRecorder::class)->record($membership, new \Splicewire\Beam\Write\WriteRequirement(
-                        behavior: $behavior,
-                        subject: $membership,
-                        submittedMembers: $members,
-                        actor: $actor,
-                    ));
-                }
+                $organisation = app(\Splicewire\Beam\Agreements\Organisation\ActingOrganisation::class)->current();
+                app(AccountAssentRecorder::class)->record(array_values($members), $actor, $membership, $organisation, $behavior);
             }
 
             return $team;
