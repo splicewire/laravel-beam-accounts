@@ -62,7 +62,7 @@ it('refuses an invitation member from an earlier version and leaves membership a
 
     $this->actingAs($invitee)
         ->postJson("/invitations/{$invitation->token}/redeem", [
-            'agreementMember' => ['key' => 'terms', 'version' => 2, 'digest' => 'old-digest'],
+            'agreementMembers' => [['key' => 'terms', 'version' => 2, 'digest' => 'old-digest']],
         ])
         ->assertStatus(428)
         ->assertJsonPath('requirements.0.key', 'terms');
@@ -77,7 +77,7 @@ it('records the invitee and the resulting membership exactly once after admitted
 
     $this->actingAs($invitee)
         ->postJson("/invitations/{$invitation->token}/redeem", [
-            'agreementMember' => ['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest'],
+            'agreementMembers' => [['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest']],
         ])
         ->assertOk();
 
@@ -88,7 +88,38 @@ it('records the invitee and the resulting membership exactly once after admitted
         ->and($this->assentRecorder->calls[0][0]->is($membership))->toBeTrue()
         ->and($this->assentRecorder->calls[0][1]->behavior)->toBe('invitations.redeem')
         ->and($this->assentRecorder->calls[0][1]->actor->is($invitee))->toBeTrue()
-        ->and($this->assentRecorder->calls[0][1]->submittedMembers['agreementMember']->key)->toBe('terms');
+        ->and($this->assentRecorder->calls[0][1]->submittedMembers['terms']->key)->toBe('terms');
+});
+
+it('admits an invitation only when every blocking agreement has its own submitted member', function (): void {
+    $requirements = [new Requires('terms'), new Requires('privacy')];
+    app()->instance(RequirementDeclarations::class, new Agreements14InvitationDeclarations($requirements));
+    app()->instance(RequirementAdmission::class, new RequirementAdmission(new Agreements14InvitationResolver($requirements)));
+    [, $team, $invitee, $invitation] = agreements14TeamAndInvitee('ivy@example.test');
+
+    $this->actingAs($invitee)->postJson("/invitations/{$invitation->token}/redeem", [
+        'agreementMembers' => [
+            ['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest'],
+            ['key' => 'privacy', 'version' => 4, 'digest' => 'privacy-digest'],
+        ],
+    ])->assertOk();
+
+    expect(array_keys($this->assentRecorder->calls[0][1]->submittedMembers))->toBe(['terms', 'privacy'])
+        ->and(Membership::query()->where('team_id', $team->getKey())->where('user_id', $invitee->getKey())->exists())->toBeTrue();
+});
+
+it('names only the missing invitation agreement in its 428 refusal', function (): void {
+    $requirements = [new Requires('terms'), new Requires('privacy')];
+    app()->instance(RequirementDeclarations::class, new Agreements14InvitationDeclarations($requirements));
+    app()->instance(RequirementAdmission::class, new RequirementAdmission(new Agreements14InvitationResolver($requirements)));
+    [, $team, $invitee, $invitation] = agreements14TeamAndInvitee('ivy@example.test');
+
+    $this->actingAs($invitee)->postJson("/invitations/{$invitation->token}/redeem", [
+        'agreementMembers' => [['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest']],
+    ])->assertStatus(428)->assertJsonPath('requirements.0.key', 'privacy');
+
+    expect(Membership::query()->where('team_id', $team->getKey())->where('user_id', $invitee->getKey())->exists())->toBeFalse()
+        ->and($this->assentRecorder->calls)->toBeEmpty();
 });
 
 it('rolls back membership and accepted_at when the assent append fails', function (): void {
@@ -97,7 +128,7 @@ it('rolls back membership and accepted_at when the assent append fails', functio
     $this->withoutExceptionHandling();
 
     expect(fn () => $this->actingAs($invitee)->postJson("/invitations/{$invitation->token}/redeem", [
-        'agreementMember' => ['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest'],
+        'agreementMembers' => [['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest']],
     ]))->toThrow(RuntimeException::class, 'assent append failed');
 
     expect(Membership::query()->where('team_id', $team->getKey())->where('user_id', $invitee->getKey())->exists())->toBeFalse()
@@ -120,37 +151,47 @@ it('keeps invitation redemption available when the optional agreements seam is n
 
 final class Agreements14InvitationResolver implements RequirementResolver
 {
+    /** @param list<Requires> $requirements */
+    public function __construct(private array $requirements = [new Requires('terms')]) {}
+
     public function outstanding(mixed $party, string $behavior, mixed $subject, array $submittedMembers): array
     {
         if ($behavior !== 'invitations.redeem') {
             return [];
         }
 
-        $member = $submittedMembers['agreementMember'] ?? null;
-        if ($member instanceof AgreementMemberData
-            && $member->key === 'terms'
-            && $member->version === 3
-            && $member->digest === 'frozen-digest') {
-            return [];
+        $outstanding = [];
+        foreach ($this->requirements as $requirement) {
+            $member = $submittedMembers[$requirement->agreement] ?? null;
+            $valid = $member instanceof AgreementMemberData
+                && $member->key === $requirement->agreement
+                && (($requirement->agreement === 'terms' && $member->version === 3 && $member->digest === 'frozen-digest')
+                    || ($requirement->agreement === 'privacy' && $member->version === 4 && $member->digest === 'privacy-digest'));
+            if (! $valid) {
+                $outstanding[] = new OutstandingRequirementData(
+                    key: $requirement->agreement,
+                    version: $requirement->agreement === 'terms' ? 3 : 4,
+                    digest: $requirement->agreement === 'terms' ? 'frozen-digest' : 'privacy-digest',
+                    kind: 'contract',
+                    title: ucfirst($requirement->agreement),
+                    scope: 'party',
+                    subject: null,
+                    readUrl: '/agreements/'.$requirement->agreement,
+                    acceptOperation: null,
+                    member: 'agreementMembers',
+                );
+            }
         }
 
-        return [new OutstandingRequirementData(
-            key: 'terms',
-            version: 3,
-            digest: 'frozen-digest',
-            kind: 'contract',
-            title: 'Terms',
-            scope: 'party',
-            subject: null,
-            readUrl: '/beam/agreements/agreements/terms',
-            acceptOperation: null,
-            member: 'agreementMember',
-        )];
+        return $outstanding;
     }
 }
 
 final class Agreements14InvitationDeclarations implements RequirementDeclarations
 {
+    /** @param list<Requires> $requirements */
+    public function __construct(private array $requirements = [new Requires('terms')]) {}
+
     public function declares(string $behavior): bool
     {
         return $this->requirementsFor($behavior) !== [];
@@ -158,12 +199,12 @@ final class Agreements14InvitationDeclarations implements RequirementDeclaration
 
     public function requirementsFor(string $behavior): array
     {
-        return $behavior === 'invitations.redeem' ? [new Requires('terms')] : [];
+        return $behavior === 'invitations.redeem' ? $this->requirements : [];
     }
 
     public function all(): array
     {
-        return ['invitations.redeem' => [new Requires('terms')]];
+        return $this->requirements === [] ? [] : ['invitations.redeem' => $this->requirements];
     }
 }
 

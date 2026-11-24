@@ -9,9 +9,9 @@ use Splicewire\Beam\Accounts\Landing;
 use Splicewire\Beam\Accounts\Localization\AccountError;
 use Splicewire\Beam\Accounts\Models\Invitation;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
+use Splicewire\Beam\Agreements\AccountAssentRecorder;
 use Splicewire\Beam\Agreements\AssentRecorder;
 use Splicewire\Beam\Agreements\Data\AgreementMemberData;
-use Splicewire\Beam\Agreements\Data\RequirementRefusalData;
 use Splicewire\Beam\Agreements\RequirementDeclarations;
 use Splicewire\Beam\Particle\Attributes\ParticleOp;
 use Splicewire\Beam\Particle\OperationCall;
@@ -54,8 +54,8 @@ use Splicewire\Beam\Particle\Subject\ColumnSubject;
     ability: false,
     input: RedeemInvitationData::class,
     output: InvitationAcceptedData::class,
-    errors: [428 => RequirementRefusalData::class],
     subject: new ColumnSubject('token', throughResource: false),
+    recordsAssent: true,
 )]
 class RedeemInvitation
 {
@@ -75,9 +75,12 @@ class RedeemInvitation
             self::refuse($verdict, $request);
         }
 
-        $members = $input->agreementMember instanceof AgreementMemberData
-            ? ['agreementMember' => $input->agreementMember]
-            : [];
+        $members = [];
+        foreach ($input->agreementMembers instanceof \Spatie\LaravelData\Optional ? [] : $input->agreementMembers as $member) {
+            if ($member instanceof AgreementMemberData) {
+                $members[$member->key] = $member;
+            }
+        }
         $behavior = 'invitations.redeem';
         $requirements = app()->bound(RequirementDeclarations::class)
             ? app(RequirementDeclarations::class)->requirementsFor($behavior)
@@ -85,16 +88,19 @@ class RedeemInvitation
         $team = $invitation->getConnection()->transaction(function () use ($redemption, $invitation, $actor, $requirements, $members, $behavior) {
             $team = $redemption->redeem($invitation, $actor);
 
-            if ($requirements !== []
-                && app()->bound(AssentRecorder::class)
-                && self::hasDeclaredMember($requirements, $members)) {
+            if ($requirements !== [] && $members !== []) {
                 $membership = $team->memberships()->where('user_id', $actor->getAuthIdentifier())->firstOrFail();
-                app(AssentRecorder::class)->record($membership, new \Splicewire\Beam\Write\WriteRequirement(
-                    behavior: $behavior,
-                    subject: $membership,
-                    submittedMembers: $members,
-                    actor: $actor,
-                ));
+                if (app()->bound(AccountAssentRecorder::class)) {
+                    $organisation = app(\Splicewire\Beam\Agreements\Organisation\ActingOrganisation::class)->current();
+                    app(AccountAssentRecorder::class)->record(array_values($members), $actor, $membership, $organisation, $behavior);
+                } elseif (app()->bound(AssentRecorder::class)) {
+                    app(AssentRecorder::class)->record($membership, new \Splicewire\Beam\Write\WriteRequirement(
+                        behavior: $behavior,
+                        subject: $membership,
+                        submittedMembers: $members,
+                        actor: $actor,
+                    ));
+                }
             }
 
             return $team;
@@ -134,19 +140,4 @@ class RedeemInvitation
         throw \Splicewire\Beam\Localization\CodedValidationException::for('invitation', $error);
     }
 
-    /** @param list<\Splicewire\Beam\Agreements\Requires> $requirements
-     * @param  array<string, AgreementMemberData>  $members
-     */
-    private static function hasDeclaredMember(array $requirements, array $members): bool
-    {
-        foreach ($requirements as $requirement) {
-            foreach ($members as $member) {
-                if ($requirement->agreement === $member->key) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
 }

@@ -27,7 +27,7 @@ it('admits signup with the current agreement member and records it against the n
         'email' => 'ada@example.test',
         'password' => 'password-1234',
         'passwordConfirmation' => 'password-1234',
-        'agreementMember' => ['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest'],
+        'agreementMembers' => [['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest']],
     ]);
 
     expect($user)->toBeInstanceOf(User::class)
@@ -36,7 +36,50 @@ it('admits signup with the current agreement member and records it against the n
         ->and($this->assentRecorder->calls[0][1]->behavior)->toBe('auth.register')
         ->and($this->assentRecorder->calls[0][1]->subject)->toBeNull()
         ->and($this->assentRecorder->calls[0][1]->actor)->toBe($user)
-        ->and($this->assentRecorder->calls[0][1]->submittedMembers['agreementMember']->key)->toBe('terms');
+        ->and($this->assentRecorder->calls[0][1]->submittedMembers['terms']->key)->toBe('terms');
+});
+
+it('admits and forwards one current member for each blocking Agreement', function (): void {
+    $requirements = [new Requires('terms'), new Requires('privacy')];
+    app()->instance(RequirementDeclarations::class, new Agreements14SignupDeclarations($requirements));
+    app()->instance(RequirementAdmission::class, new RequirementAdmission(new Agreements14SignupResolver($requirements)));
+    $recorder = $this->assentRecorder;
+
+    $user = app(CreateNewUser::class)->create([
+        'name' => 'Ada',
+        'email' => 'ada@example.test',
+        'password' => 'password-1234',
+        'passwordConfirmation' => 'password-1234',
+        'agreementMembers' => [
+            ['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest'],
+            ['key' => 'privacy', 'version' => 4, 'digest' => 'privacy-digest'],
+        ],
+    ]);
+
+    expect($user)->toBeInstanceOf(User::class)
+        ->and(array_keys($recorder->calls[0][1]->submittedMembers))->toBe(['terms', 'privacy']);
+});
+
+it('refuses only the outstanding Agreement when a multi-member signup omits one', function (): void {
+    $requirements = [new Requires('terms'), new Requires('privacy')];
+    app()->instance(RequirementDeclarations::class, new Agreements14SignupDeclarations($requirements));
+    app()->instance(RequirementAdmission::class, new RequirementAdmission(new Agreements14SignupResolver($requirements)));
+
+    try {
+        app(CreateNewUser::class)->create([
+            'name' => 'Ada',
+            'email' => 'ada@example.test',
+            'password' => 'password-1234',
+            'passwordConfirmation' => 'password-1234',
+            'agreementMembers' => [['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest']],
+        ]);
+        $this->fail('the missing privacy Agreement did not refuse signup');
+    } catch (RequirementRefused $refusal) {
+        expect(array_map(fn ($item) => $item->key, $refusal->refusal->requirements))->toBe(['privacy']);
+    }
+
+    expect(User::query()->where('email', 'ada@example.test')->exists())->toBeFalse()
+        ->and($this->assentRecorder->calls)->toBeEmpty();
 });
 
 it('refuses signup without the current agreement member before creating an account', function (): void {
@@ -57,7 +100,7 @@ it('refuses a stale signup member before creating an account', function (): void
         'email' => 'ada@example.test',
         'password' => 'password-1234',
         'passwordConfirmation' => 'password-1234',
-        'agreementMember' => ['key' => 'terms', 'version' => 2, 'digest' => 'old-digest'],
+        'agreementMembers' => [['key' => 'terms', 'version' => 2, 'digest' => 'old-digest']],
     ]))->toThrow(RequirementRefused::class);
 
     expect(User::query()->where('email', 'ada@example.test')->exists())->toBeFalse()
@@ -72,7 +115,7 @@ it('rolls back signup when recording the admitted agreement fails', function ():
         'email' => 'ada@example.test',
         'password' => 'password-1234',
         'passwordConfirmation' => 'password-1234',
-        'agreementMember' => ['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest'],
+        'agreementMembers' => [['key' => 'terms', 'version' => 3, 'digest' => 'frozen-digest']],
     ]))->toThrow(RuntimeException::class, 'assent append failed');
 
     expect(User::query()->where('email', 'ada@example.test')->exists())->toBeFalse();
@@ -130,33 +173,39 @@ final class Agreements14SignupDeclarations implements RequirementDeclarations
 
 final class Agreements14SignupResolver implements RequirementResolver
 {
+    /** @param list<Requires> $requirements */
+    public function __construct(private array $requirements = [new Requires('terms')]) {}
+
     public function outstanding(mixed $party, string $behavior, mixed $subject, array $submittedMembers): array
     {
         if ($behavior !== 'auth.register') {
             return [];
         }
 
-        foreach ($submittedMembers as $member) {
-            if ($member instanceof AgreementMemberData
-                && $member->key === 'terms'
-                && $member->version === 3
-                && $member->digest === 'frozen-digest') {
-                return [];
+        $outstanding = [];
+        foreach ($this->requirements as $requirement) {
+            $member = $submittedMembers[$requirement->agreement] ?? null;
+            $valid = $member instanceof AgreementMemberData
+                && $member->key === $requirement->agreement
+                && (($requirement->agreement === 'terms' && $member->version === 3 && $member->digest === 'frozen-digest')
+                    || ($requirement->agreement === 'privacy' && $member->version === 4 && $member->digest === 'privacy-digest'));
+            if (! $valid) {
+                $outstanding[] = new OutstandingRequirementData(
+                    key: $requirement->agreement,
+                    version: $requirement->agreement === 'terms' ? 3 : 4,
+                    digest: $requirement->agreement === 'terms' ? 'frozen-digest' : 'privacy-digest',
+                    kind: 'contract',
+                    title: ucfirst($requirement->agreement),
+                    scope: 'party',
+                    subject: null,
+                    readUrl: '/agreements/'.$requirement->agreement,
+                    acceptOperation: null,
+                    member: 'agreementMembers',
+                );
             }
         }
 
-        return [new OutstandingRequirementData(
-            key: 'terms',
-            version: 3,
-            digest: 'frozen-digest',
-            kind: 'contract',
-            title: 'Terms',
-            scope: 'party',
-            subject: null,
-            readUrl: '/beam/agreements/agreements/terms',
-            acceptOperation: null,
-            member: 'agreementMember',
-        )];
+        return $outstanding;
     }
 }
 

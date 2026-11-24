@@ -16,6 +16,7 @@ final class AuthEntryPageData extends Data
     /**
      * @param  list<array<string, mixed>>|null  $body  JsonDoc nodes, as seeded by AuthPagesSeeder.
      * @param  list<DemoAccountLinkData>|Optional  $demoAccounts
+     * @param  list<AgreementPromptData>|Optional  $agreements
      */
     public function __construct(
         public string $slug,

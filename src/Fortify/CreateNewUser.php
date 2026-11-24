@@ -13,6 +13,7 @@ use Splicewire\Beam\Accounts\Doors\Door;
 use Splicewire\Beam\Accounts\Doors\NewUserData;
 use Splicewire\Beam\Accounts\Facades\BeamAccounts;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
+use Splicewire\Beam\Agreements\AccountAssentRecorder;
 use Splicewire\Beam\Agreements\AssentRecorder;
 use Splicewire\Beam\Agreements\Data\AgreementMemberData;
 use Splicewire\Beam\Agreements\RequirementAdmission;
@@ -34,7 +35,7 @@ class CreateNewUser implements CreatesNewUsers
     public function __construct(protected TeamProvisioner $teams, protected AccountDoors $doors) {}
 
     /**
-     * @param  array<string, string>  $input
+     * @param  array<string, mixed>  $input
      */
     public function create(array $input): Authenticatable
     {
@@ -80,13 +81,17 @@ class CreateNewUser implements CreatesNewUsers
             $user = $this->createUser($input);
             $this->afterCreating($user, $input);
 
-            if ($user instanceof Model && self::hasDeclaredMember($requirements, $members)) {
-                app(AssentRecorder::class)->record($user, new WriteRequirement(
-                    behavior: $behavior,
-                    subject: null,
-                    submittedMembers: $members,
-                    actor: $user,
-                ));
+            if ($user instanceof Model && $members !== []) {
+                if (app()->bound(AccountAssentRecorder::class)) {
+                    app(AccountAssentRecorder::class)->record(array_values($members), $user, $user, null, $behavior);
+                } elseif (app()->bound(AssentRecorder::class)) {
+                    app(AssentRecorder::class)->record($user, new WriteRequirement(
+                        behavior: $behavior,
+                        subject: null,
+                        submittedMembers: $members,
+                        actor: $user,
+                    ));
+                }
             }
 
             return $user;
@@ -94,7 +99,7 @@ class CreateNewUser implements CreatesNewUsers
     }
 
     /**
-     * @param  array<string, string>  $input
+     * @param  array<string, mixed>  $input
      */
     protected function createUser(array $input): Authenticatable
     {
@@ -108,7 +113,7 @@ class CreateNewUser implements CreatesNewUsers
     /**
      * Consumer hook — runs after the user + team-of-one exist. No-op by default.
      *
-     * @param  array<string, string>  $input
+     * @param  array<string, mixed>  $input
      */
     protected function afterCreating(Authenticatable $user, array $input): void
     {
@@ -118,31 +123,21 @@ class CreateNewUser implements CreatesNewUsers
     /** @return array<string, AgreementMemberData> */
     private static function submittedMembers(array $input): array
     {
-        $value = $input['agreementMember'] ?? null;
-
-        if (! is_array($value)
-            || ! is_string($value['key'] ?? null)
-            || ! is_int($value['version'] ?? null)
-            || ! is_string($value['digest'] ?? null)) {
+        $values = $input['agreementMembers'] ?? [];
+        if (! is_array($values)) {
             return [];
         }
 
-        return ['agreementMember' => new AgreementMemberData($value['key'], $value['version'], $value['digest'])];
-    }
-
-    /** @param list<\Splicewire\Beam\Agreements\Requires> $requirements
-     * @param  array<string, AgreementMemberData>  $members
-     */
-    private static function hasDeclaredMember(array $requirements, array $members): bool
-    {
-        foreach ($requirements as $requirement) {
-            foreach ($members as $member) {
-                if ($requirement->agreement === $member->key) {
-                    return true;
-                }
+        $members = [];
+        foreach ($values as $value) {
+            if (is_array($value)
+                && is_string($value['key'] ?? null)
+                && is_int($value['version'] ?? null)
+                && is_string($value['digest'] ?? null)) {
+                $members[$value['key']] = new AgreementMemberData($value['key'], $value['version'], $value['digest']);
             }
         }
 
-        return false;
+        return $members;
     }
 }
