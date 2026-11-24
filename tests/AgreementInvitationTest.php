@@ -9,6 +9,8 @@ use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 use Splicewire\Beam\Agreements\AccountAssentRecorder;
 use Splicewire\Beam\Agreements\Data\AgreementMemberData;
 use Splicewire\Beam\Agreements\Data\OutstandingRequirementData;
+use Splicewire\Beam\Agreements\Organisation\ActingOrganisation;
+use Splicewire\Beam\Agreements\Organisation\NoActingOrganisation;
 use Splicewire\Beam\Agreements\RequirementAdmission;
 use Splicewire\Beam\Agreements\RequirementDeclarations;
 use Splicewire\Beam\Agreements\RequirementResolver;
@@ -19,6 +21,7 @@ beforeEach(function (): void {
     $this->agreementResolver = new Agreements14InvitationResolver;
     app()->instance(RequirementAdmission::class, new RequirementAdmission($this->agreementResolver));
     app()->instance(RequirementDeclarations::class, new Agreements14InvitationDeclarations);
+    app()->instance(ActingOrganisation::class, new NoActingOrganisation);
     $this->assentRecorder = new Agreements14InvitationRecorder;
     app()->instance(AccountAssentRecorder::class, $this->assentRecorder);
 });
