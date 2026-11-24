@@ -6443,7 +6443,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/splicewire/laravel-beam.git",
-                "reference": "ad11cc5c03192b4ce77a159b16d4fd37b7ba65ad"
+                "reference": "9ca88b091f8b825d36cc7689b3780495c21d34c8"
             },
             "require": {
                 "illuminate/contracts": "^11.0|^12.0|^13.0",
@@ -6584,7 +6584,7 @@
                 "MIT"
             ],
             "description": "The schema-driven-CMS core: composes the open schema foundation (schemastud/laravel-data-schemas + schemastud/laravel-frame) and the open versioning foundation (rushing/laravel-versioning) into a schema-typed, snapshot-versioned, migrate-on-read BeamParticle. Depends DOWN on the open foundations (the ADR-0092 direction, paid→open); per ADR-0156 that now includes schemastud/laravel-frame — the agnostic resource-scaffolding rung — so beam natively implements Frame's FrameResourceHandler port (chain: splicewire/beam → schemastud/frame → schemastud/data-schemas, monotonic, no cycle). Also the runtime home of the host-hook registries (webhook / sitemap / doctor), the realm registry, and the particle resource declarations. The media arm (medialibrary + the media model traits + media table) was extracted DOWN into splicewire/laravel-beam-media (HTTP-03 / ADR-0178); base beam no longer requires medialibrary and does NOT require beam-media (no cycle). Headless = no editor SURFACE running; Frame's scaffolding may be present-but-inert. No Beam model is minted; beam is a substrate, not an instance.",
-            "time": "2026-11-22T12:39:18+00:00"
+            "time": "2026-11-24T00:06:16+00:00"
         },
         {
             "name": "spomky-labs/cbor-php",
@@ -14132,7 +14132,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/splicewire/laravel-beam-agreements.git",
-                "reference": "d0c82dce3134d7df700bf4d0be229f00f3b38f2e"
+                "reference": "5259a8232f9231596098a788f16e49c10cf487a0"
             },
             "require": {
                 "illuminate/contracts": "^11.0|^12.0|^13.0",
@@ -14216,7 +14216,7 @@
                 "laravel",
                 "splicewire"
             ],
-            "time": "2026-11-22T13:24:17+00:00"
+            "time": "2026-11-24T00:31:43+00:00"
         },
         {
             "name": "splicewire/laravel-beam-analytics",
