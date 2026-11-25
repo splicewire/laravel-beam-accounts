@@ -1,9 +1,13 @@
 <?php
 
 use Illuminate\Support\Facades\Schema;
+use Splicewire\Beam\Accounts\Actions\DemoLoginLinks;
 use Splicewire\Beam\Accounts\BeamAccountsServiceProvider;
 use Splicewire\Beam\Accounts\Database\Seeders\DemoTeamSeeder;
+use Splicewire\Beam\Accounts\Enums\Role;
+use Splicewire\Beam\Accounts\Facades\BeamDemo;
 use Splicewire\Beam\Accounts\Models\Team;
+use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 /**
  * The demo-seed gate reads the TEAMS estate's third state, not its publish flag.
@@ -108,5 +112,34 @@ it('skips the demo seeder, without fataling, when the teams tables are not there
 
     app(DemoTeamSeeder::class)->run();
 
+    expect(Schema::hasTable((new Team)->getTable()))->toBeFalse();
+});
+
+/**
+ * Ticket 29: a host that runs its own team system declares the teams estate ABSENT, so `beam_teams`
+ * is never on its disk — and yet it must still be able to seed the demo SUBJECTS, because
+ * {@see DemoLoginLinks::for()} is team-agnostic (it mints from a user row by its demo email, with no
+ * team involved). The old seeder returned at the teams-table guard BEFORE the user loop, so a
+ * teams-absent host got zero demo users and `for()` was null — 18 browser flows then `visit(null)`.
+ *
+ * The contract this pins: the subjects seed, and `for()` yields a real signed link, WITHOUT any
+ * `beam_teams` table being created. Team provisioning and realm reach are the only things the
+ * missing estate skips.
+ */
+it('still seeds the demo subjects, and mints a login link, when the teams estate is absent', function () {
+    Schema::dropIfExists((new Team)->getTable());
+
+    app(DemoTeamSeeder::class)->run();
+
+    // The demo subjects exist team-agnostically...
+    expect(User::where('email', BeamDemo::email(Role::Owner->value))->exists())->toBeTrue();
+
+    // ...the engine-homed single-link door mints a real signed URL for one...
+    expect(app(DemoLoginLinks::class)->for(Role::Owner->value))
+        ->not->toBeNull()
+        ->toContain('/login-as')
+        ->toContain('signature=');
+
+    // ...and NO team estate was fabricated on a host that declared it absent.
     expect(Schema::hasTable((new Team)->getTable()))->toBeFalse();
 });
