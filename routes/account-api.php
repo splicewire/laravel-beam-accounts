@@ -38,7 +38,11 @@ Route::prefix('tokens')->name('tokens.')->group(function () {
     // GET on the collection, so it precedes nothing else.
     Route::get('permissions', [ApiTokenController::class, 'permissions'])->name('permissions');
 
-    Route::get('/', [ApiTokenController::class, 'index'])->name('index');
+    // The collection index stamps the `tokens` resource and mounts its hook-event catalog beside it, so the mount
+    // gets the same `{root}/tokens/discovery` and `{root}/tokens/hooks/events` the flagship's legacy tenant mount
+    // has (owner-review-20261112 56).
+    Route::get('/', [ApiTokenController::class, 'index'])->name('index')
+        ->beam()->inResource('tokens', hookEvents: true);
     Route::post('/', [ApiTokenController::class, 'store'])->name('store');
 
     // Renew (extend expiry, same secret) + rotate (fresh secret, archive the old one).
@@ -64,7 +68,8 @@ Route::prefix('members')->name('members.')->group(function () {
 });
 
 Route::prefix('invitations')->name('invitations.')->group(function () {
-    Route::get('/', [TeamInvitationController::class, 'index'])->name('index');
+    // Stamps the `invitations` resource, which mounts `{root}/invitations/discovery` (owner-review-20261112 56).
+    Route::get('/', [TeamInvitationController::class, 'index'])->name('index')->beam()->inResource('invitations');
     Route::post('/', [TeamInvitationController::class, 'send'])->name('send');
     Route::post('{id}/resend', [TeamInvitationController::class, 'resend'])->name('resend');
     Route::delete('{id}', [TeamInvitationController::class, 'revoke'])->name('revoke');

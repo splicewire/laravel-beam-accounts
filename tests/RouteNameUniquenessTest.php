@@ -45,6 +45,9 @@ class RouteNameUniquenessTest extends TestCase
         AccountsRoutes::me();
         AccountsRoutes::mount();
         AccountsRoutes::sharingLedger();
+        // The per-mount discovery and hook-event rows the resource stamps add (owner-review-20261112 56), as beam's
+        // boot-time pass mounts them at a host.
+        app(\Splicewire\Beam\Discovery\ResourceDiscoveryAutoMounter::class)->mount();
 
         $routes = app('router')->getRoutes();
         $names = collect($routes->getRoutes())->map(fn ($route) => $route->getName())->filter();
