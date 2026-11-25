@@ -11,8 +11,10 @@ use Inertia\Response;
 use Spatie\LaravelData\Optional;
 use Splicewire\Beam\Accounts\Actions\AgreementPageProps;
 use Splicewire\Beam\Accounts\Data\Pages\AcceptInvitationPageData;
+use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Ops\RedeemInvitation;
 use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
+use Splicewire\Beam\Localization\BeamSchemaText;
 
 /**
  * `GET invitations/{token}` (`invitations.accept`) — the page the invitation email links to.
@@ -51,6 +53,7 @@ class InvitationAcceptController extends Controller
             teamName: $live ? $redemption->teamName($invitation) : null,
             email: $live ? $invitation->email : null,
             role: $live ? (string) $invitation->role : null,
+            roleLabel: $live ? self::roleLabel((string) $invitation->role) : null,
             inviterName: $live ? $redemption->inviterName($invitation) : null,
             expiresAt: $live ? $redemption->expiresAt($invitation)->toIso8601String() : null,
             viewerEmail: $viewer === null ? null : (string) data_get($viewer, 'email'),
@@ -60,6 +63,18 @@ class InvitationAcceptController extends Controller
             logoutUrl: self::routeOrNull('logout'),
             agreements: AgreementPageProps::forBehavior('invitations.redeem', $viewer)['agreements'] ?? new Optional,
         ));
+    }
+
+    /**
+     * The role's display label through beam's ladder (`beam-accounts::enums.<Role>.cases.<Case>.label`), the same
+     * text the team page and the invitation mail show. Null for a role string outside {@see Role}: the page then
+     * shows what it showed before this prop existed.
+     */
+    private static function roleLabel(string $role): ?string
+    {
+        $known = Role::tryFrom($role);
+
+        return $known === null ? null : app(BeamSchemaText::class)->enumCaseLabel($known, $known->label());
     }
 
     /** @param  array<string, string>  $query */

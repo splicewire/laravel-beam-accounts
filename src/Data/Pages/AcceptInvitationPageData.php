@@ -18,6 +18,10 @@ use Splicewire\Beam\Accounts\Teams\InvitationRedemption;
  * resolved to a live invitation: an invalid or tampered link names nothing, so a guessed token learns no
  * team name.
  *
+ * `roleLabel` is the role's display label from the Role enum's catalog line (beam's ladder, localization 69b), so the
+ * invitee reads the role in their language. It is null when the role string is not a {@see \Splicewire\Beam\Accounts\Enums\Role}
+ * case, and the page then derives the label from `role` itself.
+ *
  * `acceptUrl` is the `redeem` operation's URL (present only when the viewer can redeem); `registerUrl` /
  * `loginUrl` / `logoutUrl` are the host's Fortify routes when it mounts them, so the page never offers a
  * door the host does not have.
@@ -30,6 +34,7 @@ final class AcceptInvitationPageData extends Data
         public ?string $teamName = null,
         public ?string $email = null,
         public ?string $role = null,
+        public ?string $roleLabel = null,
         public ?string $inviterName = null,
         public ?string $expiresAt = null,
         public ?string $viewerEmail = null,
