@@ -137,6 +137,13 @@ Session/Fortify web guard by default. The opt-in token `api` guard seam
 (`splicewire.account.api.enabled`, default-off, Sanctum) is prepared for a satellite that
 exposes its own proprietary API — never Passport.
 
+**Route names beside Fortify.** The settings routes (`beam.accounts.register_routes`, default on) name
+`user-password.update`, which Fortify's `Features::updatePasswords()` also names, so a host with both gets a duplicate
+name and `route:cache` refuses. Such a host sets `ACCOUNT_REGISTER_ROUTES=false` and wires its own settings routes,
+as the flagship and the tower starter do. The V1 macros (`splicewireAccountsAuthV1()`, `splicewireAccountsSessionV1()`)
+register bare `login`, `logout`, `password.email` and `password.update`: mount them inside a name group
+(`->name('api.v1.')`), as both hosts do.
+
 ## Registries
 
 This package declares two registries:
