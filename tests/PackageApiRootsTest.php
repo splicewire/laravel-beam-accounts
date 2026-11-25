@@ -60,8 +60,8 @@ it('names the new exports beam.accounts.api.* so a dual mount beside the legacy 
     Route::middleware('host-account')->group(fn () => AccountsRoutes::sharingLedger());
     $routes = app('router')->getRoutes();
     $names = collect($routes->getRoutes())->map(fn ($route) => $route->getName())->filter();
-    // Scoped to this package's stems: unprefixed names (logout, password.*) can collide with a host's own routes
-    // independently of the stem (recorded as a LOW; nominated separately).
+    // Scoped to this package's stems. Every route this test mounts is named under `beam.accounts.` (the exports'
+    // `beam.accounts.api.*`, the legacy macro's `beam.accounts.*`); the filter keeps a host's own names out of it.
     expect($names->filter(fn (string $name) => str_starts_with($name, 'beam.accounts.'))->duplicates()->values()->all())->toBe([]);
 
     expect($routes->match(Request::create('/beam/accounts/tokens'))->getName())->toBe('beam.accounts.api.tokens.index')

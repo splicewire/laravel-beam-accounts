@@ -23,10 +23,12 @@ use Splicewire\Beam\Accounts\Http\Controllers\Account\TeamMemberController;
 |     it". These verbs mint bearer credentials and change who can reach a team; which guard, which
 |     throttle and which prefix they sit behind is a host fact.
 |
-| The URIs and names match the flagship's existing spelling EXACTLY, because
+| The URIs match the flagship's existing spelling EXACTLY, because
 | `@splicewire/beam-accounts`' `TokensClient` / `TeamClient` are written against them and must keep
-| working at either host: `{api_root}/…` with `beam.accounts.{resource}.{verb}` names, the standard
-| `{data: …}` envelope on every verb, and the snake `expires_in_days` body key.
+| working at either host: `{api_root}/…`, the standard `{data: …}` envelope on every verb, and the
+| snake `expires_in_days` body key. Until ticket 16 the route NAMES carry one of two stems:
+| `beam.accounts.api.{resource}.{verb}` when `AccountsRoutes::mount()` mounts this file, and the legacy
+| `beam.accounts.{resource}.{verb}` when the `splicewireAccountApiRoutes()` macro does (bare or prefixed).
 |
 | Verb/sub-resource routes precede `{id}` so a literal segment is never read as an id.
 */
