@@ -352,6 +352,26 @@ it('refuses the old snake expiry spelling on renew and rotate without changing t
         ->and(PersonalAccessToken::where('name', 'strict-expiry')->count())->toBe(1);
 });
 
+it('answers 404 for another principal\'s token on renew and rotate before it validates the body', function () {
+    apiOwner();
+    $created = $this->postJson('/beam/accounts/tokens', ['name' => 'not-yours', 'expiresInDays' => 5])
+        ->assertCreated()
+        ->json('data');
+    $token = PersonalAccessToken::findOrFail($created['id']);
+    $expiry = $token->expires_at->toISOString();
+
+    // Someone else asks after it with a malformed expiry: the token is not theirs, so 404, never a 422 that
+    // answers on the body first (owner-review-20261112 81, the same order trap as member update-role).
+    apiOwner('other@example.test');
+    foreach (['renew', 'rotate'] as $verb) {
+        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/{$verb}", ['expiresInDays' => 0])->assertNotFound();
+        $this->postJson("/beam/accounts/tokens/{$token->getKey()}/{$verb}", ['expiresInDays' => 'soon'])->assertNotFound();
+    }
+
+    expect($token->fresh()->expires_at->toISOString())->toBe($expiry)
+        ->and(PersonalAccessToken::where('name', 'not-yours')->count())->toBe(1);
+});
+
 it('sweeps other SESSION tokens and leaves deliberate API tokens working', function () {
     [$owner] = apiOwner();
 

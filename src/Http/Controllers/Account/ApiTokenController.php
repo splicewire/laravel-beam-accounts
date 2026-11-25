@@ -166,8 +166,8 @@ class ApiTokenController extends Controller
     #[ResponseFromData(AccountErrorData::class, status: 422)]
     public function renew(Request $request, string $id): JsonResponse
     {
-        $input = ApiTokenExpiryInputData::validateAndCreate($request);
-
+        // Lookup and gate before the body: a token that is not the caller's is 404 whatever was sent, never a 422
+        // on its shape first (owner-review-20261112 81).
         $token = $this->findOwnToken($id);
 
         if ($token === null) {
@@ -175,6 +175,8 @@ class ApiTokenController extends Controller
         }
 
         TokenManagement::authorize($request->user(), TokenManagement::RENEW, $token);
+
+        $input = ApiTokenExpiryInputData::validateAndCreate($request);
 
         if ($token->archived_at) {
             return response()->json((new AccountErrorData(AccountError::RenewArchived->message(), AccountError::RenewArchived->code()))->toArray(), 422);
@@ -203,8 +205,7 @@ class ApiTokenController extends Controller
     #[ResponseFromData(AccountErrorData::class, status: 422)]
     public function rotate(Request $request, string $id): JsonResponse
     {
-        $input = ApiTokenExpiryInputData::validateAndCreate($request);
-
+        // Lookup and gate before the body, as renew (owner-review-20261112 81).
         $old = $this->findOwnToken($id);
 
         if ($old === null) {
@@ -212,6 +213,8 @@ class ApiTokenController extends Controller
         }
 
         TokenManagement::authorize($request->user(), TokenManagement::ROTATE, $old);
+
+        $input = ApiTokenExpiryInputData::validateAndCreate($request);
 
         if ((string) $old->getKey() === (string) $this->currentTokenId($request)) {
             return response()->json((new AccountErrorData(AccountError::RotateCurrent->message(), AccountError::RotateCurrent->code()))->toArray(), 422);
