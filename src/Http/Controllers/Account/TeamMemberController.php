@@ -87,12 +87,14 @@ class TeamMemberController extends Controller
     #[ResponseFromData(AccountErrorData::class, status: 422)]
     public function updateRole(Request $request, string $id): JsonResponse
     {
+        // Gate first, body second: a non-owner is refused on who they are (403), never told the body's rules
+        // by a 422 first (owner-review-20261112 81; the order legacy tenancy's member update already keeps).
+        $team = $this->team($request);
+        $this->assertOwner($team, $request->user());
+
         $validated = $request->validate([
             'role' => ['required', 'string', 'in:'.implode(',', Role::values())],
         ]);
-
-        $team = $this->team($request);
-        $this->assertOwner($team, $request->user());
 
         $member = $this->member($team, $id);
 

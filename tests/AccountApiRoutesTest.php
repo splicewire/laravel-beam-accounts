@@ -419,6 +419,25 @@ it('lets an owner change a member\'s role and refuses a member doing the same', 
     expect($team->fresh()->memberRole($member->fresh()))->toBe(Role::Admin);
 });
 
+it('refuses a non-owner\'s role change before it validates the body', function () {
+    [$owner, $team] = apiOwner();
+    $admin = apiSeat($team, 'admin@example.test', Role::Admin);
+    $member = apiSeat($team, 'member@example.test', Role::Member);
+
+    // A malformed body from a non-owner is refused on who sent it, not on its shape: 403, never a 422 that
+    // names the validation rules to someone who may not change roles at all (owner-review-20261112 81).
+    foreach ([$admin, $member] as $actor) {
+        Auth::login($actor);
+        $this->putJson("/beam/accounts/members/{$member->id}/role", ['role' => 'not-a-role'])->assertForbidden();
+        $this->putJson("/beam/accounts/members/{$member->id}/role", [])->assertForbidden();
+    }
+
+    // The owner still gets the validation answer, and nothing moved.
+    Auth::login($owner);
+    $this->putJson("/beam/accounts/members/{$member->id}/role", ['role' => 'not-a-role'])->assertStatus(422);
+    expect($team->fresh()->memberRole($member->fresh()))->toBe(Role::Member);
+});
+
 it('refuses to demote or remove the last owner', function () {
     [$owner] = apiOwner();
 
