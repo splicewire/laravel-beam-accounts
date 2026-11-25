@@ -45,19 +45,8 @@ trait WiresSeed
             return;
         }
 
-        // Only an explicit `false` turns the step off here; null is no objection. The environment is not read:
-        // the `demo` membership below hands that choice to the run's Seeding Scenario.
-        $flag = config('beam.accounts.demo.seed_users');
-        $enabled = $flag === null || (bool) $flag;
-
-        // AND the demo gate with the TEAMS ESTATE, which this seeder writes into (`beam_teams` /
-        // `beam_memberships`). A host that runs its own team system declares that estate ABSENT
-        // precisely so those tables are never created on its disk (the flagship's
-        // `config/beam/accounts.php` says so in terms: "the engine's teams/memberships tables must
-        // never be created here"). Gating on the demo key alone made the two facts contradict — the
-        // demo gate is on everywhere but production, so at such a host the seeder RAN and died on
-        // `relation "beam_teams" does not exist`, measured at ~/Herd/splicewire-app where
-        // `splicewire:beam:seed` reported 3 seeded / 1 FAILED.
+        // The host's EXPLICIT decision wins outright; only a `null` (the default from
+        // `env('ACCOUNT_SEED_DEMO_USERS')`) hands the choice to the teams estate below.
         //
         // ⚠️ The estate reading is `estateDeclaredPresent()`, NOT `publishesEstateNamed()`. The gate
         // has three values and only `'absent'` declines the estate: `false` means "already committed
@@ -69,12 +58,27 @@ trait WiresSeed
         // by the helper, since naming only the modern one sends a reader to a key that is `true` at
         // their host (the mistake beam-facade 155 spent a section on).
         //
+        // Why `null` DEFERS but an explicit `true` does NOT (ticket 29): the demo SUBJECTS are
+        // team-agnostic and, as of {@see DemoTeamSeeder::run()}, seed BEFORE that seeder's teams-table
+        // guard and never fabricate `beam_teams`. So a host that runs its own team system — teams
+        // estate `'absent'` — can safely opt IN to login-able demo subjects by setting the key to
+        // `true` (the flagship does, for its accounts browser flows). It is not opted in by DEFAULT:
+        // a bare `absent` host with no opinion stays off, so existing such hosts are not surprised.
+        // When that unopinionated-but-demo-on case leaves the links empty, it is made VISIBLE rather
+        // than silent by {@see \Splicewire\Beam\Accounts\Doctor\DemoSeedReachabilityAudit}.
+        //
         // This stays a pure CONFIG read: it resolves in `boot`, where no database connection is
         // guaranteed and a `Schema::hasTable()` here would put a schema query on every request. The
         // "are the tables actually there" half is capability rather than policy, and lives at the
-        // point of use — {@see DemoTeamSeeder::run()} skips itself with a message, exactly as its
-        // ungated sibling {@see RolePermissionsSeeder} already did.
-        $enabled = $enabled && BeamAccountsServiceProvider::estateDeclaredPresent('migrations');
+        // point of use — {@see DemoTeamSeeder::run()} skips its TEAM step with a message, exactly as
+        // its ungated sibling {@see RolePermissionsSeeder} already did.
+        $flag = config('beam.accounts.demo.seed_users');
+
+        if ($flag === null) {
+            $enabled = BeamAccountsServiceProvider::estateDeclaredPresent('migrations');
+        } else {
+            $enabled = (bool) $flag;
+        }
 
         config(['beam.accounts.demo.seed_users' => $enabled]);
 

@@ -32,6 +32,7 @@ use Splicewire\Beam\Accounts\Concerns\WiresTeamsMigrations;
 use Splicewire\Beam\Accounts\Console\LoginAsCommand;
 use Splicewire\Beam\Accounts\Contracts\AccountShellProvider;
 use Splicewire\Beam\Accounts\Doctor\BeamAccountsRetiredMigrationAudit;
+use Splicewire\Beam\Accounts\Doctor\DemoSeedReachabilityAudit;
 use Splicewire\Beam\Accounts\Doctor\PermissionModelPairingAudit;
 use Splicewire\Beam\Accounts\Doctor\PublishGateCoverageAudit;
 use Splicewire\Beam\Accounts\Entitlements\BundleRegistry;
@@ -617,6 +618,15 @@ class BeamAccountsServiceProvider extends PackageServiceProvider implements Chai
             $this->app->make(BeamDoctorManifest::class)->register(
                 'splicewire/laravel-beam-accounts',
                 PermissionModelPairingAudit::class,
+            );
+
+            // A demo login door open onto an empty roster is silent: the door and the demo-subject
+            // seed step are gated independently, so a teams-absent host can boot with sign-in on and
+            // nothing seeded behind it (ticket 29). This makes that state VISIBLE and names the safe
+            // remedy. {@see DemoSeedReachabilityAudit}.
+            $this->app->make(BeamDoctorManifest::class)->register(
+                'splicewire/laravel-beam-accounts',
+                DemoSeedReachabilityAudit::class,
             );
         }
     }

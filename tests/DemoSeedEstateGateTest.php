@@ -63,15 +63,16 @@ it('reads the same claim through the deprecated register_* spelling', function (
 });
 
 /**
- * The one host that must never be seeded: `splicewire-app` runs its own team system over
- * `tenant_users` and declares the engine's teams estate absent. That is the outage the AND was
- * added for (`splicewire:beam:seed` reported 3 seeded / 1 FAILED on `relation "beam_teams" does not
- * exist`), and it stays closed — through the third state, which is the thing that actually says so.
+ * A teams-absent host is NOT seeded by DEFAULT — it runs its own team system over its own user table
+ * and `null` (the key's default) defers to that estate, so existing such hosts are never surprised
+ * into fabricating `beam_teams`. The outage the old AND was added for stays fixed: the fatal lived in
+ * the SEEDER running against a missing table, and {@see DemoTeamSeeder::run()} now seeds the
+ * team-agnostic subjects BEFORE its teams-table guard and never creates `beam_teams` on such a host.
  */
-it('closes the gate when the host declares the teams estate absent', function () {
+it('leaves an absent-estate host off by default (null seed_users defers to the absent estate)', function () {
     config([
         'beam.accounts.publish_migrations' => 'absent',
-        'beam.accounts.demo.seed_users' => true,
+        'beam.accounts.demo.seed_users' => null,
     ]);
 
     rebootAccountsProvider();
@@ -80,7 +81,25 @@ it('closes the gate when the host declares the teams estate absent', function ()
         ->and(config('beam.accounts.demo.seed_users'))->toBeFalse();
 });
 
-it('closes the gate on the third state written through register_*', function () {
+/**
+ * ...but an EXPLICIT `true` opts it in (ticket 29): the flagship runs its own team system (teams
+ * estate absent) yet must seed login-able demo SUBJECTS for its accounts browser flows. The subjects
+ * are team-agnostic and seed before the seeder's teams-table guard, so the opt-in is safe — the step
+ * runs and `beam_teams` is still never created. The host's explicit decision wins over the estate.
+ */
+it('lets an absent-estate host opt IN to demo subjects with an explicit true', function () {
+    config([
+        'beam.accounts.publish_migrations' => 'absent',
+        'beam.accounts.demo.seed_users' => true,
+    ]);
+
+    rebootAccountsProvider();
+
+    expect(BeamAccountsServiceProvider::estateDeclaredPresent('migrations'))->toBeFalse()
+        ->and(config('beam.accounts.demo.seed_users'))->toBeTrue();
+});
+
+it('reads the explicit opt-in through the deprecated register_* spelling too', function () {
     config([
         'beam.accounts.register_migrations' => 'absent',
         'beam.accounts.demo.seed_users' => true,
@@ -88,7 +107,7 @@ it('closes the gate on the third state written through register_*', function () 
 
     rebootAccountsProvider();
 
-    expect(config('beam.accounts.demo.seed_users'))->toBeFalse();
+    expect(config('beam.accounts.demo.seed_users'))->toBeTrue();
 });
 
 /** An explicit `false` from the host still wins; the estate reading only ever narrows it. */

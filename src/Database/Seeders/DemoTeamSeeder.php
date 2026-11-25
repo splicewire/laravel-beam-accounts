@@ -39,31 +39,39 @@ class DemoTeamSeeder extends Seeder
         // demo door decides who can log in, on the login path. A door defaulting off in production read here was the
         // same environment gate under another name. Demo subjects seeded behind a shut door cannot log in.
 
-        // Capability, checked here rather than in the config gate that registers this step. The gate
-        // is resolved in the provider's `boot`, where there is no database to ask — it can only read
-        // what the host DECLARED about the teams estate ({@see
-        // \Splicewire\Beam\Accounts\Concerns\WiresSeed}). Whether the tables are actually on this
-        // connection is a run-time fact, and the answer to it is a message and a return, not the
-        // `relation "beam_teams" does not exist` fatal that took down a whole `splicewire:beam:seed`
-        // run at ~/Herd/splicewire-app. Mirrors {@see RolePermissionsSeeder::run()}'s own guard.
-        $teams = (new Team)->getTable();
-
-        if (! Schema::hasTable($teams)) {
-            $this->command?->warn("beam-accounts: demo subjects skipped (no `{$teams}` table on this connection — the teams estate is not migrated here).");
-
-            return;
-        }
-
         $model = BeamAccounts::userModel();
         $password = Hash::make((string) config('beam.accounts.demo.password', 'password'));
 
-        // Every subject in the role-derived roster (+ solo) gets a deterministic account.
+        // The demo SUBJECTS seed first and UNCONDITIONALLY, because they are team-agnostic: {@see
+        // \Splicewire\Beam\Accounts\Actions\DemoLoginLinks::for()} mints a one-click sign-in from a
+        // user row found by its demo email, with no team involved. A host that runs its own team
+        // system declares the engine's teams estate ABSENT (ticket 29) — it must still get login-able
+        // demo subjects, and before this seeded them AFTER the teams-table guard below, so it got
+        // none and `for()` was null, sending 18 browser flows into `visit(null)`.
         $users = [];
         foreach (BeamDemo::keys() as $key) {
             $users[$key] = $model::query()->firstOrCreate(
                 ['email' => BeamDemo::email($key)],
                 ['name' => BeamDemo::name($key), 'password' => $password, 'email_verified_at' => now()],
             );
+        }
+
+        // Everything below writes the TEAMS estate (`beam_teams` / `beam_memberships`). Capability,
+        // checked here rather than in the config gate that registers this step. The gate is resolved
+        // in the provider's `boot`, where there is no database to ask — it can only read what the host
+        // DECLARED about the teams estate ({@see \Splicewire\Beam\Accounts\Concerns\WiresSeed}).
+        // Whether the tables are actually on this connection is a run-time fact, and the answer to it
+        // is a message and a return, not the `relation "beam_teams" does not exist` fatal that took
+        // down a whole `splicewire:beam:seed` run at ~/Herd/splicewire-app. Mirrors {@see
+        // RolePermissionsSeeder::run()}'s own guard. The subjects above are already seeded; a
+        // teams-absent host simply skips team provisioning and realm reach, and NEVER fabricates
+        // `beam_teams` on a host that declared that estate has no place here.
+        $teams = (new Team)->getTable();
+
+        if (! Schema::hasTable($teams)) {
+            $this->command?->warn("beam-accounts: demo team + realm reach skipped (no `{$teams}` table on this connection — the teams estate is not migrated here); the demo subjects were seeded and are login-able.");
+
+            return;
         }
 
         // One shared team carrying every role, so the role gates can be assumed and
