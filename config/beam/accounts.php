@@ -1,7 +1,7 @@
 <?php
 
 use Splicewire\Beam\Accounts\Authorization\RolePermissions;
-use Splicewire\Beam\Accounts\Entitlements\TeamPrincipalGrantSource;
+use Splicewire\Beam\Accounts\Entitlements\TeamGranteeSource;
 
 return [
     // The session guard the account surface runs on. Satellites are session/cookie
@@ -341,10 +341,11 @@ return [
         // implementation (BeamUxEntry IS the realm root) when installed.
         'realm_grantable' => null,
 
-        // Selects records whose access grants are read on behalf of a principal. The default
-        // preserves the Owner/Admin team-pivot traversal; a host may bind its own source (for
-        // example, a tenant-backed source) without changing the separate realm-root lookup above.
-        'principal_grant_source' => TeamPrincipalGrantSource::class,
+        // Selects and authorizes records whose access grants are read on behalf of a principal.
+        // The resolver trusts returned records, so a host source must exclude member-equivalent seats.
+        // Missing in an older published nested config falls back to TeamGranteeSource; explicit null
+        // opts out. A host may bind a tenant-backed source without changing the realm-root lookup above.
+        'grantees' => TeamGranteeSource::class,
 
         // tutorial-dx 04: where the principal's PLAN lives, read by the default module resolver
         // (Entitlements\ModuleEntitlementResolver: realm defaults ∪ bundle(plan) ∪ grants). Strict:

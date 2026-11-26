@@ -4,7 +4,7 @@ namespace Splicewire\Beam\Accounts\Entitlements;
 
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
-use Splicewire\Beam\Accounts\Entitlements\Contracts\PrincipalGrantSource;
+use Splicewire\Beam\Accounts\Entitlements\Contracts\GranteeSource;
 use Splicewire\Beam\Accounts\Entitlements\Contracts\RealmGrantable;
 
 /**
@@ -16,9 +16,9 @@ use Splicewire\Beam\Accounts\Entitlements\Contracts\RealmGrantable;
  *
  * `is_staff` is gone: there is no flag anywhere in this resolution. A principal's authoring/operator
  * reach is DATA — `manage` grants (`rushing/laravel-permission-cascade`'s `AccessGrant`/`HasVisibility`
- * directory ACL) held by records selected through `beam.accounts.entitlements.principal_grant_source`,
+ * directory ACL) held by records selected through `beam.accounts.entitlements.grantees`,
  * on a realm's root grantable row. The default source reads Owner/Admin team memberships and excludes
- * Member; a host can bind a different principal-grant source. For each granted realm the principal
+ * Member; a host can bind a different grantee source. For each granted realm the principal
  * composes `ux.{realm}.author`; if ANY realm is granted, the coarse `ux.author` alias also composes; if
  * the `operator` realm specifically is granted, `os.enter` and `os.operate` compose too — reproducing
  * today's blanket staff capability exactly, but as data grants rather than a boolean column.
@@ -137,23 +137,23 @@ class DefaultEntitlementResolver implements EntitlementResolver
 
     /**
      * The realms whose root entries carry a `manage` grant for records selected by the configured
-     * principal-grant source. Empty when either source or the grant model is unconfigured.
+     * grantee source. Empty when either source or the grant model is unconfigured.
      *
      * @return list<string>
      */
     protected function grantedRealms(mixed $principal): array
     {
         $grantable = $this->realmGrantable();
-        $principalGrantSource = $this->principalGrantSource();
+        $granteeSource = $this->granteeSource();
         $grantModel = config('permission-cascade.grant_model');
 
-        if ($grantable === null || $principalGrantSource === null || $grantModel === null) {
+        if ($grantable === null || $granteeSource === null || $grantModel === null) {
             return [];
         }
 
         $realms = [];
 
-        foreach ($principalGrantSource->granteesFor($principal) as $grantee) {
+        foreach ($granteeSource->granteesFor($principal) as $grantee) {
             $ids = $grantModel::query()
                 ->where('grantable_type', $grantable->grantableMorphType())
                 ->where('grantee_type', $grantee->getMorphClass())
@@ -181,10 +181,16 @@ class DefaultEntitlementResolver implements EntitlementResolver
         return $class !== null ? app($class) : null;
     }
 
-    /** The host-bound principal-grant source, or null when unconfigured. */
-    protected function principalGrantSource(): ?PrincipalGrantSource
+    /** The configured grantee source; absent older published keys retain the team default, null opts out. */
+    protected function granteeSource(): ?GranteeSource
     {
-        $class = config('beam.accounts.entitlements.principal_grant_source');
+        $key = 'beam.accounts.entitlements.grantees';
+
+        if (! config()->has($key)) {
+            return app(TeamGranteeSource::class);
+        }
+
+        $class = config($key);
 
         return $class !== null ? app($class) : null;
     }

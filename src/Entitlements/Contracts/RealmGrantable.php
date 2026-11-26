@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * binds a concrete implementation via `config('beam.accounts.entitlements.realm_grantable')`
  * (beam-ux binds its own OOTB); unbound, the grant-cascade rung resolves no realms at all — the
  * null-default discipline (ADR-0009). This seam resolves a grantable root to a realm; the separate
- * PrincipalGrantSource seam chooses which records' grants are read on behalf of a principal.
+ * GranteeSource seam chooses which records' grants are read on behalf of a principal.
  */
 interface RealmGrantable
 {

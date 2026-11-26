@@ -2,11 +2,11 @@
 
 namespace Splicewire\Beam\Accounts\Entitlements;
 
-use Splicewire\Beam\Accounts\Entitlements\Contracts\PrincipalGrantSource;
+use Splicewire\Beam\Accounts\Entitlements\Contracts\GranteeSource;
 use Splicewire\Beam\Accounts\Enums\Role;
 
-/** The default principal-grant source: eligible Owner/Admin team memberships. */
-class TeamPrincipalGrantSource implements PrincipalGrantSource
+/** The default grantee source: eligible Owner/Admin team memberships. */
+class TeamGranteeSource implements GranteeSource
 {
     /** @return iterable<\Illuminate\Database\Eloquent\Model> */
     public function granteesFor(mixed $principal): iterable
