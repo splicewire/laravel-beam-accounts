@@ -50,7 +50,7 @@ it('warns, and names the safe remedy, when a teams-absent host has the door on b
     expect($findings)->toHaveCount(1)
         ->and($findings[0]->status)->toBe(DoctorStatus::Warn)
         ->and($findings[0]->detail)->toContain('ACCOUNT_SEED_DEMO_USERS=true')
-        ->and($findings[0]->detail)->toContain('EMPTY');
+        ->and($findings[0]->detail)->toContain('resolve only if this host seeds its own');
 });
 
 it('warns when the door is on but the host turned seeding off itself, even with the estate present', function () {
@@ -63,5 +63,29 @@ it('warns when the door is on but the host turned seeding off itself, even with 
     $findings = demoSeedReachability();
 
     expect($findings)->toHaveCount(1)
-        ->and($findings[0]->status)->toBe(DoctorStatus::Warn);
+        ->and($findings[0]->status)->toBe(DoctorStatus::Warn)
+        // The audit reads config only; it must not assert the links ARE empty here either.
+        ->and($findings[0]->detail)->not->toContain('EMPTY')
+        ->and($findings[0]->detail)->not->toContain('will be empty');
+});
+
+it('does not assert the links are empty for a host that seeds its own demo subjects (door on, package seed off)', function () {
+    // A host may run the demo door ON while seeding its OWN demo subjects and leaving the package
+    // seed off (seed_users=false on a teams-absent estate). The audit reads config only — it cannot
+    // see a host-provided roster — so for this shape it must report UNCERTAINTY and name the remedy,
+    // never assert the demo login links are empty. (RED on 47f4940, which claimed EMPTY.)
+    config([
+        'beam.accounts.demo.enabled' => true,
+        'beam.accounts.publish_migrations' => 'absent',
+        'beam.accounts.demo.seed_users' => false,
+    ]);
+
+    $findings = demoSeedReachability();
+
+    expect($findings)->toHaveCount(1)
+        ->and($findings[0]->status)->toBe(DoctorStatus::Warn)
+        ->and($findings[0]->detail)->toContain('resolve only if this host seeds its own')
+        ->and($findings[0]->detail)->toContain('ACCOUNT_SEED_DEMO_USERS=true')
+        ->and($findings[0]->detail)->not->toContain('EMPTY')
+        ->and($findings[0]->detail)->not->toContain('will be empty');
 });
