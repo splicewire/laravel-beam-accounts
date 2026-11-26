@@ -1,6 +1,7 @@
 <?php
 
 use Splicewire\Beam\Accounts\Authorization\RolePermissions;
+use Splicewire\Beam\Accounts\Entitlements\TeamPrincipalGrantSource;
 
 return [
     // The session guard the account surface runs on. Satellites are session/cookie
@@ -339,6 +340,11 @@ return [
         // to resolve, the cascade grants nothing. `splicewire/laravel-beam-ux` binds its own OOTB
         // implementation (BeamUxEntry IS the realm root) when installed.
         'realm_grantable' => null,
+
+        // Selects records whose access grants are read on behalf of a principal. The default
+        // preserves the Owner/Admin team-pivot traversal; a host may bind its own source (for
+        // example, a tenant-backed source) without changing the separate realm-root lookup above.
+        'principal_grant_source' => TeamPrincipalGrantSource::class,
 
         // tutorial-dx 04: where the principal's PLAN lives, read by the default module resolver
         // (Entitlements\ModuleEntitlementResolver: realm defaults ∪ bundle(plan) ∪ grants). Strict:

@@ -4,6 +4,7 @@ namespace Splicewire\Beam\Accounts\Tests;
 
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
+use Splicewire\Beam\Accounts\Entitlements\Contracts\PrincipalGrantSource;
 use Splicewire\Beam\Accounts\Entitlements\DefaultEntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\ModuleEntitlementResolver;
 use Splicewire\Beam\Accounts\Enums\Role;
@@ -194,6 +195,39 @@ class DefaultEntitlementResolverTest extends TestCase
         $resolver = $this->app->make(DefaultEntitlementResolver::class);
 
         $this->assertSame([], $resolver->entitlementsFor(new stdClass));
+    }
+
+    public function test_a_bound_principal_grant_source_supplies_grant_holding_records(): void
+    {
+        $team = $this->team();
+        $root = RealmRoot::create(['realm' => 'site']);
+        app(AccessGrants::class)->share($root, $team, AccessGrant::ABILITY_MANAGE);
+
+        $source = new class($team) implements PrincipalGrantSource
+        {
+            public mixed $seenPrincipal = null;
+
+            public function __construct(private Team $team) {}
+
+            public function granteesFor(mixed $principal): iterable
+            {
+                $this->seenPrincipal = $principal;
+
+                return [$this->team];
+            }
+        };
+
+        config(['beam.accounts.entitlements.principal_grant_source' => $source::class]);
+        $this->app->instance($source::class, $source);
+        $principal = new stdClass;
+
+        $resolver = $this->app->make(DefaultEntitlementResolver::class);
+
+        $this->assertEqualsCanonicalizing(
+            ['ux.site.author', 'ux.author'],
+            $resolver->entitlementsFor($principal)
+        );
+        $this->assertSame($principal, $source->seenPrincipal);
     }
 
     public function test_the_default_is_bound_via_config_when_the_host_declares_none(): void

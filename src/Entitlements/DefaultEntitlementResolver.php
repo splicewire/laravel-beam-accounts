@@ -4,8 +4,8 @@ namespace Splicewire\Beam\Accounts\Entitlements;
 
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
+use Splicewire\Beam\Accounts\Entitlements\Contracts\PrincipalGrantSource;
 use Splicewire\Beam\Accounts\Entitlements\Contracts\RealmGrantable;
-use Splicewire\Beam\Accounts\Enums\Role;
 
 /**
  * The OOTB host-principal entitlement resolver — the working default a fresh beam host gets so its
@@ -16,12 +16,12 @@ use Splicewire\Beam\Accounts\Enums\Role;
  *
  * `is_staff` is gone: there is no flag anywhere in this resolution. A principal's authoring/operator
  * reach is DATA — `manage` grants (`rushing/laravel-permission-cascade`'s `AccessGrant`/`HasVisibility`
- * directory ACL) held by a Team the principal belongs to as Owner or Admin ({@see Role::grantEligible()}
- * — Member is excluded regardless of what the team holds), on a realm's root grantable row. For each
- * granted realm the principal composes `ux.{realm}.author`; if ANY realm is granted, the coarse
- * `ux.author` alias also composes; if the `operator` realm specifically is granted, `os.enter` and
- * `os.operate` compose too — reproducing today's blanket staff capability exactly, but as a Team's
- * grants rather than a boolean column.
+ * directory ACL) held by records selected through `beam.accounts.entitlements.principal_grant_source`,
+ * on a realm's root grantable row. The default source reads Owner/Admin team memberships and excludes
+ * Member; a host can bind a different principal-grant source. For each granted realm the principal
+ * composes `ux.{realm}.author`; if ANY realm is granted, the coarse `ux.author` alias also composes; if
+ * the `operator` realm specifically is granted, `os.enter` and `os.operate` compose too — reproducing
+ * today's blanket staff capability exactly, but as data grants rather than a boolean column.
  *
  * ## The board seat (`exec.view`)
  *
@@ -29,9 +29,9 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * two grants compose it: the `operator` realm grant (anyone who operates the platform sees its board), and
  * an `exec` realm grant, which is the BOARD SEAT, for a principal who should read the board and do nothing
  * else. So an `exec` grant composes `exec.view` and nothing more: no `ux.exec.author` and no `ux.author`.
- * A read seat that also unlocked the authoring chrome would make every board member a site author. No special-cased "Staff Team" identity is needed anywhere in
- * this class: any Team holding `manage` on every realm's root behaves identically to the old
- * `is_staff = true` principal.
+ * A read seat that also unlocked the authoring chrome would make every board member a site author. No special-cased
+ * "Staff Team" identity is needed anywhere in this class: any record selected by the configured source that holds
+ * `manage` on a realm root behaves identically to the old `is_staff = true` principal.
  *
  * Storing and deleting the board's scenarios (`exec.scenario.manage`, the exec scenario builder) composes from the
  * `operator` grant only. A stored scenario is shared board state, and the board seat stays a read seat: a seat holder
@@ -50,7 +50,7 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * — a genuine dot-cascade for the two keys that ARE "ux authoring" concepts. `os.enter` is unchanged:
  * it already read as dot-namespaced and needed no rename.
  *
- * The realm-root lookup itself is a port ({@see RealmGrantable}) — this class never names
+ * The realm-root lookup itself is a port, RealmGrantable — this class never names
  * `BeamUxEntry` (the paid beam-ux model realm roots actually are), since the dependency runs
  * beam-ux → beam-accounts, never the reverse. Unbound (`config('beam.accounts.entitlements.realm_grantable')`
  * null), the grant cascade resolves no realms — the null-default discipline (ADR-0009).
@@ -65,7 +65,7 @@ use Splicewire\Beam\Accounts\Enums\Role;
  * resolver) always wins. Binding it is what turns beam's `can:entitlement:{key}` gates on: permission-cascade
  * always binds the `EntitlementResolver` contract (to the null resolver when unconfigured), so beam's
  * `registerEntitlementAbilities()` already defines the gates; this default just makes them return `true` for
- * a principal whose eligible team holds the matching grant. No `laravel-beam` edit is required.
+ * a principal whose configured grant source supplies a matching grant-holding record. No `laravel-beam` edit is required.
  */
 class DefaultEntitlementResolver implements EntitlementResolver
 {
@@ -103,7 +103,7 @@ class DefaultEntitlementResolver implements EntitlementResolver
     public function __construct(private EntitlementComposer $composer) {}
 
     /**
-     * The entitlement keys `$principal` holds, derived entirely from its eligible teams' realm grants.
+     * The entitlement keys `$principal` holds, derived from realm grants on records selected by the configured source.
      *
      * @return array<int, string>
      */
@@ -136,41 +136,28 @@ class DefaultEntitlementResolver implements EntitlementResolver
     }
 
     /**
-     * The realms `$principal`'s eligible (Owner/Admin) team memberships hold a `manage` grant on the
-     * realm's root entry for, deduped. Empty when the principal exposes no `teams()` relation, holds no
-     * eligible membership, or the host hasn't bound a {@see RealmGrantable}.
+     * The realms whose root entries carry a `manage` grant for records selected by the configured
+     * principal-grant source. Empty when either source or the grant model is unconfigured.
      *
      * @return list<string>
      */
     protected function grantedRealms(mixed $principal): array
     {
-        if (! is_object($principal) || ! method_exists($principal, 'teams')) {
-            return [];
-        }
-
         $grantable = $this->realmGrantable();
+        $principalGrantSource = $this->principalGrantSource();
         $grantModel = config('permission-cascade.grant_model');
 
-        if ($grantable === null || $grantModel === null) {
+        if ($grantable === null || $principalGrantSource === null || $grantModel === null) {
             return [];
         }
 
         $realms = [];
 
-        foreach ($principal->teams as $team) {
-            $role = $team->pivot->role ?? null;
-            $role = $role !== null ? Role::tryFrom($role) : null;
-
-            // A null (absent) or unrecognized role degrades to "not eligible" rather than throwing —
-            // a stale/hand-edited membership row must never fatal every entitlement Gate check.
-            if ($role === null || ! $role->grantEligible()) {
-                continue;
-            }
-
+        foreach ($principalGrantSource->granteesFor($principal) as $grantee) {
             $ids = $grantModel::query()
                 ->where('grantable_type', $grantable->grantableMorphType())
-                ->where('grantee_type', $team->getMorphClass())
-                ->where('grantee_id', (string) $team->getKey())
+                ->where('grantee_type', $grantee->getMorphClass())
+                ->where('grantee_id', (string) $grantee->getKey())
                 ->where('ability', AccessGrant::ABILITY_MANAGE)
                 ->where('effect', AccessGrant::EFFECT_ALLOW)
                 ->pluck('grantable_id');
@@ -186,10 +173,18 @@ class DefaultEntitlementResolver implements EntitlementResolver
         return array_keys($realms);
     }
 
-    /** The host-bound realm-root port, or null when unconfigured. */
+    /** The host-bound realm-root lookup port, or null when unconfigured. */
     protected function realmGrantable(): ?RealmGrantable
     {
         $class = config('beam.accounts.entitlements.realm_grantable');
+
+        return $class !== null ? app($class) : null;
+    }
+
+    /** The host-bound principal-grant source, or null when unconfigured. */
+    protected function principalGrantSource(): ?PrincipalGrantSource
+    {
+        $class = config('beam.accounts.entitlements.principal_grant_source');
 
         return $class !== null ? app($class) : null;
     }
