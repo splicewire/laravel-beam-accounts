@@ -52,12 +52,14 @@ class TeamInvitationController extends Controller
     /**
      * List pending invitations
      *
-     * The current team's UNACCEPTED invitations. The scope is {@see InvitationData::scope()}, the same
-     * one the Frame list and the Frame revoke-by-id ride.
+     * The current team's unaccepted invitations, the same set the invitations resource lists and
+     * revokes by id.
      */
     #[ResponseFromData(InvitationData::class)]
     public function index(Request $request): JsonResponse
     {
+        // The scope is InvitationData::scope(), the same one the Frame list and the Frame revoke-by-id
+        // ride (kept out of the docblock, which the API reference publishes: owner-review-20261112 F88-a).
         TeamMemberDecisions::authorizeInvitationList($request->user());
 
         $invitations = $this->scoped()
@@ -120,9 +122,8 @@ class TeamInvitationController extends Controller
     /**
      * Revoke an invitation
      *
-     * Deletes a still-pending invitation. An accepted or foreign-team row never resolves through
-     * {@see InvitationData::scope()}, so it answers 404 rather than deleting something it should not
-     * be able to see.
+     * Deletes a still-pending invitation. An accepted invitation, or one from another team, is never
+     * found, so it answers 404 rather than deleting something it should not be able to see.
      */
     #[ResponseFromData(InvitationData::class)]
     #[ResponseFromData(AccountErrorData::class, status: 404)]
@@ -130,6 +131,8 @@ class TeamInvitationController extends Controller
     {
         TeamMemberDecisions::authorize($request->user(), TeamMemberDecisions::MANAGE_INVITATIONS, BeamAccounts::currentTeam());
 
+        // An accepted or foreign-team row never resolves through InvitationData::scope() (kept out of
+        // the docblock, which the API reference publishes: owner-review-20261112 F88-a).
         $invitation = $this->scoped()->whereKey($id)->first();
 
         if ($invitation === null) {

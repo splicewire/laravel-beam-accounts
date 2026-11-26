@@ -67,13 +67,15 @@ class TeamMemberController extends Controller
     /**
      * The role vocabulary
      *
-     * Both context subsets of the {@see Role} enum in one read — `assignable` (every role a member can
+     * Both context subsets of the team role list in one read — `assignable` (every role a member can
      * be set to, ownership transfer included) and `invitable` (owner excluded). Server-derived, so no
-     * hand-authored client list can drift from the enum.
+     * hand-authored client list can drift from the roles.
      */
     #[ResponseFromData(RoleOptionsData::class)]
     public function roles(Request $request): JsonResponse
     {
+        // Both subsets come from the Role enum (kept out of the docblock, which the API reference
+        // publishes: owner-review-20261112 F88-a).
         TeamMemberDecisions::authorize($request->user(), TeamMemberDecisions::VIEW, $this->team($request));
 
         return response()->json(['data' => RoleOptionsData::current()]);
