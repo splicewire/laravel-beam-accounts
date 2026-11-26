@@ -60,20 +60,23 @@ class DemoSeedReachabilityAudit implements DoctorAudit
         // one-line remedy, and the one a host reaches without ever having chosen it.
         if (BeamAccountsServiceProvider::estateDeclaredAbsent('migrations')) {
             return [Finding::warn(self::CHECK,
-                'Demo sign-in is ON, but no demo subject will be seeded here: this host declares the '.
-                'teams estate absent and has not set `beam.accounts.demo.seed_users`, so the seed step '.
-                'defers to that estate and stays off. The demo login links will be EMPTY. Set '.
-                '`ACCOUNT_SEED_DEMO_USERS=true` to seed the team-agnostic demo SUBJECTS — safe on a '.
+                'Demo sign-in is ON, but this package will not seed any demo subject here: this host '.
+                'declares the teams estate absent and has not set `beam.accounts.demo.seed_users`, so '.
+                'the seed step defers to that estate and stays off. This audit reads config only and '.
+                'cannot see a host-provided roster, so the demo login links will resolve only if this '.
+                'host seeds its own demo subjects. To have the package seed them, set '.
+                '`ACCOUNT_SEED_DEMO_USERS=true` — it seeds the team-agnostic demo SUBJECTS, safe on a '.
                 'teams-absent host, which the seeder provisions before its teams-table guard and '.
-                'without ever creating `beam_teams`. (Leave it off only if this host publishes its own '.
-                'demo subjects.)')];
+                'without ever creating `beam_teams`.')];
         }
 
         // Door on, subjects off, estate present: the host turned the key off itself. Still worth
-        // saying, because the door is open onto an empty roster — but it is the host's own `false`.
+        // saying — the door is open and the package seeds nothing — but the links are not necessarily
+        // empty: a host may publish its own roster, which this config-only audit cannot see.
         return [Finding::warn(self::CHECK,
-            'Demo sign-in is ON, but `beam.accounts.demo.seed_users` is false here, so no demo subjects '.
-            'are seeded and the demo login links will be empty. Set it to true (or unset it) to seed '.
-            'the demo subjects, unless this host publishes its own.')];
+            'Demo sign-in is ON, but `beam.accounts.demo.seed_users` is false here, so this package '.
+            'seeds no demo subjects. This audit reads config only and cannot see a host-provided '.
+            'roster, so the demo login links will resolve only if this host seeds its own. To have the '.
+            'package seed them, set `ACCOUNT_SEED_DEMO_USERS=true` (or unset it).')];
     }
 }
