@@ -292,6 +292,24 @@ it('registers a new invitee, returns them to the link, and seats them with the i
     expect($invitee->fresh()->hasRole(Role::Admin->value))->toBeTrue();
 });
 
+it('re-seats a removed invitee with the invitation role rather than a detached old role', function () {
+    [$owner, $team] = onboardingOwner();
+    $invitee = onboardingUser('returning@example.test');
+    $team->assignMember($invitee, Role::Admin);
+    $team->removeMember($invitee); // Beam's own team hard-detaches membership rows.
+
+    expect($team->hasMember($invitee))->toBeFalse()
+        ->and($team->memberRole($invitee))->toBeNull();
+
+    $invitation = onboardingInvite($team, $owner, 'returning@example.test', Role::Member->value);
+    $this->actingAs($invitee)->postJson("/invitations/{$invitation->token}/redeem")
+        ->assertOk()
+        ->assertJsonPath('data.role', Role::Member->value);
+
+    expect($team->fresh()->hasMember($invitee))->toBeTrue()
+        ->and($team->fresh()->memberRole($invitee))->toBe(Role::Member);
+});
+
 it('answers a JSON redeem with the seat taken', function () {
     [$owner, $team] = onboardingOwner();
     $invitation = onboardingInvite($team, $owner, 'json-invitee@example.test');

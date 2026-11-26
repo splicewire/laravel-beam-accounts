@@ -115,39 +115,30 @@ trait HasMembers
         return $query->exists();
     }
 
+    /**
+     * The role of an active member, or null when there is no active seat or the stored role is unknown.
+     * Hosts that soft-mark removal must not expose a removed seat's old role to authorization callers.
+     */
     public function memberRole(Authenticatable $user): ?Role
     {
-        $member = $this->membersQuery()
-            ->wherePivot($this->membersQuery()->getRelatedPivotKeyName(), $user->getKey())
-            ->first();
+        $query = $this->membersQuery()
+            ->wherePivot($this->membersQuery()->getRelatedPivotKeyName(), $user->getKey());
 
+        if (($removed = $this->memberRemovedColumn()) !== null) {
+            $query->wherePivotNull($removed);
+        }
+
+        $member = $query->first();
         $value = $member?->getRelationValue('pivot')?->getAttribute($this->memberRoleColumn());
 
         // `tryFrom`, not `from`, because this reads a value the CALLING author never chose. `Role`
         // is closed (`owner|admin|member`) while the pivot column is a plain string, so the host's
-        // database is free to hold a role the enum has never heard of — and does: measured
-        // 2026-08-29 at `~/Herd/splicewire-app`, 17 of 42 `tenant_users` rows carry `service` (all
-        // one user; `system-tenant-seeding` 02 is the documented author of every one). `from()`
-        // threw `ValueError` there, so both membership gates answered a real authorization question
-        // with HTTP 500 instead of 403, measured over the wire with the gate proven closed on
-        // `DELETE /api/v1/beam/accounts/members/…` and `POST /api/v1/beam/accounts/invitations`.
-        // The four CALLER-supplied `Role::from()` sites (`TeamProvisioner:62,76`,
-        // `TeamMembers:29,57`) deliberately still throw — that is grammar their author controls.
+        // database may hold a role the enum does not know. Keep that containment, and apply the
+        // active-seat filter above so a removed row cannot authorize through its historical role.
         //
-        // ⚠️ This is CONTAINMENT, NOT RESOLUTION, and the cost is real. It makes `null` mean two
-        // things: a `service` seat is now `hasMember() === true` AND `memberRole() === null`, so the
-        // two contract methods disagree about whether that user is on the team, and
-        // `TeamContract:47`'s own docblock says null means "not a member". Nothing reads it that way
-        // today — both consumers are allow-lists that deny cleanly on null (`MembershipPolicy:34`
-        // `=== Role::Owner`, `:50` `in_array(…, [Owner, Admin], true)`), and nothing dereferences the
-        // return or branches on `!== null` to PERMIT — so nothing breaks. But an ability later
-        // written as `if ($team->memberRole($u) === null) { abort(404); }`, a natural reading of the
-        // documented contract, would 404 a user who genuinely holds a seat, and the 500 that would
-        // have announced the vocabulary was incomplete is gone.
-        //
-        // The real question is deferred, not answered: is `service` a membership role, or a
-        // machine-identity axis wearing the role column? Until that is settled, the divergence is
-        // pinned by `tests/ServiceSeatDeniesRatherThanFatalsTest.php` rather than left as prose.
+        // An unrecognized role can still make `hasMember()` true while this returns null. That is a
+        // separate vocabulary question; null here also means no active seat, matching the contract's
+        // authorization use.
         return $value !== null ? Role::tryFrom($value) : null;
     }
 

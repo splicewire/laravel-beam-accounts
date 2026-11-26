@@ -1,10 +1,13 @@
 <?php
 
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Splicewire\Beam\Accounts\Authorization\MembershipPolicy;
 use Splicewire\Beam\Accounts\Enums\Role;
 use Splicewire\Beam\Accounts\Fortify\CreateNewUser;
 use Splicewire\Beam\Accounts\Teams\TeamMembers;
 use Splicewire\Beam\Accounts\Teams\TeamProvisioner;
+use Splicewire\Beam\Accounts\Tests\Fixtures\HostTeam;
 use Splicewire\Beam\Accounts\Tests\Fixtures\User;
 
 /*
@@ -49,4 +52,39 @@ it('admits owner AND admin to manageInvitations, but not a plain member', functi
         ->and($this->policy->manageInvitations($this->admin->fresh(), $this->team))->toBeTrue()
         ->and($this->policy->manageInvitations($this->member->fresh(), $this->team))->toBeFalse()
         ->and($this->policy->manageInvitations(null, $this->team))->toBeFalse();
+});
+
+it('denies membership abilities for a host member whose seat was removed', function () {
+    Schema::create('host_teams', function (Blueprint $table): void {
+        $table->string('id')->primary();
+        $table->string('name');
+        $table->timestamps();
+    });
+    Schema::create('host_team_users', function (Blueprint $table): void {
+        $table->id();
+        $table->string('host_team_id');
+        $table->unsignedBigInteger('user_id');
+        $table->string('role')->default('member');
+        $table->timestamp('removed_at')->nullable();
+        $table->timestamps();
+        $table->unique(['host_team_id', 'user_id']);
+    });
+
+    $team = HostTeam::create(['id' => 'host-team-policy', 'name' => 'Host team']);
+    $formerOwner = User::create([
+        'name' => 'Former owner',
+        'email' => 'former-owner@example.test',
+        'password' => 'password-1234',
+    ]);
+    $team->assignMember($formerOwner, Role::Owner);
+
+    expect($this->policy->manageMembers($formerOwner, $team))->toBeTrue()
+        ->and($this->policy->manageInvitations($formerOwner, $team))->toBeTrue();
+
+    $team->removeMember($formerOwner);
+
+    expect($team->hasMember($formerOwner))->toBeFalse()
+        ->and($team->memberRole($formerOwner))->toBeNull()
+        ->and($this->policy->manageMembers($formerOwner, $team))->toBeFalse()
+        ->and($this->policy->manageInvitations($formerOwner, $team))->toBeFalse();
 });

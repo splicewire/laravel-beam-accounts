@@ -183,7 +183,9 @@ it('answers the team contract off the foreign pivot, honouring the removed colum
     $team->removeMember($member);
 
     expect($team->fresh()->hasMember($member))->toBeFalse()
+        ->and($team->fresh()->memberRole($member))->toBeNull()
         ->and($team->fresh()->members())->toHaveCount(0)
+        ->and(DB::table('host_team_users')->whereNotNull('removed_at')->value('role'))->toBe(Role::Admin->value)
         ->and(DB::table('host_team_users')->whereNotNull('removed_at')->count())->toBe(1);
 });
 
