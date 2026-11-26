@@ -2,10 +2,12 @@
 
 namespace Splicewire\Beam\Accounts\Entitlements;
 
+use Illuminate\Database\QueryException;
 use Rushing\PermissionCascade\Contracts\AccessGrant;
 use Rushing\PermissionCascade\Contracts\EntitlementResolver;
 use Splicewire\Beam\Accounts\Entitlements\Contracts\GranteeSource;
 use Splicewire\Beam\Accounts\Entitlements\Contracts\RealmGrantable;
+use Splicewire\Beam\Accounts\Localization\AccountError;
 
 /**
  * The OOTB host-principal entitlement resolver — the working default a fresh beam host gets so its
@@ -154,13 +156,30 @@ class DefaultEntitlementResolver implements EntitlementResolver
         $realms = [];
 
         foreach ($granteeSource->granteesFor($principal) as $grantee) {
-            $ids = $grantModel::query()
-                ->where('grantable_type', $grantable->grantableMorphType())
-                ->where('grantee_type', $grantee->getMorphClass())
-                ->where('grantee_id', (string) $grantee->getKey())
-                ->where('ability', AccessGrant::ABILITY_MANAGE)
-                ->where('effect', AccessGrant::EFFECT_ALLOW)
-                ->pluck('grantable_id');
+            try {
+                $ids = $grantModel::query()
+                    ->where('grantable_type', $grantable->grantableMorphType())
+                    ->where('grantee_type', $grantee->getMorphClass())
+                    ->where('grantee_id', (string) $grantee->getKey())
+                    ->where('ability', AccessGrant::ABILITY_MANAGE)
+                    ->where('effect', AccessGrant::EFFECT_ALLOW)
+                    ->pluck('grantable_id');
+            } catch (QueryException $exception) {
+                if (! str_starts_with((string) ($exception->errorInfo[0] ?? ''), '22')) {
+                    throw $exception;
+                }
+
+                throw new GranteeSourceMismatch(
+                    AccountError::GranteeKeyMismatch,
+                    [
+                        'source' => $granteeSource::class,
+                        'morph' => $grantee->getMorphClass(),
+                        'key_type' => get_debug_type($grantee->getKey()),
+                        'grant_model' => $grantModel,
+                    ],
+                    $exception,
+                );
+            }
 
             foreach ($ids as $id) {
                 $realm = $grantable->realmForGrantableId((string) $id);

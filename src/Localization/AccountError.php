@@ -197,6 +197,9 @@ enum AccountError: string implements CodedError
     #[Message('config(beam.accounts.teams.resolver) returned a :type, which does not implement TeamContract.')]
     case TeamResolverInvalid = 'team_resolver_invalid';
 
+    #[Message('Grantee source :source returned :morph with a :key_type key that grant model :grant_model cannot store.')]
+    case GranteeKeyMismatch = 'grantee_key_mismatch';
+
     public function abortIf(bool $condition, int $status, array $params = []): void
     {
         if ($condition) {
