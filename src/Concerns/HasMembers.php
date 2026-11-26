@@ -133,12 +133,26 @@ trait HasMembers
 
         // `tryFrom`, not `from`, because this reads a value the CALLING author never chose. `Role`
         // is closed (`owner|admin|member`) while the pivot column is a plain string, so the host's
-        // database may hold a role the enum does not know. Keep that containment, and apply the
-        // active-seat filter above so a removed row cannot authorize through its historical role.
+        // database can hold a role the enum has never heard of — and does: measured 2026-08-29 at
+        // `~/Herd/splicewire-app`, 17 of 42 `tenant_users` rows carried `service` (all one user;
+        // `system-tenant-seeding` 02 authored them). `from()` threw `ValueError`, so membership
+        // gates answered a real authorization question with HTTP 500 rather than 403. That was
+        // measured over the wire with the gate closed on `DELETE /api/v1/beam/accounts/members/…`
+        // and `POST /api/v1/beam/accounts/invitations`. The four caller-supplied `Role::from()`
+        // sites (`TeamProvisioner:62,76`, `TeamMembers:29,57`) deliberately still throw — that is
+        // grammar their author controls.
         //
-        // An unrecognized role can still make `hasMember()` true while this returns null. That is a
-        // separate vocabulary question; null here also means no active seat, matching the contract's
-        // authorization use.
+        // This is CONTAINMENT, NOT RESOLUTION. An active `service` seat still has
+        // `hasMember() === true` and `memberRole() === null`, so those contract methods disagree
+        // for an unrecognized role; `TeamContract:47` documents null as "not a member".
+        // `MembershipPolicy` denies the unknown role through its allow-lists, and
+        // `TeamMemberController:165` likewise gates the member read on a non-null role. The
+        // unsupported-role consequence remains pinned by
+        // `tests/ServiceSeatDeniesRatherThanFatalsTest.php`. Whether `service` belongs in the role
+        // vocabulary or is a machine-identity axis remains a separate question.
+        //
+        // The active-seat filter above independently makes a recognized role on a soft-removed row
+        // return null, matching `hasMember()`. Its pivot role remains stored for the host's audit.
         return $value !== null ? Role::tryFrom($value) : null;
     }
 
